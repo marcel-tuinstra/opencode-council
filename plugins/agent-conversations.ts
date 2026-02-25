@@ -1,4 +1,35 @@
 import type { Plugin } from "@opencode-ai/plugin";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+// =============================================================================
+// Configuration Constants
+// =============================================================================
+
+/**
+ * MCP call limits per turn.
+ * - default: standard limit when no deep investigation is requested
+ * - deep: expanded limit when user requests thorough/comprehensive analysis
+ */
+const MCP_CAPS = {
+  default: 2,
+  deep: 6
+} as const;
+
+/**
+ * Turn counts by number of active roles and intent type.
+ * Format: { [roleCount]: turnCount } or { [intent]: { [roleCount]: turnCount } }
+ */
+const TURN_COUNTS = {
+  default: { 2: 8, 3: 10, 4: 12, 5: 12, max: 14 },
+  backend: { 2: 8, 3: 10, 4: 10, max: 12 },
+  marketing: { 2: 10, 3: 10, max: 12 }
+} as const;
+
+// =============================================================================
+// Types
+// =============================================================================
 
 const SUPPORTED_ROLES = [
   "CTO",
@@ -12,18 +43,112 @@ const SUPPORTED_ROLES = [
 
 type Role = (typeof SUPPORTED_ROLES)[number];
 type Intent = "backend" | "design" | "marketing" | "roadmap" | "research" | "mixed";
-type MentionedProvider = "sentry" | "github" | "shortcut" | "nuxt";
+
+type McpProviderConfig = {
+  key: string;
+  regex: RegExp;
+  hint: string;
+  toolPrefix: string;
+};
+
 type SessionPolicy = {
   roles: Role[];
   targets: Record<Role, number>;
   intent: Intent;
-  mcpProviders: MentionedProvider[];
+  mcpProviders: string[];
   mcpHints: string[];
   staleSensitive: boolean;
   allowDeepMcp: boolean;
   mcpCallCount: number;
-  mcpTouched: Partial<Record<MentionedProvider, number>>;
+  mcpTouched: Record<string, number>;
+  mcpWarnings: string[];
 };
+
+type McpBlockResult = {
+  blocked: boolean;
+  warning?: string;
+};
+
+// =============================================================================
+// Built-in Provider Patterns (fallback when not auto-detected)
+// =============================================================================
+
+const BUILTIN_PROVIDER_PATTERNS: McpProviderConfig[] = [
+  {
+    key: "sentry",
+    regex: /\b(sentry|sentry\.io)\b/i,
+    hint: "Sentry MCP (issues, traces, releases)",
+    toolPrefix: "sentry_"
+  },
+  {
+    key: "github",
+    regex: /\b(github|github\.com)\b/i,
+    hint: "GitHub MCP (PRs, commits, code context)",
+    toolPrefix: "github_"
+  },
+  {
+    key: "shortcut",
+    regex: /\b(shortcut)\b/i,
+    hint: "Shortcut MCP (stories, epics, milestones)",
+    toolPrefix: "shortcut_"
+  },
+  {
+    key: "nuxt",
+    regex: /\b(nuxt|nuxt\s*ui|ui\.nuxt\.com)\b/i,
+    hint: "Nuxt UI MCP (components, docs, examples)",
+    toolPrefix: "nuxt-ui_"
+  },
+  {
+    key: "jira",
+    regex: /\b(jira|atlassian)\b/i,
+    hint: "Jira MCP (issues, boards, sprints)",
+    toolPrefix: "jira_"
+  },
+  {
+    key: "confluence",
+    regex: /\b(confluence|wiki)\b/i,
+    hint: "Confluence MCP (pages, spaces, search)",
+    toolPrefix: "confluence_"
+  },
+  {
+    key: "linear",
+    regex: /\b(linear)\b/i,
+    hint: "Linear MCP (issues, projects, cycles)",
+    toolPrefix: "linear_"
+  },
+  {
+    key: "notion",
+    regex: /\b(notion)\b/i,
+    hint: "Notion MCP (pages, databases)",
+    toolPrefix: "notion_"
+  },
+  {
+    key: "slack",
+    regex: /\b(slack)\b/i,
+    hint: "Slack MCP (messages, channels)",
+    toolPrefix: "slack_"
+  },
+  {
+    key: "datadog",
+    regex: /\b(datadog)\b/i,
+    hint: "Datadog MCP (metrics, monitors, logs)",
+    toolPrefix: "datadog_"
+  }
+];
+
+// =============================================================================
+// Runtime State
+// =============================================================================
+
+let installedProviders: string[] | null = null;
+let mcpProviderPatterns: McpProviderConfig[] = [];
+
+const sessionPolicy = new Map<string, SessionPolicy>();
+const systemInjectedForSession = new Set<string>();
+
+// =============================================================================
+// Constants and Regexes
+// =============================================================================
 
 const ROLE_ALIASES: Record<string, Role> = {
   cto: "CTO",
@@ -44,48 +169,8 @@ const MARKER_SUFFIX = ">>";
 
 const DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(process.env.AGENT_CONVERSATIONS_DEBUG ?? "");
 
-const previewText = (text: string, max = 80) => {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  return normalized.length <= max ? normalized : `${normalized.slice(0, max)}...`;
-};
-
-const debugLog = (event: string, details?: Record<string, unknown>) => {
-  if (!DEBUG_ENABLED) {
-    return;
-  }
-
-  const payload = details ? ` ${JSON.stringify(details)}` : "";
-  console.error(`[agent-conversations] ${event}${payload}`);
-};
-
 const STALE_SENSITIVE_REGEX =
   /\b(current|latest|today|this week|this month|recent|live|regression|incident|status|right now|fresh|up-to-date)\b/i;
-
-const MCP_PROVIDER_PATTERNS: Array<{ key: MentionedProvider; regex: RegExp; hint: string }> = [
-  {
-    key: "sentry",
-    regex: /\b(sentry|sentry\.io)\b/i,
-    hint: "Sentry MCP (issues, traces, releases)"
-  },
-  {
-    key: "github",
-    regex: /\b(github|github\.com)\b/i,
-    hint: "GitHub MCP (PRs, commits, code context)"
-  },
-  {
-    key: "shortcut",
-    regex: /\b(shortcut)\b/i,
-    hint: "Shortcut MCP (stories, epics, milestones)"
-  },
-  {
-    key: "nuxt",
-    regex: /\b(nuxt|nuxt\s*ui|ui\.nuxt\.com)\b/i,
-    hint: "Nuxt UI MCP (components, docs, examples)"
-  }
-];
-
-const sessionPolicy = new Map<string, SessionPolicy>();
-const systemInjectedForSession = new Set<string>();
 
 const DEEP_MCP_REGEX =
   /\b(deeper|deep dive|thorough|comprehensive|full investigation|as needed|as much as needed|exhaustive)\b/i;
@@ -171,6 +256,103 @@ const INTENT_ROLE_WEIGHTS: Record<Intent, Record<Role, number>> = {
   }
 };
 
+// =============================================================================
+// Debug Logging
+// =============================================================================
+
+const previewText = (text: string, max = 80) => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return normalized.length <= max ? normalized : `${normalized.slice(0, max)}...`;
+};
+
+const debugLog = (event: string, details?: Record<string, unknown>) => {
+  if (!DEBUG_ENABLED) {
+    return;
+  }
+
+  const payload = details ? ` ${JSON.stringify(details)}` : "";
+  console.error(`[agent-conversations] ${event}${payload}`);
+};
+
+// =============================================================================
+// Runtime MCP Provider Detection
+// =============================================================================
+
+/**
+ * Reads OpenCode config and returns installed MCP provider keys.
+ * Falls back to empty array if config cannot be read.
+ */
+const loadInstalledProviders = async (): Promise<string[]> => {
+  try {
+    const configPath = join(homedir(), ".config", "opencode", "config.json");
+    const content = await readFile(configPath, "utf-8");
+    const config = JSON.parse(content);
+    const mcpKeys = Object.keys(config.mcp ?? {});
+    debugLog("providers.loaded", { providers: mcpKeys, source: configPath });
+    return mcpKeys;
+  } catch (error) {
+    debugLog("providers.load_failed", { error: String(error) });
+    return [];
+  }
+};
+
+/**
+ * Initializes MCP provider patterns based on installed providers.
+ * Combines runtime detection with built-in patterns.
+ */
+const initializeProviderPatterns = async (): Promise<void> => {
+  if (installedProviders !== null) {
+    return; // Already initialized
+  }
+
+  installedProviders = await loadInstalledProviders();
+
+  // Start with patterns for installed providers that have built-in configs
+  const patterns: McpProviderConfig[] = [];
+  const seen = new Set<string>();
+
+  for (const providerKey of installedProviders) {
+    const builtin = BUILTIN_PROVIDER_PATTERNS.find((p) => p.key === providerKey);
+    if (builtin) {
+      patterns.push(builtin);
+      seen.add(providerKey);
+    } else {
+      // Create a dynamic pattern for unknown providers
+      patterns.push({
+        key: providerKey,
+        regex: new RegExp(`\\b(${providerKey})\\b`, "i"),
+        hint: `${providerKey} MCP`,
+        toolPrefix: `${providerKey}_`
+      });
+      seen.add(providerKey);
+    }
+  }
+
+  // Add remaining built-in patterns that weren't installed (for forward compatibility)
+  for (const builtin of BUILTIN_PROVIDER_PATTERNS) {
+    if (!seen.has(builtin.key)) {
+      patterns.push(builtin);
+    }
+  }
+
+  mcpProviderPatterns = patterns;
+  debugLog("providers.patterns_initialized", {
+    installed: installedProviders,
+    totalPatterns: patterns.length
+  });
+};
+
+/**
+ * Checks if a provider is actually installed.
+ */
+const isProviderInstalled = (providerKey: string): boolean => {
+  return installedProviders?.includes(providerKey) ?? false;
+};
+
+// =============================================================================
+// Role Detection
+// =============================================================================
+
 const isSupportedRole = (role: string): role is Role => {
   return SUPPORTED_ROLES.includes(role as Role);
 };
@@ -246,39 +428,9 @@ const detectRolesFromText = (text: string): Role[] | null => {
   return mentionRoles.length > 0 ? mentionRoles : null;
 };
 
-const getTotalTurns = (roles: Role[], intent: Intent) => {
-  if (roles.length <= 1) {
-    return 0;
-  }
-
-  if (intent === "backend") {
-    if (roles.length === 2) {
-      return 8;
-    }
-    if (roles.length <= 4) {
-      return 10;
-    }
-    return 12;
-  }
-
-  if (intent === "marketing") {
-    if (roles.length <= 3) {
-      return 10;
-    }
-    return 12;
-  }
-
-  if (roles.length === 2) {
-    return 8;
-  }
-  if (roles.length === 3) {
-    return 10;
-  }
-  if (roles.length <= 5) {
-    return 12;
-  }
-  return 14;
-};
+// =============================================================================
+// Intent Detection
+// =============================================================================
 
 const detectIntent = (text: string): Intent => {
   const scores: Record<Intent, number> = {
@@ -313,22 +465,29 @@ const detectIntent = (text: string): Intent => {
   return bestScore > 0 ? best : "mixed";
 };
 
-const detectMcpProviders = (text: string): MentionedProvider[] => {
-  const providers: MentionedProvider[] = [];
-  const seen = new Set<MentionedProvider>();
+// =============================================================================
+// Turn Calculation
+// =============================================================================
 
-  for (const provider of MCP_PROVIDER_PATTERNS) {
-    if (provider.regex.test(text) && !seen.has(provider.key)) {
-      providers.push(provider.key);
-      seen.add(provider.key);
-    }
+const getTotalTurns = (roles: Role[], intent: Intent): number => {
+  if (roles.length <= 1) {
+    return 0;
   }
 
-  return providers;
-};
+  const roleCount = roles.length;
+  const intentConfig = TURN_COUNTS[intent as keyof typeof TURN_COUNTS] ?? TURN_COUNTS.default;
+  const defaultConfig = TURN_COUNTS.default;
 
-const buildMcpHints = (providers: MentionedProvider[]) => {
-  return MCP_PROVIDER_PATTERNS.filter((provider) => providers.includes(provider.key)).map((provider) => provider.hint);
+  // Check intent-specific config first, then fall back to default
+  if (roleCount in intentConfig) {
+    return intentConfig[roleCount as keyof typeof intentConfig] as number;
+  }
+  if (roleCount in defaultConfig) {
+    return defaultConfig[roleCount as keyof typeof defaultConfig] as number;
+  }
+
+  // Use max for large role counts
+  return (intentConfig as { max?: number }).max ?? defaultConfig.max;
 };
 
 const buildTurnTargets = (roles: Role[], sourceText: string): Record<Role, number> => {
@@ -425,169 +584,207 @@ const buildTurnTargets = (roles: Role[], sourceText: string): Record<Role, numbe
   return targets;
 };
 
+// =============================================================================
+// MCP Provider Detection
+// =============================================================================
+
+const detectMcpProviders = (text: string): string[] => {
+  const providers: string[] = [];
+  const seen = new Set<string>();
+
+  for (const provider of mcpProviderPatterns) {
+    if (provider.regex.test(text) && !seen.has(provider.key)) {
+      providers.push(provider.key);
+      seen.add(provider.key);
+    }
+  }
+
+  return providers;
+};
+
+const buildMcpHints = (providers: string[]): string[] => {
+  return mcpProviderPatterns
+    .filter((provider) => providers.includes(provider.key))
+    .map((provider) => provider.hint);
+};
+
+const providerFromToolName = (tool: string): string | null => {
+  for (const provider of mcpProviderPatterns) {
+    if (tool.startsWith(provider.toolPrefix)) {
+      return provider.key;
+    }
+  }
+  return null;
+};
+
+const getMissingProviders = (policy: SessionPolicy): string[] => {
+  return policy.mcpProviders.filter((provider) => !(policy.mcpTouched[provider] && policy.mcpTouched[provider] > 0));
+};
+
+// =============================================================================
+// Graceful MCP Blocking
+// =============================================================================
+
+/**
+ * Checks if an MCP call should be blocked, returning a warning instead of throwing.
+ * Returns { blocked: false } if the call is allowed.
+ * Returns { blocked: true, warning: "..." } if blocked.
+ */
+const checkMcpAccess = (tool: string, policy: SessionPolicy): McpBlockResult => {
+  const provider = providerFromToolName(tool);
+
+  if (!provider) {
+    return { blocked: false };
+  }
+
+  // Check if provider is installed
+  if (!isProviderInstalled(provider)) {
+    return {
+      blocked: true,
+      warning: `MCP provider '${provider}' is not installed. Install it in ~/.config/opencode/config.json to use.`
+    };
+  }
+
+  // Check if no providers were mentioned
+  if (policy.mcpProviders.length === 0) {
+    return {
+      blocked: true,
+      warning: `MCP blocked: no provider explicitly mentioned in prompt. Mention '${provider}' to enable.`
+    };
+  }
+
+  // Check if this specific provider was mentioned
+  if (!policy.mcpProviders.includes(provider)) {
+    return {
+      blocked: true,
+      warning: `MCP provider '${provider}' not mentioned in prompt. Only these are allowed: ${policy.mcpProviders.join(", ")}.`
+    };
+  }
+
+  // Check multi-provider fairness rule
+  if (policy.mcpProviders.length > 1) {
+    const missing = getMissingProviders(policy);
+    if (missing.length > 0 && !missing.includes(provider)) {
+      return {
+        blocked: true,
+        warning: `MCP provider '${provider}' temporarily blocked. Check these first: ${missing.join(", ")}.`
+      };
+    }
+  }
+
+  // Check call limit
+  const cap = policy.allowDeepMcp ? MCP_CAPS.deep : MCP_CAPS.default;
+  if (policy.mcpCallCount >= cap) {
+    return {
+      blocked: true,
+      warning: `MCP call limit (${cap}) reached. Ask for "deeper investigation" to increase limit.`
+    };
+  }
+
+  return { blocked: false };
+};
+
+// =============================================================================
+// System Prompt Building (Simplified)
+// =============================================================================
+
 const buildSystemInstruction = (
   roles: Role[],
   targets: Record<Role, number>,
-  mcpProviders: MentionedProvider[],
-  mcpHints: string[],
+  mcpProviders: string[],
   staleSensitive: boolean
-) => {
+): string => {
   if (roles.length === 1) {
     const role = roles[0];
+    const mcpNote = mcpProviders.length > 0
+      ? `MCP allowed for: ${mcpProviders.join(", ")}.`
+      : "MCP disabled (no provider mentioned).";
+
     return [
-      `You are the ${role} persona in this turn.`,
-      "Provide a complete, context-rich response, not a greeting-only reply.",
-      "Go deeper when useful: include tradeoffs, concrete actions, and rationale.",
-      mcpHints.length > 0
-        ? `- Soft MCP mode: MCP is allowed only for explicitly mentioned providers (${mcpHints.join(", ")}).`
-        : "- Soft MCP mode: do not call MCP tools unless a provider is explicitly mentioned.",
-      mcpProviders.length > 1
-        ? `- Multiple providers were explicitly named (${mcpProviders.join(", ")}); use at least one targeted MCP check per named provider before final recommendations, unless a provider has no accessible data.`
-        : "- Use MCP only when it materially improves confidence.",
-      mcpHints.length > 0
-        ? "- Keep MCP usage minimal: max 2 MCP calls total unless explicitly asked for deeper investigation."
-        : staleSensitive
-          ? "- If confidence is low or information may be stale, suggest using `/mcp` for live context."
-          : "- Do not suggest `/mcp` unless the user asks for live/current data.",
-      "- If external context is used, cite it briefly.",
-      "Do not prefix the response with the role label.",
-      "Return a normal direct answer."
-    ].join("\n");
+      `You are the ${role} persona.`,
+      "Provide a complete, actionable response with tradeoffs and rationale.",
+      mcpNote,
+      staleSensitive ? "Data may be stale; suggest /mcp if confidence is low." : "",
+      "Do not prefix response with role label."
+    ].filter(Boolean).join("\n");
   }
 
-  const rolesWithAt = roles.map((role) => `@${role}`).join(", ");
-  const requiredPrefixList = roles.map((role) => `${role}:`).join(", ");
   const leadRole = roles[0];
+  const totalTurns = roles.reduce((sum, role) => sum + (targets[role] ?? 0), 0);
   const turnPlan = roles
     .filter((role) => targets[role] > 0)
-    .map((role) => `${role} ${targets[role]}`)
-    .join(", ");
-  const omittedRoles = roles.filter((role) => targets[role] === 0);
-  const totalTurns = roles.reduce((sum, role) => sum + (targets[role] ?? 0), 0);
+    .map((role) => `${role}:${targets[role]}`)
+    .join(" ");
+
+  const mcpNote = mcpProviders.length > 0
+    ? `MCP allowed for: ${mcpProviders.join(", ")}. Max ${MCP_CAPS.default} calls.`
+    : "MCP disabled (no provider mentioned).";
 
   return [
-    "You are facilitating a natural multi-agent discussion.",
-    `Active agents: ${rolesWithAt}.`,
-    "The roles are functional personas, not specific real people.",
-    "You must follow these rules exactly:",
-    "- Use short back-and-forth turns as a chat thread.",
-    `- Produce around ${totalTurns} turns using this weighted turn plan: ${turnPlan}.`,
-    `- The first mentioned role (${leadRole}) is the lead: open the thread and close with the final recommendation.`,
-    "- Weight contributions by relevance to the user question; do not force equal airtime.",
-    "- Treat the weighted turn plan as strict caps, not suggestions.",
-    omittedRoles.length > 0
-      ? `- These tagged roles are out-of-scope for this prompt and should be omitted unless absolutely needed: ${omittedRoles.join(", ")}.`
-      : "- Tagged roles that are not relevant may be omitted, or add one brief defer line.",
-    "- Keep each turn concise but substantial (1-3 sentences).",
-    `- Every line must start with one of: ${requiredPrefixList}`,
-    "- Prefix each line with a turn number like [1], [2], [3].",
-    mcpHints.length > 0
-      ? `- Soft MCP mode: MCP is allowed only for these explicitly mentioned providers: ${mcpHints.join(", ")}.`
-      : "- Soft MCP mode: do not call MCP tools unless a provider is explicitly mentioned.",
-    mcpProviders.length > 1
-      ? `- Because multiple providers were explicitly named (${mcpProviders.join(", ")}), include at least one MCP check per named provider before the final recommendation, unless data is unavailable.`
-      : "- Use MCP only when it materially improves confidence.",
-    mcpHints.length > 0
-      ? "- Keep MCP usage minimal: max 2 MCP calls total unless explicitly asked for deeper investigation."
-      : staleSensitive
-        ? "- If confidence is low or information may be stale, add one brief suggestion to use `/mcp`."
-        : "- Do not suggest `/mcp` unless the user asks for live/current data.",
-    "- If MCP context is used, add a brief source note in-line.",
-    "- Do not output headings, bullets, or narrator text.",
-    "- Add one empty line between turns to feel like message bubbles.",
-    "- Format every line as [n] ROLE: message"
-  ].join("\n");
+    `Multi-agent discussion: ${roles.map((r) => `@${r}`).join(", ")}`,
+    "",
+    "Format: [n] ROLE: message (1-3 sentences per turn)",
+    `Plan: ~${totalTurns} turns, weighted: ${turnPlan}`,
+    `Lead (${leadRole}): opens and closes with recommendation`,
+    "",
+    mcpNote,
+    staleSensitive ? "Data may be stale; one agent may suggest /mcp if needed." : "",
+    "",
+    "No markdown, no bullets, no narrator. Plain chat lines only."
+  ].filter(Boolean).join("\n");
 };
 
 const buildUserEnforcement = (
   roles: Role[],
   targets: Record<Role, number>,
-  mcpProviders: MentionedProvider[],
-  mcpHints: string[],
+  mcpProviders: string[],
   staleSensitive: boolean
-) => {
+): string => {
   if (roles.length === 1) {
     return [
       "",
       "",
-      "Assistant format contract:",
-      "- Provide a full, context-rich answer; avoid greeting-only replies.",
-      "- Include concrete recommendations and rationale.",
-      mcpHints.length > 0
-        ? `- Soft MCP mode: MCP is allowed only for explicitly mentioned providers (${mcpHints.join(", ")}).`
-        : "- Soft MCP mode: do not call MCP tools unless a provider is explicitly mentioned.",
-      mcpProviders.length > 1
-        ? `- Multiple providers were explicitly named (${mcpProviders.join(", ")}); use at least one MCP check per named provider when gathering evidence.`
-        : "- Use MCP only when it materially improves confidence.",
-      mcpHints.length > 0
-        ? "- Keep MCP usage minimal: max 2 MCP calls total unless explicitly asked for deeper investigation."
-        : staleSensitive
-          ? "- If confidence is low or data may be stale, briefly suggest using `/mcp`."
-          : "- Do not suggest `/mcp` unless the user asks for live/current data.",
-      "- If external context is used, cite the source briefly.",
-      "- Do not prefix the response with a role label.",
-      "- Do not use markdown or bullet points.",
-      "- Use plain natural prose."
+      "Format: plain prose, no role prefix, no markdown.",
+      mcpProviders.length > 0 ? `MCP: ${mcpProviders.join(", ")} only.` : "MCP: disabled.",
+      "Include concrete recommendations."
     ].join("\n");
   }
 
-  const firstRole = roles[0];
-  const requiredPrefixList = roles.map((role) => `${role}:`).join(", ");
+  const leadRole = roles[0];
   const turnPlan = roles
     .filter((role) => targets[role] > 0)
-    .map((role) => `${role} ${targets[role]}`)
-    .join(", ");
-  const omittedRoles = roles.filter((role) => targets[role] === 0);
+    .map((role) => `${role}:${targets[role]}`)
+    .join(" ");
 
   return [
     "",
     "",
-    "Assistant format contract:",
-    `- Start the response immediately with ${firstRole}:`,
-    `- Every line must start with one of: ${requiredPrefixList}`,
-    "- Prefix each line with sequential numbering: [1], [2], [3], ...",
-    `- Follow weighted speaking plan: ${turnPlan}.`,
-    `- The first role (${firstRole}) leads: it opens and closes with the final recommendation.`,
-    "- Weighted by relevance; do not split airtime evenly.",
-    "- Treat speaking plan as hard caps per role.",
-    omittedRoles.length > 0
-      ? `- Omit these tagged roles unless absolutely necessary: ${omittedRoles.join(", ")}.`
-      : "- Tagged roles that are irrelevant may be skipped or add one brief defer line.",
-    "- Keep each turn concise but substantial (1-3 sentences).",
-    mcpHints.length > 0
-      ? `- Soft MCP mode: MCP is allowed only for these explicitly mentioned providers: ${mcpHints.join(", ")}.`
-      : "- Soft MCP mode: do not call MCP tools unless a provider is explicitly mentioned.",
-    mcpProviders.length > 1
-      ? `- Multiple providers were explicitly named (${mcpProviders.join(", ")}); gather at least one MCP evidence point per named provider unless unavailable.`
-      : "- Use MCP only when it materially improves confidence.",
-    mcpHints.length > 0
-      ? "- Keep MCP usage minimal: max 2 MCP calls total unless explicitly asked for deeper investigation."
-      : staleSensitive
-        ? "- If confidence is low or data may be stale, include one brief suggestion to use `/mcp`."
-        : "- Do not suggest `/mcp` unless the user asks for live/current data.",
-    "- If MCP context is used, include a brief source note.",
-    "- Add one empty line between lines for bubble-like spacing.",
-    "- Do not use markdown or bullet points.",
-    "- Use plain lines only: [n] ROLE: message"
-  ].join("\n");
+    `Format: [n] ROLE: message | Start with ${leadRole}: | Plan: ${turnPlan}`,
+    mcpProviders.length > 0 ? `MCP: ${mcpProviders.join(", ")} only, max ${MCP_CAPS.default} calls.` : "MCP: disabled.",
+    staleSensitive ? "Suggest /mcp if data may be stale." : "",
+    "No markdown. Plain lines only."
+  ].filter(Boolean).join("\n");
 };
 
 const enforceUserContract = (
   text: string,
   roles: Role[],
   targets: Record<Role, number>,
-  mcpProviders: MentionedProvider[],
-  mcpHints: string[],
+  mcpProviders: string[],
   staleSensitive: boolean
-) => {
-  if (text.includes("Assistant format contract:")) {
+): string => {
+  if (text.includes("Format:")) {
     return text;
   }
 
-  return `${text}${buildUserEnforcement(roles, targets, mcpProviders, mcpHints, staleSensitive)}`;
+  return `${text}${buildUserEnforcement(roles, targets, mcpProviders, staleSensitive)}`;
 };
 
-const normalizeThreadOutput = (text: string, roles: Role[], targets: Record<Role, number>) => {
+// =============================================================================
+// Output Normalization
+// =============================================================================
+
+const normalizeThreadOutput = (text: string, roles: Role[], targets: Record<Role, number>): string => {
   if (roles.length <= 1) {
     return text;
   }
@@ -676,7 +873,7 @@ const normalizeThreadOutput = (text: string, roles: Role[], targets: Record<Role
   return numbered.join("\n\n");
 };
 
-const appendMcpSuggestion = (text: string, leadRole: Role, numbered: boolean) => {
+const appendMcpSuggestion = (text: string, leadRole: Role, numbered: boolean): string => {
   if (/\/mcp\b/i.test(text)) {
     return text;
   }
@@ -702,8 +899,8 @@ const appendMissingProviderNotice = (
   text: string,
   leadRole: Role,
   numbered: boolean,
-  missingProviders: MentionedProvider[]
-) => {
+  missingProviders: string[]
+): string => {
   if (missingProviders.length === 0) {
     return text;
   }
@@ -727,27 +924,23 @@ const appendMissingProviderNotice = (
   return `${text}\n\n[${nextTurn}] ${leadRole}: ${notice}`;
 };
 
-const getMissingProviders = (policy: SessionPolicy) => {
-  return policy.mcpProviders.filter((provider) => !(policy.mcpTouched[provider] && policy.mcpTouched[provider]! > 0));
+const appendMcpWarnings = (text: string, warnings: string[]): string => {
+  if (warnings.length === 0) {
+    return text;
+  }
+
+  const warningBlock = warnings.map((w) => `[MCP] ${w}`).join("\n");
+  return `${text}\n\n---\n${warningBlock}`;
 };
 
-const providerFromToolName = (tool: string): MentionedProvider | null => {
-  if (tool.startsWith("sentry_")) {
-    return "sentry";
-  }
-  if (tool.startsWith("github_")) {
-    return "github";
-  }
-  if (tool.startsWith("shortcut_")) {
-    return "shortcut";
-  }
-  if (tool.startsWith("nuxt-ui_")) {
-    return "nuxt";
-  }
-  return null;
-};
+// =============================================================================
+// Plugin Export
+// =============================================================================
 
 export const AgentConversations: Plugin = async () => {
+  // Initialize provider patterns on plugin load
+  await initializeProviderPatterns();
+
   return {
     "tui.prompt.append": async ({ input }) => {
       const roles = detectRolesFromMentions(input);
@@ -765,6 +958,7 @@ export const AgentConversations: Plugin = async () => {
       });
       return `${input}\n\n${marker}`;
     },
+
     "experimental.chat.messages.transform": async (_input, output) => {
       const userMessages = output.messages.filter((message) => message.info.role === "user");
       const message = userMessages[userMessages.length - 1];
@@ -820,9 +1014,10 @@ export const AgentConversations: Plugin = async () => {
       const mcpHints = buildMcpHints(mcpProviders);
       const staleSensitive = STALE_SENSITIVE_REGEX.test(sourceText);
       const allowDeepMcp = DEEP_MCP_REGEX.test(sourceText);
+
       for (const part of message.parts) {
         if (part.type === "text") {
-          part.text = enforceUserContract(part.text, roles, targets, mcpProviders, mcpHints, staleSensitive);
+          part.text = enforceUserContract(part.text, roles, targets, mcpProviders, staleSensitive);
         }
       }
 
@@ -835,8 +1030,10 @@ export const AgentConversations: Plugin = async () => {
         staleSensitive,
         allowDeepMcp,
         mcpCallCount: 0,
-        mcpTouched: {}
+        mcpTouched: {},
+        mcpWarnings: []
       });
+
       debugLog("messages.transform.policy_set", {
         sessionID: message.info.sessionID,
         roles,
@@ -846,6 +1043,7 @@ export const AgentConversations: Plugin = async () => {
         allowDeepMcp
       });
     },
+
     "experimental.chat.system.transform": async (input, output) => {
       if (!input.sessionID || systemInjectedForSession.has(input.sessionID)) {
         debugLog("system.transform.skipped", {
@@ -866,16 +1064,18 @@ export const AgentConversations: Plugin = async () => {
 
       const targets = policy?.targets ?? buildTurnTargets(roles, "");
       const mcpProviders = policy?.mcpProviders ?? [];
-      const mcpHints = policy?.mcpHints ?? [];
       const staleSensitive = policy?.staleSensitive ?? false;
-      output.system.push(buildSystemInstruction(roles, targets, mcpProviders, mcpHints, staleSensitive));
+
+      output.system.push(buildSystemInstruction(roles, targets, mcpProviders, staleSensitive));
       systemInjectedForSession.add(input.sessionID);
+
       debugLog("system.transform.injected", {
         sessionID: input.sessionID,
         roles,
         mcpProviders
       });
     },
+
     "tool.execute.before": async (input) => {
       const provider = providerFromToolName(input.tool);
       if (!provider) {
@@ -896,39 +1096,40 @@ export const AgentConversations: Plugin = async () => {
         return;
       }
 
-      if (policy.mcpProviders.length === 0) {
-        throw new Error("MCP calls are disabled unless a provider is explicitly mentioned in the prompt.");
-      }
+      const result = checkMcpAccess(input.tool, policy);
 
-      if (!policy.mcpProviders.includes(provider)) {
-        throw new Error(`MCP provider '${provider}' is blocked for this turn; only explicitly mentioned providers are allowed.`);
-      }
-
-      if (policy.mcpProviders.length > 1) {
-        const missing = getMissingProviders(policy);
-        if (missing.length > 0 && !missing.includes(provider)) {
-          throw new Error(
-            `MCP provider '${provider}' is temporarily blocked until each named provider is checked at least once. Missing: ${missing.join(", ")}.`
-          );
+      if (result.blocked) {
+        // Graceful handling: collect warning instead of throwing
+        if (result.warning) {
+          policy.mcpWarnings.push(result.warning);
+          sessionPolicy.set(input.sessionID, policy);
         }
+
+        debugLog("tool.execute.before.blocked", {
+          sessionID: input.sessionID,
+          provider,
+          tool: input.tool,
+          warning: result.warning
+        });
+
+        // Still throw to prevent the call, but with a cleaner message
+        throw new Error(result.warning ?? "MCP call blocked.");
       }
 
-      const cap = policy.allowDeepMcp ? 6 : 2;
-      if (policy.mcpCallCount >= cap) {
-        throw new Error(`MCP call limit reached for this turn (${cap}). Ask for deeper investigation to increase the limit.`);
-      }
-
+      // Allow the call
       policy.mcpCallCount += 1;
       policy.mcpTouched[provider] = (policy.mcpTouched[provider] ?? 0) + 1;
       sessionPolicy.set(input.sessionID, policy);
+
       debugLog("tool.execute.before.allowed", {
         sessionID: input.sessionID,
         provider,
         tool: input.tool,
         mcpCallCount: policy.mcpCallCount,
-        cap
+        cap: policy.allowDeepMcp ? MCP_CAPS.deep : MCP_CAPS.default
       });
     },
+
     "experimental.text.complete": async (input, output) => {
       const policy = sessionPolicy.get(input.sessionID);
       if (!policy) {
@@ -939,6 +1140,7 @@ export const AgentConversations: Plugin = async () => {
       }
 
       let nextText = output.text;
+
       if (policy.roles.length > 1) {
         nextText = normalizeThreadOutput(nextText, policy.roles, policy.targets);
       }
@@ -955,13 +1157,18 @@ export const AgentConversations: Plugin = async () => {
         nextText = appendMcpSuggestion(nextText, policy.roles[0], policy.roles.length > 1);
       }
 
+      // Append any MCP warnings that were collected
+      nextText = appendMcpWarnings(nextText, policy.mcpWarnings);
+
       output.text = nextText;
+
       debugLog("text.complete.processed", {
         sessionID: input.sessionID,
         roles: policy.roles,
         mcpProviders: policy.mcpProviders,
         staleSensitive: policy.staleSensitive,
-        hadThreadNormalization: policy.roles.length > 1
+        hadThreadNormalization: policy.roles.length > 1,
+        mcpWarningsCount: policy.mcpWarnings.length
       });
     }
   };
