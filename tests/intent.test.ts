@@ -1,0 +1,37 @@
+import { describe, expect, it } from "vitest";
+import { buildTurnTargets, detectIntent } from "../plugins/agent-conversations/intent";
+import type { Role } from "../plugins/agent-conversations/types";
+
+const sumTurns = (targets: Record<Role, number>) => {
+  return Object.values(targets).reduce((sum, value) => sum + value, 0);
+};
+
+describe("intent", () => {
+  it("classifies backend intent", () => {
+    expect(detectIntent("Investigate API latency and p95 regressions")).toBe("backend");
+  });
+
+  it("falls back to mixed when no keywords match", () => {
+    expect(detectIntent("Talk about team vibes and coordination")).toBe("mixed");
+  });
+
+  it("returns zero turns for single role", () => {
+    const targets = buildTurnTargets(["CTO"], "Investigate API latency");
+    expect(sumTurns(targets)).toBe(0);
+  });
+
+  it("allocates backend turns with stronger CTO/DEV share", () => {
+    const targets = buildTurnTargets(["CTO", "DEV", "PM"], "API latency regression and backend performance");
+    expect(sumTurns(targets)).toBe(10);
+    expect(targets.CTO).toBeGreaterThanOrEqual(targets.PM);
+    expect(targets.DEV).toBeGreaterThanOrEqual(targets.PM);
+  });
+
+  it("uses max turn fallback for larger role groups", () => {
+    const targets = buildTurnTargets(
+      ["CTO", "DEV", "PO", "PM", "CEO", "MARKETING"],
+      "General planning discussion"
+    );
+    expect(sumTurns(targets)).toBe(14);
+  });
+});

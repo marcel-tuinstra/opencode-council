@@ -4,29 +4,27 @@ This guide shows how to tweak MCP checks and create or adapt agent personas.
 
 ## 1) Customize MCP provider checks
 
-File: `plugins/agent-conversations.ts`
+Files: `plugins/agent-conversations/constants.ts` and `plugins/agent-conversations/mcp.ts`
 
 Main places to edit:
 
-- `type MentionedProvider` (add your provider key)
-- `MCP_PROVIDER_PATTERNS` (detect provider names from user text)
+- `BUILTIN_PROVIDER_PATTERNS` (detect provider names from user text)
 - `providerFromToolName()` (map MCP tool name prefix to provider key)
 
 Example for Jira:
 
 ```ts
-type MentionedProvider = "sentry" | "github" | "shortcut" | "nuxt" | "jira";
-
-const MCP_PROVIDER_PATTERNS = [
+const BUILTIN_PROVIDER_PATTERNS = [
   // existing providers...
   {
     key: "jira",
     regex: /\b(jira|atlassian)\b/i,
-    hint: "Jira MCP (issues, boards, sprints)"
+    hint: "Jira MCP (issues, boards, sprints)",
+    toolPrefix: "jira_"
   }
 ];
 
-const providerFromToolName = (tool: string): MentionedProvider | null => {
+const providerFromToolName = (tool: string): string | null => {
   // existing mappings...
   if (tool.startsWith("jira_")) {
     return "jira";
@@ -37,7 +35,7 @@ const providerFromToolName = (tool: string): MentionedProvider | null => {
 
 ## 2) Tune MCP strictness and call limits
 
-File: `plugins/agent-conversations.ts`
+Files: `plugins/agent-conversations/constants.ts`, `plugins/agent-conversations/mcp.ts`, and `plugins/agent-conversations/index.ts`
 
 Useful knobs:
 
@@ -49,7 +47,7 @@ If you want a softer policy, you can remove the temporary block that forces chec
 
 ## 3) Add or rename discussion roles
 
-File: `plugins/agent-conversations.ts`
+Files: `plugins/agent-conversations/types.ts`, `plugins/agent-conversations/constants.ts`, `plugins/agent-conversations/roles.ts`, `plugins/agent-conversations/intent.ts`, and `plugins/agent-conversations/output.ts`
 
 When introducing a new role, update all of the following:
 
