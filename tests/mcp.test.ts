@@ -15,6 +15,7 @@ const basePolicy = (): SessionPolicy => ({
   },
   heartbeat: false,
   intent: "backend",
+  lastPrompt: "@cto @dev investigate api latency",
   mcpProviders: ["sentry"],
   mcpHints: [],
   staleSensitive: false,

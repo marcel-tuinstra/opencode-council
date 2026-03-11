@@ -19,6 +19,13 @@ import {
   providerFromToolName
 } from "./mcp";
 import {
+  clearSessionMemory,
+  formatMemoryForPrompt,
+  getSessionMemory,
+  persistSessionMemory,
+  shouldResetSessionMemory
+} from "./memory";
+import {
   appendMcpSuggestion,
   appendMcpWarnings,
   appendMissingProviderNotice,
@@ -109,9 +116,19 @@ export const AgentConversations: Plugin = async () => {
       const staleSensitive = STALE_SENSITIVE_REGEX.test(sourceText);
       const allowDeepMcp = DEEP_MCP_REGEX.test(sourceText);
 
+      const shouldResetMemory = shouldResetSessionMemory(sourceText);
+      if (shouldResetMemory) {
+        await clearSessionMemory(message.info.sessionID);
+      }
+      const storedMemory = shouldResetMemory ? null : await getSessionMemory(message.info.sessionID);
+      const memoryContext = storedMemory ? formatMemoryForPrompt(storedMemory) : "";
+
       for (const part of message.parts) {
         if (part.type === "text") {
-          part.text = enforceUserContract(part.text, roles, targets, heartbeat, mcpProviders, staleSensitive);
+          const withMemory = memoryContext && !part.text.includes("[Session Memory]")
+            ? `${part.text}${memoryContext}`
+            : part.text;
+          part.text = enforceUserContract(withMemory, roles, targets, heartbeat, mcpProviders, staleSensitive);
         }
       }
 
@@ -120,6 +137,7 @@ export const AgentConversations: Plugin = async () => {
         targets,
         heartbeat,
         intent,
+        lastPrompt: sourceText,
         mcpProviders,
         mcpHints,
         staleSensitive,
@@ -264,6 +282,7 @@ export const AgentConversations: Plugin = async () => {
       }
 
       nextText = appendMcpWarnings(nextText, policy.mcpWarnings);
+      await persistSessionMemory(input.sessionID, policy.lastPrompt, nextText);
       output.text = nextText;
 
       debugLog("text.complete.processed", {

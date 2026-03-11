@@ -23,6 +23,7 @@ export type SessionPolicy = {
   targets: Record<Role, number>;
   heartbeat: boolean;
   intent: Intent;
+  lastPrompt: string;
   mcpProviders: string[];
   mcpHints: string[];
   staleSensitive: boolean;

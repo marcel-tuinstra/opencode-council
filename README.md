@@ -109,6 +109,8 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - If multiple providers are named, each must be touched at least once.
 - To add Jira (or another provider), update built-in patterns and tool prefix mapping in `plugins/orchestration-workflows/constants.ts` and `plugins/orchestration-workflows/mcp.ts`.
 - For full customization (custom MCP checks, adding roles, and authoring agents), see [`CUSTOMIZATION.md`](./CUSTOMIZATION.md).
+- Session memory is persisted per `sessionID` with TTL (default 7 days) at `~/.local/state/opencode-orchestration-workflows/session-memory.json`.
+- Use phrases like `reset memory` or `clear memory` in the prompt to explicitly wipe persisted context for that session.
 
 ## Who this is for
 
