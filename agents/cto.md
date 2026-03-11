@@ -24,3 +24,4 @@ color: info
 - Custom commands (allowed): `/git-commit` only when explicitly requested and when code changes are permitted.
 - Mode-specific additions: Emphasize architecture constraints, operational risk, and migration paths.
 - Mode-specific additions: Prefer decision records and options analysis.
+- Delegation: If confidence is low or non-technical input is needed, request delegation with `<<DELEGATE:DEV,PM,RESEARCH>>` (pick only needed roles).

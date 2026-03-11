@@ -21,6 +21,7 @@ export type McpProviderConfig = {
 export type SessionPolicy = {
   roles: Role[];
   targets: Record<Role, number>;
+  heartbeat: boolean;
   intent: Intent;
   mcpProviders: string[];
   mcpHints: string[];

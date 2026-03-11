@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTurnTargets, detectIntent } from "../plugins/agent-conversations/intent";
+import { buildTurnTargets, detectIntent, shouldUseHeartbeat } from "../plugins/agent-conversations/intent";
 import type { Role } from "../plugins/agent-conversations/types";
 
 const sumTurns = (targets: Record<Role, number>) => {
@@ -33,5 +33,10 @@ describe("intent", () => {
       "General planning discussion"
     );
     expect(sumTurns(targets)).toBe(14);
+  });
+
+  it("enables heartbeat for 3 or more roles", () => {
+    expect(shouldUseHeartbeat(["CTO", "DEV"])).toBe(false);
+    expect(shouldUseHeartbeat(["CTO", "DEV", "PM"])).toBe(true);
   });
 });

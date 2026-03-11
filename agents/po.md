@@ -27,3 +27,4 @@ color: warning
 - Shortcut commands (recommended): `shortcut_iterations-search`
 - Mode-specific additions: Emphasize acceptance criteria and user impact in outputs.
 - Mode-specific additions: Prefer decisions and trade-offs over implementation detail.
+- Delegation: If confidence is low or delivery/technical evidence is needed, request delegation with `<<DELEGATE:PM,RESEARCH,CTO>>` (pick only needed roles).

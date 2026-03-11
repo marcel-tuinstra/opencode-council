@@ -1,6 +1,58 @@
 import type { Role } from "./types";
 import { normalizeRole } from "./roles";
 
+const DELEGATION_REGEX = /<<DELEGATE:([^>]+)>>/i;
+const DELEGATION_REMOVAL_REGEX = /\s*<<DELEGATE:[^>]+>>\s*/gi;
+
+const LEAKED_CONTROL_PREFIXES = [
+  "Format: plain prose, no role prefix, no markdown.",
+  "Delegation (optional): if needed, emit <<DELEGATE:ROLE1,ROLE2>> then switch to [n] ROLE: message lines.",
+  "Format: [n] ROLE: message | Start with",
+  "Heartbeat: Phase 1 Frame, Phase 2 Challenge (react to another role), Phase 3 Synthesize by lead.",
+  "No markdown. Plain lines only."
+];
+
+export const stripControlLeakage = (text: string): string => {
+  const withoutReminders = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "");
+  const lines = withoutReminders.split("\n");
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return true;
+    }
+    return !LEAKED_CONTROL_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
+  });
+
+  return filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+};
+
+export const extractDelegatedRoles = (text: string, leadRole: Role): { roles: Role[]; text: string } => {
+  const match = text.match(DELEGATION_REGEX);
+  if (!match) {
+    return { roles: [leadRole], text };
+  }
+
+  const cleanedText = text.replace(DELEGATION_REMOVAL_REGEX, " ").replace(/\s+\n/g, "\n").trim();
+
+  const delegated = match[1]
+    .split(",")
+    .map((role) => normalizeRole(role.trim()))
+    .filter((role): role is Role => role !== null && role !== leadRole);
+
+  const unique: Role[] = [];
+  for (const role of delegated) {
+    if (!unique.includes(role)) {
+      unique.push(role);
+    }
+  }
+
+  const capped = unique.slice(0, 3);
+  return {
+    roles: [leadRole, ...capped],
+    text: cleanedText || text
+  };
+};
+
 export const normalizeThreadOutput = (text: string, roles: Role[], targets: Record<Role, number>): string => {
   if (roles.length <= 1) {
     return text;

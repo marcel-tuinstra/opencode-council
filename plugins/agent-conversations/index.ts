@@ -9,7 +9,7 @@ import {
 } from "./constants";
 import { buildSystemInstruction, enforceUserContract } from "./contracts";
 import { debugLog, previewText } from "./debug";
-import { buildTurnTargets, detectIntent } from "./intent";
+import { buildTurnTargets, detectIntent, shouldUseHeartbeat } from "./intent";
 import {
   buildMcpHints,
   checkMcpAccess,
@@ -22,7 +22,9 @@ import {
   appendMcpSuggestion,
   appendMcpWarnings,
   appendMissingProviderNotice,
-  normalizeThreadOutput
+  extractDelegatedRoles,
+  normalizeThreadOutput,
+  stripControlLeakage
 } from "./output";
 import { detectRolesFromMentions, detectRolesFromText } from "./roles";
 import {
@@ -101,6 +103,7 @@ export const AgentConversations: Plugin = async () => {
 
       const intent = detectIntent(sourceText);
       const targets = buildTurnTargets(roles, sourceText);
+      const heartbeat = shouldUseHeartbeat(roles);
       const mcpProviders = detectMcpProviders(sourceText);
       const mcpHints = buildMcpHints(mcpProviders);
       const staleSensitive = STALE_SENSITIVE_REGEX.test(sourceText);
@@ -108,13 +111,14 @@ export const AgentConversations: Plugin = async () => {
 
       for (const part of message.parts) {
         if (part.type === "text") {
-          part.text = enforceUserContract(part.text, roles, targets, mcpProviders, staleSensitive);
+          part.text = enforceUserContract(part.text, roles, targets, heartbeat, mcpProviders, staleSensitive);
         }
       }
 
       sessionPolicy.set(message.info.sessionID, {
         roles,
         targets,
+        heartbeat,
         intent,
         mcpProviders,
         mcpHints,
@@ -128,6 +132,7 @@ export const AgentConversations: Plugin = async () => {
       debugLog("messages.transform.policy_set", {
         sessionID: message.info.sessionID,
         roles,
+        heartbeat,
         intent,
         mcpProviders,
         staleSensitive,
@@ -152,10 +157,11 @@ export const AgentConversations: Plugin = async () => {
       }
 
       const targets = policy?.targets ?? buildTurnTargets(roles, "");
+      const heartbeat = policy?.heartbeat ?? shouldUseHeartbeat(roles);
       const mcpProviders = policy?.mcpProviders ?? [];
       const staleSensitive = policy?.staleSensitive ?? false;
 
-      output.system.push(buildSystemInstruction(roles, targets, mcpProviders, staleSensitive));
+      output.system.push(buildSystemInstruction(roles, targets, heartbeat, mcpProviders, staleSensitive));
       systemInjectedForSession.add(input.sessionID);
 
       debugLog("system.transform.injected", {
@@ -221,22 +227,40 @@ export const AgentConversations: Plugin = async () => {
         return;
       }
 
-      let nextText = output.text;
+      let nextText = stripControlLeakage(output.text);
+      let activeRoles = policy.roles;
+      let activeTargets = policy.targets;
+
+      if (policy.roles.length === 1) {
+        const delegated = extractDelegatedRoles(nextText, policy.roles[0]);
+        nextText = delegated.text;
+
+        if (delegated.roles.length > 1) {
+          activeRoles = delegated.roles;
+          activeTargets = buildTurnTargets(activeRoles, nextText);
+          nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
+          debugLog("text.complete.delegation_upgraded", {
+            sessionID: input.sessionID,
+            leadRole: policy.roles[0],
+            delegatedRoles: delegated.roles.slice(1)
+          });
+        }
+      }
 
       if (policy.roles.length > 1) {
-        nextText = normalizeThreadOutput(nextText, policy.roles, policy.targets);
+        nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
       }
 
       if (policy.mcpProviders.length > 1) {
         const missingProviders = getMissingProviders(policy);
         if (missingProviders.length > 0) {
-          nextText = appendMissingProviderNotice(nextText, policy.roles[0], policy.roles.length > 1, missingProviders);
+          nextText = appendMissingProviderNotice(nextText, activeRoles[0], activeRoles.length > 1, missingProviders);
         }
       }
 
       const shouldSuggestMcp = policy.staleSensitive && policy.mcpProviders.length === 0;
       if (shouldSuggestMcp) {
-        nextText = appendMcpSuggestion(nextText, policy.roles[0], policy.roles.length > 1);
+        nextText = appendMcpSuggestion(nextText, activeRoles[0], activeRoles.length > 1);
       }
 
       nextText = appendMcpWarnings(nextText, policy.mcpWarnings);
@@ -244,10 +268,10 @@ export const AgentConversations: Plugin = async () => {
 
       debugLog("text.complete.processed", {
         sessionID: input.sessionID,
-        roles: policy.roles,
+        roles: activeRoles,
         mcpProviders: policy.mcpProviders,
         staleSensitive: policy.staleSensitive,
-        hadThreadNormalization: policy.roles.length > 1,
+        hadThreadNormalization: activeRoles.length > 1,
         mcpWarningsCount: policy.mcpWarnings.length
       });
     }

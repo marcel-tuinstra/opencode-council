@@ -17,6 +17,7 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` runs these tests on No
 - Mentions inside code (inline or fenced) should be ignored.
 - File references like `@INSTALL.md` should be ignored.
 - Marker payload (`<<AGENT_CONVERSATIONS:CTO,DEV>>`) should restore roles.
+- Delegation marker (`<<DELEGATE:PM,RESEARCH>>`) should be removed from final text while promoting to threaded mode when role lines are present.
 
 ## Intent and Turn Planning
 
@@ -24,6 +25,7 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` runs these tests on No
 - Marketing prompts should favor `MARKETING` and `CEO` airtime.
 - Single-role prompts should remain direct prose.
 - Multi-role prompts should start and end with the lead role.
+- Heartbeat mode should auto-enable for 3 or more roles and include Frame/Challenge/Synthesize guidance.
 
 ## MCP Policy
 

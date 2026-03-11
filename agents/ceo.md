@@ -18,3 +18,4 @@ color: accent
 - Shortcut commands (recommended): `shortcut_stories-create-comment`
 - Mode-specific additions: Emphasize outcomes, ROI, and risk concentration.
 - Mode-specific additions: Summaries should be concise and executive-level.
+- Delegation: If confidence is low or cross-functional input is needed, request delegation with `<<DELEGATE:PM,PO,RESEARCH>>` (pick only needed roles).

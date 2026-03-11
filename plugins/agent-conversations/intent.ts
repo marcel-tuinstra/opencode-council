@@ -5,6 +5,10 @@ import {
 } from "./constants";
 import type { Intent, Role } from "./types";
 
+export const shouldUseHeartbeat = (roles: Role[]): boolean => {
+  return roles.length >= 3;
+};
+
 export const detectIntent = (text: string): Intent => {
   const scores: Record<Intent, number> = {
     backend: 0,
