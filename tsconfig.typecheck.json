@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": [
+    "plugins/agent-conversations/constants.ts",
+    "plugins/agent-conversations/contracts.ts",
+    "plugins/agent-conversations/debug.ts",
+    "plugins/agent-conversations/intent.ts",
+    "plugins/agent-conversations/mcp.ts",
+    "plugins/agent-conversations/output.ts",
+    "plugins/agent-conversations/roles.ts",
+    "plugins/agent-conversations/session.ts",
+    "plugins/agent-conversations/types.ts",
+    "tests/**/*.ts"
+  ]
+}
