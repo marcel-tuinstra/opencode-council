@@ -1,5 +1,8 @@
 # OpenCode Agent Conversations Plugin
 
+[![CI](https://github.com/marcel-tuinstra/opencode-agent-conversations/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-agent-conversations/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 Community plugin for OpenCode to run and orchestrate multi-agent conversations.
 
 Note: This is an independent community plugin for OpenCode and is not affiliated with or endorsed by OpenCode.
