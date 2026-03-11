@@ -11,6 +11,15 @@ export const TURN_COUNTS = {
   marketing: { 2: 10, 3: 10, max: 12 }
 } as const;
 
+export const COMPACTION_PROFILES: Record<Intent, { triggerTokens: number; targetTokens: number }> = {
+  backend: { triggerTokens: 700, targetTokens: 420 },
+  design: { triggerTokens: 760, targetTokens: 460 },
+  marketing: { triggerTokens: 640, targetTokens: 380 },
+  roadmap: { triggerTokens: 780, targetTokens: 460 },
+  research: { triggerTokens: 760, targetTokens: 440 },
+  mixed: { triggerTokens: 720, targetTokens: 430 }
+};
+
 export const BUILTIN_PROVIDER_PATTERNS: McpProviderConfig[] = [
   {
     key: "sentry",

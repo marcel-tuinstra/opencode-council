@@ -109,6 +109,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - If multiple providers are named, each must be touched at least once.
 - To add Jira (or another provider), update built-in patterns and tool prefix mapping in `plugins/orchestration-workflows/constants.ts` and `plugins/orchestration-workflows/mcp.ts`.
 - For full customization (custom MCP checks, adding roles, and authoring agents), see [`CUSTOMIZATION.md`](./CUSTOMIZATION.md).
+- Context compaction uses workflow-aware profiles in `plugins/orchestration-workflows/constants.ts` (`COMPACTION_PROFILES`) and preserves goals, constraints, blockers, and open actions.
 
 ## Who this is for
 
