@@ -9,6 +9,7 @@ import {
 } from "./constants";
 import { buildSystemInstruction, enforceUserContract } from "./contracts";
 import { debugLog, previewText } from "./debug";
+import { appendCompactionNotice, compactWorkflowContext } from "./compact";
 import { buildTurnTargets, detectIntent, shouldUseHeartbeat } from "./intent";
 import {
   clearSessionBudgetState,
@@ -111,17 +112,20 @@ export const AgentConversations: Plugin = async () => {
       }
 
       const intent = detectIntent(sourceText);
-      const targets = buildTurnTargets(roles, sourceText);
+      const compactedInput = compactWorkflowContext(sourceText, intent);
+      const workingSourceText = compactedInput.text;
+      const targets = buildTurnTargets(roles, workingSourceText);
       const heartbeat = shouldUseHeartbeat(roles);
-      const mcpProviders = detectMcpProviders(sourceText);
+      const mcpProviders = detectMcpProviders(workingSourceText);
       const mcpHints = buildMcpHints(mcpProviders);
-      const staleSensitive = STALE_SENSITIVE_REGEX.test(sourceText);
-      const allowDeepMcp = DEEP_MCP_REGEX.test(sourceText);
+      const staleSensitive = STALE_SENSITIVE_REGEX.test(workingSourceText);
+      const allowDeepMcp = DEEP_MCP_REGEX.test(workingSourceText);
       recordBudgetUsage(message.info.sessionID, intent, "plan", estimateTokens(sourceText));
 
       for (const part of message.parts) {
         if (part.type === "text") {
-          part.text = enforceUserContract(part.text, roles, targets, heartbeat, mcpProviders, staleSensitive);
+          const withCompaction = part.text === sourceText ? workingSourceText : part.text;
+          part.text = enforceUserContract(withCompaction, roles, targets, heartbeat, mcpProviders, staleSensitive);
         }
       }
 
@@ -296,6 +300,13 @@ export const AgentConversations: Plugin = async () => {
       }
 
       nextText = appendMcpWarnings(nextText, policy.mcpWarnings);
+      const compactedOutput = compactWorkflowContext(nextText, policy.intent);
+      if (compactedOutput.compacted) {
+        nextText = appendCompactionNotice(compactedOutput.text, compactedOutput.summary);
+      } else if (compactedOutput.fallbackReason) {
+        nextText = appendCompactionNotice(nextText, compactedOutput.fallbackReason);
+      }
+
       if (summarizeBudget.action === "compact" || summarizeBudget.action === "truncate" || summarizeBudget.action === "halt") {
         nextText = applyBudgetAction(nextText, summarizeBudget.action, summarizeBudget.reason, getTruncateTokenLimit());
       }
