@@ -11,6 +11,13 @@ import { buildSystemInstruction, enforceUserContract } from "./contracts";
 import { debugLog, previewText } from "./debug";
 import { buildTurnTargets, detectIntent, shouldUseHeartbeat } from "./intent";
 import {
+  clearSessionBudgetState,
+  estimateTokens,
+  finalizeBudgetRun,
+  getTruncateTokenLimit,
+  recordBudgetUsage
+} from "./budget";
+import {
   buildMcpHints,
   checkMcpAccess,
   detectMcpProviders,
@@ -21,6 +28,7 @@ import {
 import {
   appendMcpSuggestion,
   appendMcpWarnings,
+  applyBudgetAction,
   appendMissingProviderNotice,
   extractDelegatedRoles,
   normalizeThreadOutput,
@@ -94,6 +102,7 @@ export const AgentConversations: Plugin = async () => {
 
       if (!roles || roles.length === 0) {
         resetSessionState(message.info.sessionID);
+        clearSessionBudgetState(message.info.sessionID);
         debugLog("messages.transform.policy_cleared", {
           sessionID: message.info.sessionID,
           reason: "no_roles_detected"
@@ -108,6 +117,7 @@ export const AgentConversations: Plugin = async () => {
       const mcpHints = buildMcpHints(mcpProviders);
       const staleSensitive = STALE_SENSITIVE_REGEX.test(sourceText);
       const allowDeepMcp = DEEP_MCP_REGEX.test(sourceText);
+      recordBudgetUsage(message.info.sessionID, intent, "plan", estimateTokens(sourceText));
 
       for (const part of message.parts) {
         if (part.type === "text") {
@@ -191,6 +201,21 @@ export const AgentConversations: Plugin = async () => {
         return;
       }
 
+      const executeBudget = recordBudgetUsage(
+        input.sessionID,
+        policy.intent,
+        "execute",
+        estimateTokens(input.tool)
+      );
+      if (executeBudget.action === "halt") {
+        debugLog("tool.execute.before.budget_halt", {
+          sessionID: input.sessionID,
+          tool: input.tool,
+          reason: executeBudget.reason
+        });
+        throw new Error(`Budget governor halted execution: ${executeBudget.reason}.`);
+      }
+
       const result = checkMcpAccess(input.tool, policy);
       if (result.blocked) {
         if (result.warning) {
@@ -231,6 +256,13 @@ export const AgentConversations: Plugin = async () => {
       let activeRoles = policy.roles;
       let activeTargets = policy.targets;
 
+      const summarizeBudget = recordBudgetUsage(
+        input.sessionID,
+        policy.intent,
+        "summarize",
+        estimateTokens(nextText)
+      );
+
       if (policy.roles.length === 1) {
         const delegated = extractDelegatedRoles(nextText, policy.roles[0]);
         nextText = delegated.text;
@@ -264,7 +296,21 @@ export const AgentConversations: Plugin = async () => {
       }
 
       nextText = appendMcpWarnings(nextText, policy.mcpWarnings);
+      if (summarizeBudget.action === "compact" || summarizeBudget.action === "truncate" || summarizeBudget.action === "halt") {
+        nextText = applyBudgetAction(nextText, summarizeBudget.action, summarizeBudget.reason, getTruncateTokenLimit());
+      }
       output.text = nextText;
+
+      const baseline = finalizeBudgetRun(input.sessionID);
+      if (baseline) {
+        debugLog("text.complete.baseline_report", {
+          sessionID: input.sessionID,
+          intent: policy.intent,
+          p50Tokens: baseline.p50Tokens,
+          p95Tokens: baseline.p95Tokens,
+          runs: baseline.runs
+        });
+      }
 
       debugLog("text.complete.processed", {
         sessionID: input.sessionID,
@@ -274,6 +320,8 @@ export const AgentConversations: Plugin = async () => {
         hadThreadNormalization: activeRoles.length > 1,
         mcpWarningsCount: policy.mcpWarnings.length
       });
+
+      clearSessionBudgetState(input.sessionID);
     }
   };
 };
