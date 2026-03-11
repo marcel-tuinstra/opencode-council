@@ -4,7 +4,7 @@ This guide shows how to tweak MCP checks and create or adapt agent personas.
 
 ## 1) Customize MCP provider checks
 
-Files: `plugins/agent-conversations/constants.ts` and `plugins/agent-conversations/mcp.ts`
+Files: `plugins/orchestration-workflows/constants.ts` and `plugins/orchestration-workflows/mcp.ts`
 
 Main places to edit:
 
@@ -35,7 +35,7 @@ const providerFromToolName = (tool: string): string | null => {
 
 ## 2) Tune MCP strictness and call limits
 
-Files: `plugins/agent-conversations/constants.ts`, `plugins/agent-conversations/mcp.ts`, and `plugins/agent-conversations/index.ts`
+Files: `plugins/orchestration-workflows/constants.ts`, `plugins/orchestration-workflows/mcp.ts`, and `plugins/orchestration-workflows/index.ts`
 
 Useful knobs:
 
@@ -47,7 +47,7 @@ If you want a softer policy, you can remove the temporary block that forces chec
 
 ## 3) Add or rename discussion roles
 
-Files: `plugins/agent-conversations/types.ts`, `plugins/agent-conversations/constants.ts`, `plugins/agent-conversations/roles.ts`, `plugins/agent-conversations/intent.ts`, and `plugins/agent-conversations/output.ts`
+Files: `plugins/orchestration-workflows/types.ts`, `plugins/orchestration-workflows/constants.ts`, `plugins/orchestration-workflows/roles.ts`, `plugins/orchestration-workflows/intent.ts`, and `plugins/orchestration-workflows/output.ts`
 
 When introducing a new role, update all of the following:
 

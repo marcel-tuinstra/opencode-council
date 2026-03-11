@@ -5,15 +5,15 @@
     "moduleResolution": "Bundler"
   },
   "include": [
-    "plugins/agent-conversations/constants.ts",
-    "plugins/agent-conversations/contracts.ts",
-    "plugins/agent-conversations/debug.ts",
-    "plugins/agent-conversations/intent.ts",
-    "plugins/agent-conversations/mcp.ts",
-    "plugins/agent-conversations/output.ts",
-    "plugins/agent-conversations/roles.ts",
-    "plugins/agent-conversations/session.ts",
-    "plugins/agent-conversations/types.ts",
+    "plugins/orchestration-workflows/constants.ts",
+    "plugins/orchestration-workflows/contracts.ts",
+    "plugins/orchestration-workflows/debug.ts",
+    "plugins/orchestration-workflows/intent.ts",
+    "plugins/orchestration-workflows/mcp.ts",
+    "plugins/orchestration-workflows/output.ts",
+    "plugins/orchestration-workflows/roles.ts",
+    "plugins/orchestration-workflows/session.ts",
+    "plugins/orchestration-workflows/types.ts",
     "tests/**/*.ts"
   ]
 }

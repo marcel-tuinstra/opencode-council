@@ -4,7 +4,7 @@ import {
   detectRolesFromText,
   normalizeRole,
   parseRolesFromMarker
-} from "../plugins/agent-conversations/roles";
+} from "../plugins/orchestration-workflows/roles";
 
 describe("roles", () => {
   it("normalizes role aliases", () => {
@@ -27,11 +27,11 @@ describe("roles", () => {
   });
 
   it("parses marker roles", () => {
-    expect(parseRolesFromMarker("hello <<AGENT_CONVERSATIONS:CTO,DEV,PM>>")).toEqual(["CTO", "DEV", "PM"]);
+    expect(parseRolesFromMarker("hello <<ORCHESTRATION_WORKFLOWS:CTO,DEV,PM>>")).toEqual(["CTO", "DEV", "PM"]);
   });
 
   it("prefers marker roles over mentions", () => {
-    const text = "@ceo <<AGENT_CONVERSATIONS:CTO,DEV>> @pm";
+    const text = "@ceo <<ORCHESTRATION_WORKFLOWS:CTO,DEV>> @pm";
     expect(detectRolesFromText(text)).toEqual(["CTO", "DEV"]);
   });
 });

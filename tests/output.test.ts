@@ -6,8 +6,8 @@ import {
   extractDelegatedRoles,
   normalizeThreadOutput,
   stripControlLeakage
-} from "../plugins/agent-conversations/output";
-import type { Role } from "../plugins/agent-conversations/types";
+} from "../plugins/orchestration-workflows/output";
+import type { Role } from "../plugins/orchestration-workflows/types";
 
 const targets: Record<Role, number> = {
   CTO: 2,

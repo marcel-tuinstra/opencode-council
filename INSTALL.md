@@ -2,7 +2,7 @@
 
 ```bash
 mkdir -p ~/.opencode/plugins ~/.config/opencode/agents
-cp plugins/agent-conversations.ts ~/.opencode/plugins/agent-conversations.ts
+cp plugins/orchestration-workflows.ts ~/.opencode/plugins/orchestration-workflows.ts
 cp agents/*.md ~/.config/opencode/agents/
 ```
 
@@ -26,7 +26,7 @@ Notes:
 Troubleshooting:
 
 ```bash
-AGENT_CONVERSATIONS_DEBUG=1 opencode web
+ORCHESTRATION_WORKFLOWS_DEBUG=1 opencode web
 ```
 
-This enables plugin debug logging to stderr. Look for lines prefixed with `[agent-conversations]`.
+This enables plugin debug logging to stderr. Look for lines prefixed with `[orchestration-workflows]`.

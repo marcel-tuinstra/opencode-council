@@ -1,9 +1,9 @@
-# OpenCode Agent Conversations Plugin
+# OpenCode Orchestration Workflows Plugin
 
-[![CI](https://github.com/marcel-tuinstra/opencode-agent-conversations/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-agent-conversations/actions/workflows/ci.yml)
+[![CI](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Community plugin for OpenCode to run and orchestrate multi-agent conversations.
+Community plugin for OpenCode to run role-based orchestration workflows.
 
 Note: This is an independent community plugin for OpenCode and is not affiliated with or endorsed by OpenCode.
 
@@ -96,8 +96,8 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 
 ## Repository layout
 
-- Plugin entrypoint: `plugins/agent-conversations.ts`
-- Plugin modules: `plugins/agent-conversations/*.ts`
+- Plugin entrypoint: `plugins/orchestration-workflows.ts`
+- Plugin modules: `plugins/orchestration-workflows/*.ts`
 - Tests: `tests/*.test.ts`
 - Agent personas: `agents/*.md`
 - Manual verification matrix: `TESTING.md`
@@ -107,7 +107,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Default MCP policy is mention-gated by provider name.
 - If no provider is named, MCP calls are blocked.
 - If multiple providers are named, each must be touched at least once.
-- To add Jira (or another provider), update built-in patterns and tool prefix mapping in `plugins/agent-conversations/constants.ts` and `plugins/agent-conversations/mcp.ts`.
+- To add Jira (or another provider), update built-in patterns and tool prefix mapping in `plugins/orchestration-workflows/constants.ts` and `plugins/orchestration-workflows/mcp.ts`.
 - For full customization (custom MCP checks, adding roles, and authoring agents), see [`CUSTOMIZATION.md`](./CUSTOMIZATION.md).
 
 ## Who this is for

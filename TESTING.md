@@ -16,7 +16,7 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` runs these tests on No
 - `@cto @dev` should detect both roles and produce thread mode.
 - Mentions inside code (inline or fenced) should be ignored.
 - File references like `@INSTALL.md` should be ignored.
-- Marker payload (`<<AGENT_CONVERSATIONS:CTO,DEV>>`) should restore roles.
+- Marker payload (`<<ORCHESTRATION_WORKFLOWS:CTO,DEV>>`) should restore roles.
 - Delegation marker (`<<DELEGATE:PM,RESEARCH>>`) should be removed from final text while promoting to threaded mode when role lines are present.
 
 ## Intent and Turn Planning

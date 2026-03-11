@@ -1,5 +1,5 @@
 {
-  "name": "opencode-agent-conversations",
+  "name": "opencode-orchestration-workflows",
   "private": true,
   "type": "module",
   "scripts": {
