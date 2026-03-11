@@ -36,11 +36,11 @@ type BaselineStats = {
 };
 
 const DEFAULT_CONFIG: BudgetConfig = {
-  softRunTokens: 3200,
-  hardRunTokens: 4200,
-  softStepTokens: 1400,
-  hardStepTokens: 2000,
-  truncateAtTokens: 700,
+  softRunTokens: 6400,
+  hardRunTokens: 8400,
+  softStepTokens: 2800,
+  hardStepTokens: 4000,
+  truncateAtTokens: 1400,
   costPer1kTokensUsd: 0.002,
   stepExecutionTokenCost: 120
 };
