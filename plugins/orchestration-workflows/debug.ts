@@ -1,4 +1,4 @@
-const DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(process.env.AGENT_CONVERSATIONS_DEBUG ?? "");
+const DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(process.env.ORCHESTRATION_WORKFLOWS_DEBUG ?? "");
 
 export const previewText = (text: string, max = 80) => {
   const normalized = text.replace(/\s+/g, " ").trim();
@@ -11,5 +11,5 @@ export const debugLog = (event: string, details?: Record<string, unknown>) => {
   }
 
   const payload = details ? ` ${JSON.stringify(details)}` : "";
-  console.error(`[agent-conversations] ${event}${payload}`);
+  console.error(`[orchestration-workflows] ${event}${payload}`);
 };

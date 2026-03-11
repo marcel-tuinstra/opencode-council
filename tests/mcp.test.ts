@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { checkMcpAccess } from "../plugins/agent-conversations/mcp";
-import type { SessionPolicy } from "../plugins/agent-conversations/types";
+import { checkMcpAccess } from "../plugins/orchestration-workflows/mcp";
+import type { SessionPolicy } from "../plugins/orchestration-workflows/types";
 
 const basePolicy = (): SessionPolicy => ({
   roles: ["CTO", "DEV"],

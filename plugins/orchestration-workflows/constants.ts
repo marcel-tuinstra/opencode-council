@@ -86,9 +86,9 @@ export const ROLE_ALIASES: Record<string, Role> = {
 };
 
 export const MENTION_REGEX = /@([A-Za-z][A-Za-z0-9_-]*)/g;
-export const MARKER_REGEX = /<<AGENT_CONVERSATIONS:([^>]+)>>/;
-export const MARKER_REMOVAL_REGEX = /\n*<<AGENT_CONVERSATIONS:[^>]+>>/g;
-export const MARKER_PREFIX = "<<AGENT_CONVERSATIONS:";
+export const MARKER_REGEX = /<<ORCHESTRATION_WORKFLOWS:([^>]+)>>/;
+export const MARKER_REMOVAL_REGEX = /\n*<<ORCHESTRATION_WORKFLOWS:[^>]+>>/g;
+export const MARKER_PREFIX = "<<ORCHESTRATION_WORKFLOWS:";
 export const MARKER_SUFFIX = ">>";
 
 export const STALE_SENSITIVE_REGEX =
