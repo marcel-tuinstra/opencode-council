@@ -4,7 +4,8 @@ import {
   appendMcpWarnings,
   appendMissingProviderNotice,
   extractDelegatedRoles,
-  normalizeThreadOutput
+  normalizeThreadOutput,
+  stripControlLeakage
 } from "../plugins/agent-conversations/output";
 import type { Role } from "../plugins/agent-conversations/types";
 
@@ -70,5 +71,19 @@ describe("output", () => {
     const text = "<<DELEGATE:PM,PO,RESEARCH,CTO,DEV>>";
     const delegated = extractDelegatedRoles(text, "CEO");
     expect(delegated.roles).toEqual(["CEO", "PM", "PO", "RESEARCH"]);
+  });
+
+  it("strips leaked control lines and system reminder blocks", () => {
+    const text = [
+      "Format: plain prose, no role prefix, no markdown.",
+      "Delegation (optional): if needed, emit <<DELEGATE:ROLE1,ROLE2>> then switch to [n] ROLE: message lines.",
+      "<system-reminder>",
+      "internal note",
+      "</system-reminder>",
+      "Real answer line"
+    ].join("\n");
+
+    const cleaned = stripControlLeakage(text);
+    expect(cleaned).toBe("Real answer line");
   });
 });

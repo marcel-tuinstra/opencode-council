@@ -4,6 +4,28 @@ import { normalizeRole } from "./roles";
 const DELEGATION_REGEX = /<<DELEGATE:([^>]+)>>/i;
 const DELEGATION_REMOVAL_REGEX = /\s*<<DELEGATE:[^>]+>>\s*/gi;
 
+const LEAKED_CONTROL_PREFIXES = [
+  "Format: plain prose, no role prefix, no markdown.",
+  "Delegation (optional): if needed, emit <<DELEGATE:ROLE1,ROLE2>> then switch to [n] ROLE: message lines.",
+  "Format: [n] ROLE: message | Start with",
+  "Heartbeat: Phase 1 Frame, Phase 2 Challenge (react to another role), Phase 3 Synthesize by lead.",
+  "No markdown. Plain lines only."
+];
+
+export const stripControlLeakage = (text: string): string => {
+  const withoutReminders = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "");
+  const lines = withoutReminders.split("\n");
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return true;
+    }
+    return !LEAKED_CONTROL_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
+  });
+
+  return filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+};
+
 export const extractDelegatedRoles = (text: string, leadRole: Role): { roles: Role[]; text: string } => {
   const match = text.match(DELEGATION_REGEX);
   if (!match) {

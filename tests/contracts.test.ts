@@ -34,6 +34,6 @@ describe("contracts", () => {
     expect(instruction).toContain("<<DELEGATE:ROLE1,ROLE2>>");
 
     const userText = enforceUserContract("Should we prioritize this?", ["CEO"], targets, false, [], false);
-    expect(userText).toContain("Delegation (optional)");
+    expect(userText).toBe("Should we prioritize this?");
   });
 });

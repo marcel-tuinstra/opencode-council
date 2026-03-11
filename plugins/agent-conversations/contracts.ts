@@ -107,6 +107,10 @@ export const enforceUserContract = (
   mcpProviders: string[],
   staleSensitive: boolean
 ): string => {
+  if (roles.length === 1) {
+    return text;
+  }
+
   if (text.includes("Format:")) {
     return text;
   }

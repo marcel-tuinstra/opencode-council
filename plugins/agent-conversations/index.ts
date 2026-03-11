@@ -23,7 +23,8 @@ import {
   appendMcpWarnings,
   appendMissingProviderNotice,
   extractDelegatedRoles,
-  normalizeThreadOutput
+  normalizeThreadOutput,
+  stripControlLeakage
 } from "./output";
 import { detectRolesFromMentions, detectRolesFromText } from "./roles";
 import {
@@ -226,7 +227,7 @@ export const AgentConversations: Plugin = async () => {
         return;
       }
 
-      let nextText = output.text;
+      let nextText = stripControlLeakage(output.text);
       let activeRoles = policy.roles;
       let activeTargets = policy.targets;
 
