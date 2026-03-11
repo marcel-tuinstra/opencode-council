@@ -4,6 +4,7 @@ import type { Role } from "./types";
 export const buildSystemInstruction = (
   roles: Role[],
   targets: Record<Role, number>,
+  heartbeat: boolean,
   mcpProviders: string[],
   staleSensitive: boolean
 ): string => {
@@ -33,6 +34,15 @@ export const buildSystemInstruction = (
     ? `MCP allowed for: ${mcpProviders.join(", ")}. Max ${MCP_CAPS.default} calls.`
     : "MCP disabled (no provider mentioned).";
 
+  const phasePlan = heartbeat
+    ? [
+      "Heartbeat phases:",
+      "Phase 1 (Frame): each role gives initial stance, main concern, and missing info.",
+      "Phase 2 (Challenge): each role reacts to at least one other role.",
+      "Phase 3 (Synthesize): lead role closes with recommendation."
+    ]
+    : [];
+
   return [
     `Multi-agent discussion: ${roles.map((r) => `@${r}`).join(", ")}`,
     "",
@@ -40,6 +50,7 @@ export const buildSystemInstruction = (
     `Plan: ~${totalTurns} turns, weighted: ${turnPlan}`,
     `Lead (${leadRole}): opens and closes with recommendation`,
     "",
+    ...phasePlan,
     mcpNote,
     staleSensitive ? "Data may be stale; one agent may suggest /mcp if needed." : "",
     "",
@@ -50,6 +61,7 @@ export const buildSystemInstruction = (
 const buildUserEnforcement = (
   roles: Role[],
   targets: Record<Role, number>,
+  heartbeat: boolean,
   mcpProviders: string[],
   staleSensitive: boolean
 ): string => {
@@ -69,10 +81,15 @@ const buildUserEnforcement = (
     .map((role) => `${role}:${targets[role]}`)
     .join(" ");
 
+  const heartbeatNote = heartbeat
+    ? "Heartbeat: Phase 1 Frame, Phase 2 Challenge (react to another role), Phase 3 Synthesize by lead."
+    : "";
+
   return [
     "",
     "",
     `Format: [n] ROLE: message | Start with ${leadRole}: | Plan: ${turnPlan}`,
+    heartbeatNote,
     mcpProviders.length > 0 ? `MCP: ${mcpProviders.join(", ")} only, max ${MCP_CAPS.default} calls.` : "MCP: disabled.",
     staleSensitive ? "Suggest /mcp if data may be stale." : "",
     "No markdown. Plain lines only."
@@ -83,6 +100,7 @@ export const enforceUserContract = (
   text: string,
   roles: Role[],
   targets: Record<Role, number>,
+  heartbeat: boolean,
   mcpProviders: string[],
   staleSensitive: boolean
 ): string => {
@@ -90,5 +108,5 @@ export const enforceUserContract = (
     return text;
   }
 
-  return `${text}${buildUserEnforcement(roles, targets, mcpProviders, staleSensitive)}`;
+  return `${text}${buildUserEnforcement(roles, targets, heartbeat, mcpProviders, staleSensitive)}`;
 };

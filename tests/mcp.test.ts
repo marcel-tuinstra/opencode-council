@@ -13,6 +13,7 @@ const basePolicy = (): SessionPolicy => ({
     MARKETING: 0,
     RESEARCH: 0
   },
+  heartbeat: false,
   intent: "backend",
   mcpProviders: ["sentry"],
   mcpHints: [],

@@ -24,6 +24,7 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` runs these tests on No
 - Marketing prompts should favor `MARKETING` and `CEO` airtime.
 - Single-role prompts should remain direct prose.
 - Multi-role prompts should start and end with the lead role.
+- Heartbeat mode should auto-enable for 3 or more roles and include Frame/Challenge/Synthesize guidance.
 
 ## MCP Policy
 
