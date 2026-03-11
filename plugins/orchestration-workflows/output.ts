@@ -201,3 +201,32 @@ export const appendMcpWarnings = (text: string, warnings: string[]): string => {
   const warningBlock = warnings.map((warning) => `[MCP] ${warning}`).join("\n");
   return `${text}\n\n---\n${warningBlock}`;
 };
+
+export const applyBudgetAction = (
+  text: string,
+  action: "compact" | "truncate" | "halt",
+  reason: string,
+  tokenLimit: number
+): string => {
+  if (action === "halt") {
+    return `Output paused by orchestration budget governor: ${reason}. Retry with fewer roles, a narrower scope, or a deeper-investigation instruction with explicit budget override.`;
+  }
+
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) {
+    return text;
+  }
+
+  if (action === "compact") {
+    const compacted = lines.slice(0, 8).join("\n");
+    return `${compacted}\n\n[Budget] Compact mode enabled: ${reason}. Kept the highest-signal lines to stay within budget.`;
+  }
+
+  const maxChars = Math.max(40, tokenLimit * 4);
+  if (text.length <= maxChars) {
+    return `${text}\n\n[Budget] Truncation threshold reached: ${reason}.`;
+  }
+
+  const truncated = `${text.slice(0, maxChars).trimEnd()}...`;
+  return `${truncated}\n\n[Budget] Output truncated: ${reason}.`;
+};
