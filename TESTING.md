@@ -2,6 +2,15 @@
 
 This project is primarily behavior-driven. The fastest way to validate changes is to run targeted prompts and confirm parser, policy, and output behavior.
 
+## Automated tests
+
+```bash
+npm install
+npm test
+```
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs these tests on Node 22 and 24 for every push and pull request.
+
 ## Role Parsing
 
 - `@cto @dev` should detect both roles and produce thread mode.

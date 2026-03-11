@@ -37,13 +37,16 @@ export const detectRolesFromMentions = (text: string): Role[] => {
     const mentionStart = match.index ?? -1;
     const mentionEnd = mentionStart + fullMatch.length;
     const nextChar = mentionEnd >= 0 ? (sanitizedText[mentionEnd] ?? "") : "";
+    const charAfterNext = mentionEnd + 1 >= 0 ? (sanitizedText[mentionEnd + 1] ?? "") : "";
     const prevChar = mentionStart > 0 ? (sanitizedText[mentionStart - 1] ?? "") : "";
 
     if (prevChar && /[A-Za-z0-9_./\\-]/.test(prevChar)) {
       continue;
     }
 
-    if (nextChar === "/" || nextChar === "." || nextChar === "\\") {
+    const looksLikePath = nextChar === "/" || nextChar === "\\";
+    const looksLikeExtension = nextChar === "." && /[A-Za-z0-9_-]/.test(charAfterNext);
+    if (looksLikePath || looksLikeExtension) {
       continue;
     }
 

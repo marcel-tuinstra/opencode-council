@@ -80,10 +80,20 @@ Examples:
 
 For setup steps, copy commands, and a quick verification prompt, see [`INSTALL.md`](./INSTALL.md).
 
+## Development and tests
+
+```bash
+npm install
+npm test
+```
+
+CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/workflows/ci.yml`).
+
 ## Repository layout
 
 - Plugin entrypoint: `plugins/agent-conversations.ts`
 - Plugin modules: `plugins/agent-conversations/*.ts`
+- Tests: `tests/*.test.ts`
 - Agent personas: `agents/*.md`
 - Manual verification matrix: `TESTING.md`
 
