@@ -17,9 +17,11 @@ export const buildSystemInstruction = (
     return [
       `You are the ${role} persona.`,
       "Provide a complete, actionable response with tradeoffs and rationale.",
+      "If confidence is low or cross-functional input is needed, emit one delegation marker line: <<DELEGATE:ROLE1,ROLE2>> (supported roles only).",
+      "If delegating, continue immediately with a threaded discussion using format [n] ROLE: message, and close with your own role.",
       mcpNote,
       staleSensitive ? "Data may be stale; suggest /mcp if confidence is low." : "",
-      "Do not prefix response with role label."
+      "Do not prefix response with role label unless you are delegating into threaded mode."
     ].filter(Boolean).join("\n");
   }
 
@@ -70,6 +72,7 @@ const buildUserEnforcement = (
       "",
       "",
       "Format: plain prose, no role prefix, no markdown.",
+      "Delegation (optional): if needed, emit <<DELEGATE:ROLE1,ROLE2>> then switch to [n] ROLE: message lines.",
       mcpProviders.length > 0 ? `MCP: ${mcpProviders.join(", ")} only.` : "MCP: disabled.",
       "Include concrete recommendations."
     ].join("\n");

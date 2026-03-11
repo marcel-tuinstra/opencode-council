@@ -1,6 +1,36 @@
 import type { Role } from "./types";
 import { normalizeRole } from "./roles";
 
+const DELEGATION_REGEX = /<<DELEGATE:([^>]+)>>/i;
+const DELEGATION_REMOVAL_REGEX = /\s*<<DELEGATE:[^>]+>>\s*/gi;
+
+export const extractDelegatedRoles = (text: string, leadRole: Role): { roles: Role[]; text: string } => {
+  const match = text.match(DELEGATION_REGEX);
+  if (!match) {
+    return { roles: [leadRole], text };
+  }
+
+  const cleanedText = text.replace(DELEGATION_REMOVAL_REGEX, " ").replace(/\s+\n/g, "\n").trim();
+
+  const delegated = match[1]
+    .split(",")
+    .map((role) => normalizeRole(role.trim()))
+    .filter((role): role is Role => role !== null && role !== leadRole);
+
+  const unique: Role[] = [];
+  for (const role of delegated) {
+    if (!unique.includes(role)) {
+      unique.push(role);
+    }
+  }
+
+  const capped = unique.slice(0, 3);
+  return {
+    roles: [leadRole, ...capped],
+    text: cleanedText || text
+  };
+};
+
 export const normalizeThreadOutput = (text: string, roles: Role[], targets: Record<Role, number>): string => {
   if (roles.length <= 1) {
     return text;

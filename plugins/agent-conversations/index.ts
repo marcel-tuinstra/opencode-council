@@ -22,6 +22,7 @@ import {
   appendMcpSuggestion,
   appendMcpWarnings,
   appendMissingProviderNotice,
+  extractDelegatedRoles,
   normalizeThreadOutput
 } from "./output";
 import { detectRolesFromMentions, detectRolesFromText } from "./roles";
@@ -226,21 +227,39 @@ export const AgentConversations: Plugin = async () => {
       }
 
       let nextText = output.text;
+      let activeRoles = policy.roles;
+      let activeTargets = policy.targets;
+
+      if (policy.roles.length === 1) {
+        const delegated = extractDelegatedRoles(nextText, policy.roles[0]);
+        nextText = delegated.text;
+
+        if (delegated.roles.length > 1) {
+          activeRoles = delegated.roles;
+          activeTargets = buildTurnTargets(activeRoles, nextText);
+          nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
+          debugLog("text.complete.delegation_upgraded", {
+            sessionID: input.sessionID,
+            leadRole: policy.roles[0],
+            delegatedRoles: delegated.roles.slice(1)
+          });
+        }
+      }
 
       if (policy.roles.length > 1) {
-        nextText = normalizeThreadOutput(nextText, policy.roles, policy.targets);
+        nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
       }
 
       if (policy.mcpProviders.length > 1) {
         const missingProviders = getMissingProviders(policy);
         if (missingProviders.length > 0) {
-          nextText = appendMissingProviderNotice(nextText, policy.roles[0], policy.roles.length > 1, missingProviders);
+          nextText = appendMissingProviderNotice(nextText, activeRoles[0], activeRoles.length > 1, missingProviders);
         }
       }
 
       const shouldSuggestMcp = policy.staleSensitive && policy.mcpProviders.length === 0;
       if (shouldSuggestMcp) {
-        nextText = appendMcpSuggestion(nextText, policy.roles[0], policy.roles.length > 1);
+        nextText = appendMcpSuggestion(nextText, activeRoles[0], activeRoles.length > 1);
       }
 
       nextText = appendMcpWarnings(nextText, policy.mcpWarnings);
@@ -248,10 +267,10 @@ export const AgentConversations: Plugin = async () => {
 
       debugLog("text.complete.processed", {
         sessionID: input.sessionID,
-        roles: policy.roles,
+        roles: activeRoles,
         mcpProviders: policy.mcpProviders,
         staleSensitive: policy.staleSensitive,
-        hadThreadNormalization: policy.roles.length > 1,
+        hadThreadNormalization: activeRoles.length > 1,
         mcpWarningsCount: policy.mcpWarnings.length
       });
     }

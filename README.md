@@ -16,6 +16,7 @@ Vanilla multi-mention prompts often produce uneven role participation and unpred
 ## What you get
 
 - Single mention (`@cto`) returns a normal direct answer.
+- Single-role conversations can self-delegate to additional roles via `<<DELEGATE:...>>` when confidence is low.
 - Multi-mention prompts produce threaded output like `[n] ROLE: message`.
 - Relevance-weighted airtime for better role balance.
 - Automatic heartbeat discussion phases for 3+ mentioned roles (Frame -> Challenge -> Synthesize).

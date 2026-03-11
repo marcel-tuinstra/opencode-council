@@ -28,4 +28,12 @@ describe("contracts", () => {
     const text = enforceUserContract("Discuss tradeoffs", ["CTO", "DEV", "PM"], targets, true, [], false);
     expect(text).toContain("Heartbeat: Phase 1 Frame");
   });
+
+  it("includes delegation protocol for single-role mode", () => {
+    const instruction = buildSystemInstruction(["CEO"], targets, false, [], false);
+    expect(instruction).toContain("<<DELEGATE:ROLE1,ROLE2>>");
+
+    const userText = enforceUserContract("Should we prioritize this?", ["CEO"], targets, false, [], false);
+    expect(userText).toContain("Delegation (optional)");
+  });
 });

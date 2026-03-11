@@ -3,6 +3,7 @@ import {
   appendMcpSuggestion,
   appendMcpWarnings,
   appendMissingProviderNotice,
+  extractDelegatedRoles,
   normalizeThreadOutput
 } from "../plugins/agent-conversations/output";
 import type { Role } from "../plugins/agent-conversations/types";
@@ -56,5 +57,18 @@ describe("output", () => {
     const updated = appendMcpWarnings("done", ["blocked one", "blocked two"]);
     expect(updated).toContain("[MCP] blocked one");
     expect(updated).toContain("[MCP] blocked two");
+  });
+
+  it("extracts delegated roles and removes marker", () => {
+    const text = "<<DELEGATE:PM,RESEARCH,PM>>\n[1] CEO: Opening";
+    const delegated = extractDelegatedRoles(text, "CEO");
+    expect(delegated.roles).toEqual(["CEO", "PM", "RESEARCH"]);
+    expect(delegated.text).not.toContain("<<DELEGATE");
+  });
+
+  it("caps delegation to three additional roles", () => {
+    const text = "<<DELEGATE:PM,PO,RESEARCH,CTO,DEV>>";
+    const delegated = extractDelegatedRoles(text, "CEO");
+    expect(delegated.roles).toEqual(["CEO", "PM", "PO", "RESEARCH"]);
   });
 });
