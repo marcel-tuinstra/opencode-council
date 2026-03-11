@@ -3,6 +3,7 @@ import {
   appendMcpSuggestion,
   appendMcpWarnings,
   appendMissingProviderNotice,
+  applyBudgetAction,
   extractDelegatedRoles,
   normalizeThreadOutput,
   stripControlLeakage
@@ -85,5 +86,14 @@ describe("output", () => {
 
     const cleaned = stripControlLeakage(text);
     expect(cleaned).toBe("Real answer line");
+  });
+
+  it("applies compact and halt budget actions with reason", () => {
+    const compacted = applyBudgetAction("A\nB\nC", "compact", "compact triggered at soft budget on summarize", 200);
+    expect(compacted).toContain("[Budget] Compact mode enabled");
+
+    const halted = applyBudgetAction("anything", "halt", "hard budget exceeded on summarize", 200);
+    expect(halted).toContain("budget governor");
+    expect(halted).toContain("hard budget exceeded");
   });
 });
