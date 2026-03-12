@@ -17,8 +17,38 @@ const LEAKED_CONTROL_PREFIXES = [
   "No markdown. Plain lines only."
 ];
 
+const INLINE_LEAK_MARKERS = [
+  "Format: [n] ROLE: message | Start with",
+  "Format: plain prose, no role prefix, no markdown.",
+  "Use the above message and context to generate a prompt and call the task tool with subagent:",
+  "<system-reminder>",
+  "# Plan Mode - System Reminder",
+  "CRITICAL: Plan mode ACTIVE",
+  "MCP: disabled.",
+  "No markdown. Plain lines only."
+];
+
+const trimInlineLeakageTail = (text: string): string => {
+  return text
+    .split("\n")
+    .map((line) => {
+      let cutoff = -1;
+
+      for (const marker of INLINE_LEAK_MARKERS) {
+        const index = line.indexOf(marker);
+        if (index > 0 && line.slice(0, index).trim().length > 0 && (cutoff < 0 || index < cutoff)) {
+          cutoff = index;
+        }
+      }
+
+      return cutoff >= 0 ? line.slice(0, cutoff).trimEnd() : line;
+    })
+    .join("\n");
+};
+
 export const stripControlLeakage = (text: string): string => {
-  const withoutReminders = text
+  const withoutInlineTail = trimInlineLeakageTail(text);
+  const withoutReminders = withoutInlineTail
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "")
     .replace(/Format:\s*\[n\]\s*ROLE:\s*message\s*\|\s*Start with[^\n]*(?:\n(?:Heartbeat:.*|MCP:.*|Suggest \/mcp.*|No markdown\..*))*/gi, "")
     .replace(/Format:\s*plain prose, no role prefix, no markdown\.(?:\n(?:Delegation .*|MCP:.*|Include concrete recommendations\.|No markdown\..*))*/gi, "")
