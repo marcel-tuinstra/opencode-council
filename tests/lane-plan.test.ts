@@ -5,6 +5,7 @@ import { normalizeWorkUnit } from "../plugins/orchestration-workflows/work-unit"
 
 describe("lane-plan", () => {
   it("builds tracker-agnostic lanes and a dependency graph from normalized work units", () => {
+    // Arrange
     const intake: LanePlanningWorkUnit[] = [
       {
         id: "sc-341-intake",
@@ -75,8 +76,10 @@ describe("lane-plan", () => {
       }
     ];
 
+    // Act
     const plan = planWorkUnitLanes(intake);
 
+    // Assert
     expect(plan.usesExpectedDuration).toBe(false);
     expect(plan.scoringSignals).toEqual([
       "fileOverlap",
@@ -134,6 +137,9 @@ describe("lane-plan", () => {
   });
 
   it("scores structural complexity without any duration input", () => {
+    // Arrange
+
+    // Act
     const score = scoreWorkUnitComplexity({
       fileOverlap: "high",
       coupling: "medium",
@@ -142,6 +148,7 @@ describe("lane-plan", () => {
       testIsolation: "shared"
     });
 
+    // Assert
     expect(score).toBe(13);
   });
 });

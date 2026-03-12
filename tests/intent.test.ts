@@ -8,35 +8,73 @@ const sumTurns = (targets: Record<Role, number>) => {
 
 describe("intent", () => {
   it("classifies backend intent", () => {
-    expect(detectIntent("Investigate API latency and p95 regressions")).toBe("backend");
+    // Arrange
+    const prompt = "Investigate API latency and p95 regressions";
+
+    // Act
+    const intent = detectIntent(prompt);
+
+    // Assert
+    expect(intent).toBe("backend");
   });
 
   it("falls back to mixed when no keywords match", () => {
-    expect(detectIntent("Talk about team vibes and coordination")).toBe("mixed");
+    // Arrange
+    const prompt = "Talk about team vibes and coordination";
+
+    // Act
+    const intent = detectIntent(prompt);
+
+    // Assert
+    expect(intent).toBe("mixed");
   });
 
   it("returns zero turns for single role", () => {
+    // Arrange
+
+    // Act
     const targets = buildTurnTargets(["CTO"], "Investigate API latency");
+
+    // Assert
     expect(sumTurns(targets)).toBe(0);
   });
 
   it("allocates backend turns with stronger CTO/DEV share", () => {
+    // Arrange
+
+    // Act
     const targets = buildTurnTargets(["CTO", "DEV", "PM"], "API latency regression and backend performance");
+
+    // Assert
     expect(sumTurns(targets)).toBe(10);
     expect(targets.CTO).toBeGreaterThanOrEqual(targets.PM);
     expect(targets.DEV).toBeGreaterThanOrEqual(targets.PM);
   });
 
   it("uses max turn fallback for larger role groups", () => {
+    // Arrange
+
+    // Act
     const targets = buildTurnTargets(
       ["CTO", "DEV", "PO", "PM", "CEO", "MARKETING"],
       "General planning discussion"
     );
+
+    // Assert
     expect(sumTurns(targets)).toBe(14);
   });
 
   it("enables heartbeat for 3 or more roles", () => {
-    expect(shouldUseHeartbeat(["CTO", "DEV"])).toBe(false);
-    expect(shouldUseHeartbeat(["CTO", "DEV", "PM"])).toBe(true);
+    // Arrange
+    const smallRoleSet = ["CTO", "DEV"] as const;
+    const largeRoleSet = ["CTO", "DEV", "PM"] as const;
+
+    // Act
+    const smallResult = shouldUseHeartbeat([...smallRoleSet]);
+    const largeResult = shouldUseHeartbeat([...largeRoleSet]);
+
+    // Assert
+    expect(smallResult).toBe(false);
+    expect(largeResult).toBe(true);
   });
 });
