@@ -109,6 +109,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Supervisor merge-policy helper: `plugins/orchestration-workflows/merge-policy.ts`
 - Supervisor observability dashboard helper: `plugins/orchestration-workflows/observability-dashboard.ts`
 - Supervisor operations runbook: `SUPERVISOR_OPERATIONS_RUNBOOK.md`
+- Supervisor pilot KPI baseline: `SUPERVISOR_PILOT_KPI_BASELINE.md`
 - Review-ready evidence packet template: `EVIDENCE_PACKET_TEMPLATE.md`
 - Manual verification matrix: `TESTING.md`
 
@@ -122,6 +123,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Canonical Supervisor policy defaults and override guidance live in [`POLICY_PROFILES.md`](./POLICY_PROFILES.md).
 - Canonical Supervisor work-unit intake and normalization guidance live in [`SUPERVISOR_WORK_UNITS.md`](./SUPERVISOR_WORK_UNITS.md).
 - Canonical Supervisor operator guidance for normal operations, pauses, recovery, and incidents lives in [`SUPERVISOR_OPERATIONS_RUNBOOK.md`](./SUPERVISOR_OPERATIONS_RUNBOOK.md).
+- Canonical pilot success metrics, baseline capture, and comparison method for the first Supervisor rollout live in [`SUPERVISOR_PILOT_KPI_BASELINE.md`](./SUPERVISOR_PILOT_KPI_BASELINE.md).
 - Reusable review-ready handoff template and turn-ownership contract live in [`EVIDENCE_PACKET_TEMPLATE.md`](./EVIDENCE_PACKET_TEMPLATE.md).
 - Canonical typed lane turn-ownership helpers live in `plugins/orchestration-workflows/turn-ownership.ts` and align with the review-ready packet fields.
 - Canonical typed review-ready packet enforcement lives in `plugins/orchestration-workflows/review-ready-packet.ts` and blocks `review_ready` transitions when the minimum packet is missing.
