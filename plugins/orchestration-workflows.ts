@@ -17,6 +17,13 @@ export type {
   LanePolicy,
   RepoRiskTier
 } from "./orchestration-workflows/lane-lifecycle";
+export type {
+  LaneTurnHandoffContract,
+  LaneTurnHandoffInput,
+  LaneTurnOwnership,
+  LaneTurnRole,
+  LaneTurnTransferScope
+} from "./orchestration-workflows/turn-ownership";
 export {
   assertActiveLaneCountWithinPolicy,
   assertLaneStateTransition,
@@ -28,4 +35,10 @@ export {
   LANE_LIFECYCLE_POLICY,
   resolveLanePolicy
 } from "./orchestration-workflows/lane-lifecycle";
+export {
+  assertLaneTurnOwner,
+  canRoleWriteToLane,
+  createLaneTurnHandoffContract,
+  transferLaneTurn
+} from "./orchestration-workflows/turn-ownership";
 export { normalizeWorkUnit } from "./orchestration-workflows/work-unit";

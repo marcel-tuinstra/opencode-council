@@ -103,6 +103,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Supervisor policy defaults: `POLICY_PROFILES.md`
 - Supervisor work-unit contract: `SUPERVISOR_WORK_UNITS.md`
 - Supervisor lane-planning helper: `plugins/orchestration-workflows/lane-plan.ts`
+- Supervisor turn-ownership helper: `plugins/orchestration-workflows/turn-ownership.ts`
 - Review-ready evidence packet template: `EVIDENCE_PACKET_TEMPLATE.md`
 - Manual verification matrix: `TESTING.md`
 
@@ -116,6 +117,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Canonical Supervisor policy defaults and override guidance live in [`POLICY_PROFILES.md`](./POLICY_PROFILES.md).
 - Canonical Supervisor work-unit intake and normalization guidance live in [`SUPERVISOR_WORK_UNITS.md`](./SUPERVISOR_WORK_UNITS.md).
 - Reusable review-ready handoff template and turn-ownership contract live in [`EVIDENCE_PACKET_TEMPLATE.md`](./EVIDENCE_PACKET_TEMPLATE.md).
+- Canonical typed lane turn-ownership helpers live in `plugins/orchestration-workflows/turn-ownership.ts` and align with the review-ready packet fields.
 - Context compaction uses workflow-aware profiles in `plugins/orchestration-workflows/constants.ts` (`COMPACTION_PROFILES`) and preserves goals, constraints, blockers, and open actions.
 
 ## Who this is for

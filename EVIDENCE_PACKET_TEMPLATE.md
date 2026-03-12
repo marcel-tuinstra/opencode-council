@@ -13,10 +13,11 @@ Use this template when handing a change to reviewers or transferring the next tu
 
 Use the same contract for DEV, TESTER, reviewer, or mixed-role flows.
 
-- Minimum handoff fields are: current owner, next owner, transfer scope, transfer trigger, evidence, and open questions.
+- Minimum handoff fields are: current owner, next owner, transfer scope, transfer trigger, delta summary, risks, next required evidence, and open questions.
 - Ownership transfers only when the outgoing owner has linked the evidence needed for the next turn and named the next owner explicitly.
 - Evidence must be reviewable from the packet itself: acceptance trace, verification status, and any risk or rollback note needed for the receiving owner.
 - In multi-role heartbeat flows, transfer ownership only at a turn boundary or when the lead role asks for the next turn; do not switch owners mid-turn.
+- Turn ownership keeps one active role with write authority per lane at a time; repeated re-entry loops such as `DEV -> TESTER -> DEV` require a fresh handoff packet for each turn.
 - A handoff changes who owns the next action, but it does not change merge authority; manual merge stays with the named human merge owner.
 
 ## Review-Ready Packet
@@ -57,6 +58,9 @@ Use the same contract for DEV, TESTER, reviewer, or mixed-role flows.
 - Next turn owner: `<name or role>`
 - Transfer scope: `<review|test|implementation|release-readiness|n/a>`
 - Transfer trigger: `<what is complete enough to pass the turn>`
+- Delta summary: `<what changed since the previous turn>`
+- Risks: `<known reviewer or implementer concerns>`
+- Next required evidence: `<tests, docs, screenshots, logs, or review artifact needed before the next handoff>`
 - Evidence attached: `<acceptance rows, checks, screenshots, logs, or n/a>`
 - Reviewer owner: `<name or team>`
 - Merge owner: `<name or team>`
@@ -73,3 +77,41 @@ Use the same contract for DEV, TESTER, reviewer, or mixed-role flows.
 - Keep verification entries specific enough that another reviewer can repeat them quickly.
 - If ownership stays with the same person or role, repeat that value in both handoff owner fields instead of deleting them.
 - If a transfer is blocked, leave the next owner in place, mark the trigger or evidence gap explicitly, and keep the open question short enough for the Supervisor or reviewer to resolve quickly.
+
+## Before / after examples
+
+### Example: prompt and handoff messaging
+
+Before:
+
+```text
+DEV: I changed the implementation. Tester can take a look now.
+```
+
+After:
+
+```text
+## Handoff
+- Current turn owner: DEV
+- Next turn owner: TESTER
+- Transfer scope: test
+- Transfer trigger: Implementation for the lane is complete and ready for validation.
+- Delta summary: Added the lane planning helper and tests for dependency-aware planning.
+- Risks: Planner still relies on conservative scoring defaults.
+- Next required evidence: Run npm test and verify the new lane-plan cases.
+- Evidence attached: tests/lane-plan.test.ts, README.md, SUPERVISOR_WORK_UNITS.md
+- Open questions: none
+```
+
+Noticeable behavior change:
+
+- Before, a role could signal a handoff informally and leave the next role to reconstruct context.
+- After, every turn transfer carries a structured packet that makes the next action, risks, and required evidence explicit.
+
+### Example: when there is no user-facing prompt change
+
+If a future PR only refactors internals or renames types, call that out directly in the PR summary:
+
+```text
+Before / after: no user-facing prompting or messaging change in this PR; this update is internal-only.
+```
