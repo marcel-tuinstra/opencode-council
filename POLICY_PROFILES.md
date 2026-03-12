@@ -43,7 +43,6 @@ When evidence is mixed, use these tie-breakers:
 - If a repo can directly impact production, credentials, billing, or access control, classify it as small/high-risk unless strong counter-evidence is documented.
 - If maturity signals depend on another repository or team process that is not enforced here, classify conservatively.
 - If a repo is temporarily in incident or migration mode, keep the stored tier stable and narrow the active run with human instruction instead of reclassifying permanently.
-
 ## Escalation behavior
 
 `v1-safe` escalates instead of proceeding when any of the following is true:
