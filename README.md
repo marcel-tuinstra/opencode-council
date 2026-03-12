@@ -102,6 +102,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Agent personas: `agents/*.md`
 - Supervisor policy defaults: `POLICY_PROFILES.md`
 - Supervisor work-unit contract: `SUPERVISOR_WORK_UNITS.md`
+- Supervisor lane-planning helper: `plugins/orchestration-workflows/lane-plan.ts`
 - Review-ready evidence packet template: `EVIDENCE_PACKET_TEMPLATE.md`
 - Manual verification matrix: `TESTING.md`
 
