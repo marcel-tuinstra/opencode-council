@@ -11,7 +11,7 @@ It is the baseline that implementation teams should assume unless a repository o
 | Area | `v1-safe` default | Why it is the default |
 | --- | --- | --- |
 | Lane lifecycle and caps | `lane_states: planned -> active -> waiting -> review_ready -> complete`; `max_active_lanes_by_tier: 2/3/4` for `small-high-risk`, `medium-moderate-risk`, `large-mature`; `max_concurrent_code_changes: 1`; `max_open_pull_requests: 1` | Allows limited planning concurrency without widening implementation or review concurrency by default. |
-| Merge mode | `manual` | Requires a human to merge; no auto-merge by default. |
+| Merge mode | `manual`; optional `auto-merge` only by explicit repo opt-in | Keeps human approval as the default; any auto-merge path must stay behind repository policy, service-criticality checks, and path eligibility. |
 | Budget thresholds | `soft_run_tokens: 6400`, `hard_run_tokens: 8400`, `soft_step_tokens: 2800`, `hard_step_tokens: 4000`, `truncate_at_tokens: 1400` | Reuses the current budget governor defaults already implemented in `plugins/orchestration-workflows/budget.ts`. |
 | Escalation mode | `ask-first` | Pushes risky or ambiguous actions back to a human before the workflow continues. |
 
@@ -63,7 +63,7 @@ Use `v1-safe` unless a repository explicitly opts into tighter automation policy
 | Area | `v1-safe` | Opt-in stricter automation |
 | --- | --- | --- |
 | Lane caps | Active lane caps follow repo tier defaults (`2/3/4`), while code changes and open PRs stay at `1` | Same or lower caps; never higher than the tier default without explicit configuration |
-| Merge mode | Manual merge only | `queue` is allowed only when the repo explicitly enables it and CI is required |
+| Merge mode | Manual merge only | `queue` or `auto-merge` is allowed only when the repo explicitly enables it, the repo is classified `large-mature`, and merge eligibility still passes service-criticality and path checks |
 | Budget thresholds | Current repository defaults | Lower soft and hard thresholds to force earlier compaction or escalation |
 | Escalation | Ask on risky actions | Ask earlier and on more categories, such as any repo-policy override or any failed validation |
 
@@ -87,4 +87,5 @@ Precedence should be: direct human instruction for the active run, then committe
 - Repository tiering should feed policy selection conservatively: classification sets the default active lane cap, but does not silently widen merge behavior or code-change concurrency.
 - If runtime config is added later, keep its field names aligned with the defaults and tiers defined here.
 - Do not introduce automatic merge behavior as a silent default; it must remain a repository opt-in.
+- Merge eligibility should treat service criticality and changed-path scope as the primary gates; labels may inform routing or intent, but should remain secondary hints.
 - Lane cap overrides should come only from explicit configuration, not from inferred repo maturity beyond the default tier mapping.
