@@ -3,7 +3,7 @@
 [![CI](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-OpenCode Orchestration Workflows brings structured multi-agent execution to OpenCode, with a live conversation plugin today and a supervisor/worktree foundation for staged parallel execution.
+Structured multi-agent orchestration for OpenCode, with a supervisor/worktree foundation for staged parallel execution.
 
 Note: this is an independent community plugin for OpenCode and is not affiliated with or endorsed by OpenCode.
 
