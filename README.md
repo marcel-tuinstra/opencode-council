@@ -22,6 +22,25 @@ Vanilla multi-mention prompts often produce uneven role participation and unpred
 - Automatic heartbeat discussion phases for 3+ mentioned roles (Frame -> Challenge -> Synthesize).
 - Mention-gated MCP behavior for installed providers like `sentry`, `github`, `shortcut`, and `nuxt`.
 
+## Current status
+
+- The core conversation plugin is live today: mention parsing, role-balanced thread output, heartbeat phases, MCP gating, budget control, and context compaction all run in the plugin.
+- The repository now also ships typed Supervisor contracts and helpers for work units, lane planning, lane lifecycle, turn ownership, review-ready evidence packets, merge policy, budget governance, observability, ad-hoc run history, and pilot operations.
+- Those Supervisor pieces are intentionally shipped first as reusable contracts, tests, and docs so teams can adopt them safely and wire them into runtime behavior in stages.
+
+## Already visible in runtime
+
+- Structured budget-governance checkpoints can be surfaced when a run pushes past soft-budget thresholds.
+- Delegated follow-up can carry a more explicit handoff contract with next required evidence.
+- Review-sensitive prompts can carry a review-ready checkpoint reminder instead of treating handoff/review state as implicit.
+- Debug mode can emit a unified observability snapshot for the active session.
+
+## Coming next
+
+- Deeper runtime wiring for the Supervisor helpers so more of the typed policy layer becomes visible in normal plugin flows.
+- A dedicated supervisor/worktree execution mode that uses the shipped lane planning, lifecycle, merge policy, and pilot contracts directly.
+- A real epic pilot using the documented safe-route worktree flow, KPI baseline, and incident/runbook guidance.
+
 ## How it works
 
 1. Parse mentions and set a per-session role policy.
