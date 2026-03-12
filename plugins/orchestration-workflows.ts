@@ -24,6 +24,14 @@ export type {
   RepoRiskTier
 } from "./orchestration-workflows/lane-lifecycle";
 export type {
+  MergePolicy,
+  MergePolicyCandidate,
+  MergePolicyConfig,
+  MergePolicyDecision,
+  MergePolicyMode,
+  MergeTargetCriticality
+} from "./orchestration-workflows/merge-policy";
+export type {
   LaneTurnHandoffContract,
   LaneTurnHandoffInput,
   LaneTurnOwnership,
@@ -51,6 +59,12 @@ export {
   LANE_LIFECYCLE_POLICY,
   resolveLanePolicy
 } from "./orchestration-workflows/lane-lifecycle";
+export {
+  assertMergePolicyAllowsAutoMerge,
+  DEFAULT_MERGE_POLICY_MODE,
+  evaluateMergePolicy,
+  resolveMergePolicy
+} from "./orchestration-workflows/merge-policy";
 export {
   assertLaneTurnOwner,
   canRoleWriteToLane,
