@@ -9,11 +9,20 @@ const LEAKED_CONTROL_PREFIXES = [
   "Delegation (optional): if needed, emit <<DELEGATE:ROLE1,ROLE2>> then switch to [n] ROLE: message lines.",
   "Format: [n] ROLE: message | Start with",
   "Heartbeat: Phase 1 Frame, Phase 2 Challenge (react to another role), Phase 3 Synthesize by lead.",
+  "MCP:",
+  "Suggest /mcp if data may be stale.",
+  "Use the above message and context to generate a prompt and call the task tool with subagent:",
+  "# Plan Mode - System Reminder",
+  "CRITICAL: Plan mode ACTIVE",
   "No markdown. Plain lines only."
 ];
 
 export const stripControlLeakage = (text: string): string => {
-  const withoutReminders = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "");
+  const withoutReminders = text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "")
+    .replace(/Format:\s*\[n\]\s*ROLE:\s*message\s*\|\s*Start with[^\n]*(?:\n(?:Heartbeat:.*|MCP:.*|Suggest \/mcp.*|No markdown\..*))*/gi, "")
+    .replace(/Format:\s*plain prose, no role prefix, no markdown\.(?:\n(?:Delegation .*|MCP:.*|Include concrete recommendations\.|No markdown\..*))*/gi, "")
+    .replace(/Use the above message and context to generate a prompt and call the task tool with subagent:\s*[a-z]+/gi, "");
   const lines = withoutReminders.split("\n");
   const filtered = lines.filter((line) => {
     const trimmed = line.trim();

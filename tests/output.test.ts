@@ -126,6 +126,33 @@ describe("output", () => {
     expect(cleaned).toBe("Real answer line");
   });
 
+  it("strips repeated enforcement blocks and task invocation leakage", () => {
+    // Arrange
+    const text = [
+      "Format: [n] ROLE: message | Start with CTO: | Plan: CTO:2 DEV:1 PM:1",
+      "Heartbeat: Phase 1 Frame, Phase 2 Challenge (react to another role), Phase 3 Synthesize by lead.",
+      "MCP: disabled.",
+      "Suggest /mcp if data may be stale.",
+      "No markdown. Plain lines only.",
+      "Use the above message and context to generate a prompt and call the task tool with subagent: cto",
+      "Use the above message and context to generate a prompt and call the task tool with subagent: dev",
+      "<system-reminder>",
+      "# Plan Mode - System Reminder",
+      "CRITICAL: Plan mode ACTIVE",
+      "</system-reminder>",
+      "[1] CTO: Start with query timing and release correlation.",
+      "[2] DEV: Check traces and recent deploy diff."
+    ].join("\n");
+
+    // Act
+    const cleaned = stripControlLeakage(text);
+
+    // Assert
+    expect(cleaned).toBe(
+      "[1] CTO: Start with query timing and release correlation.\n[2] DEV: Check traces and recent deploy diff."
+    );
+  });
+
   it("applies compact and halt budget actions with reason", () => {
     // Arrange
 

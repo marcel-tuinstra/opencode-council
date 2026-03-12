@@ -111,7 +111,12 @@ export const enforceUserContract = (
     return text;
   }
 
-  if (text.includes("Format:")) {
+  if (
+    text.includes("Format:")
+    || text.includes("Heartbeat:")
+    || text.includes("MCP:")
+    || text.includes("No markdown. Plain lines only.")
+  ) {
     return text;
   }
 

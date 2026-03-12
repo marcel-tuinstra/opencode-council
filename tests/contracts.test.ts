@@ -55,4 +55,21 @@ describe("contracts", () => {
     expect(instruction).toContain("<<DELEGATE:ROLE1,ROLE2>>");
     expect(userText).toBe("Should we prioritize this?");
   });
+
+  it("does not inject the user contract twice when equivalent markers already exist", () => {
+    // Arrange
+    const text = [
+      "Investigate the regression.",
+      "Format: [n] ROLE: message | Start with CTO: | Plan: CTO:2 DEV:1 PM:1",
+      "Heartbeat: Phase 1 Frame, Phase 2 Challenge (react to another role), Phase 3 Synthesize by lead.",
+      "MCP: disabled.",
+      "No markdown. Plain lines only."
+    ].join("\n");
+
+    // Act
+    const enforced = enforceUserContract(text, ["CTO", "DEV", "PM"], targets, true, [], false);
+
+    // Assert
+    expect(enforced).toBe(text);
+  });
 });
