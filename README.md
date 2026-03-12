@@ -101,6 +101,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Tests: `tests/*.test.ts`
 - Agent personas: `agents/*.md`
 - Supervisor policy defaults: `POLICY_PROFILES.md`
+- Supervisor work-unit contract: `SUPERVISOR_WORK_UNITS.md`
 - Review-ready evidence packet template: `EVIDENCE_PACKET_TEMPLATE.md`
 - Manual verification matrix: `TESTING.md`
 
@@ -112,6 +113,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - To add Jira (or another provider), update built-in patterns and tool prefix mapping in `plugins/orchestration-workflows/constants.ts` and `plugins/orchestration-workflows/mcp.ts`.
 - For full customization (custom MCP checks, adding roles, and authoring agents), see [`CUSTOMIZATION.md`](./CUSTOMIZATION.md).
 - Canonical Supervisor policy defaults and override guidance live in [`POLICY_PROFILES.md`](./POLICY_PROFILES.md).
+- Canonical Supervisor work-unit intake and normalization guidance live in [`SUPERVISOR_WORK_UNITS.md`](./SUPERVISOR_WORK_UNITS.md).
 - Reusable review-ready handoff template and turn-ownership contract live in [`EVIDENCE_PACKET_TEMPLATE.md`](./EVIDENCE_PACKET_TEMPLATE.md).
 - Context compaction uses workflow-aware profiles in `plugins/orchestration-workflows/constants.ts` (`COMPACTION_PROFILES`) and preserves goals, constraints, blockers, and open actions.
 

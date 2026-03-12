@@ -14,6 +14,7 @@
     "plugins/orchestration-workflows/roles.ts",
     "plugins/orchestration-workflows/session.ts",
     "plugins/orchestration-workflows/types.ts",
+    "plugins/orchestration-workflows/work-unit.ts",
     "tests/**/*.ts"
   ]
 }
