@@ -16,6 +16,40 @@ Every intake should normalize into a `WorkUnit` with the same minimum planning f
 
 The typed contract lives in `plugins/orchestration-workflows/work-unit.ts`.
 
+## Ad-hoc run history registry contract
+
+Ad-hoc work needs a lightweight audit record even when no tracker ticket exists yet. The smallest v1 registry contract should stay immutable and tracker-agnostic while preserving enough detail to link follow-up artifacts later.
+
+- `runId`: stable record identifier for the originating execution
+- `workUnitId`: normalized work-unit key used by planning and later references
+- `objective`: copied from the normalized `WorkUnit` so reports stay aligned with intake
+- `repo`, `branch`, `commitSet`, `operator`, `createdAt`: durable execution provenance for the originating run
+- `evidenceLinks`: copied from the originating `WorkUnit` for immediate audit context
+- `relatedArtifacts`: later PRs, merge packets, postmortems, or other review artifacts that should point back to the same run
+
+The typed helper lives in `plugins/orchestration-workflows/ad-hoc-run-history.ts`.
+
+### Before / after behavior
+
+Before:
+
+- Ad-hoc work could normalize into a `WorkUnit`, but there was no typed immutable registry record for the actual run.
+- Follow-up PRs or postmortems had no canonical place to point back to the originating non-ticketed execution.
+
+After:
+
+- An ad-hoc run can be captured as an immutable typed record keyed by work-unit id, repo, branch, commit set, operator, objective, and evidence links.
+- Later artifacts can link back to that originating run by creating a new record snapshot instead of mutating history in place.
+
+Prompting and messaging example:
+
+```text
+Before: "We handled this from Slack and can look up the branch later if needed."
+After: "Ad-hoc run adhoc:wu-17:2026-03-12T17:00:00Z recorded for work unit wu-17 with repo, branch, commit set, operator, evidence, and follow-up PR links."
+```
+
+If a future change only extends the typed registry contract without introducing runtime prompting or behavior, PR notes should state that clearly.
+
 ## Lane planning contract
 
 Lane planning should consume normalized `WorkUnit` records rather than tracker-native payloads.

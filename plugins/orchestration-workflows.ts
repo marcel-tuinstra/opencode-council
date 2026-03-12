@@ -11,6 +11,12 @@ export type {
   WorkUnitTrackerKind
 } from "./orchestration-workflows/work-unit";
 export type {
+  AdHocRunArtifactKind,
+  AdHocRunArtifactLink,
+  AdHocRunHistoryInput,
+  AdHocRunHistoryRecord
+} from "./orchestration-workflows/ad-hoc-run-history";
+export type {
   LaneCapPolicyConfig,
   LaneLifecyclePolicy,
   LaneLifecycleState,
@@ -41,4 +47,8 @@ export {
   createLaneTurnHandoffContract,
   transferLaneTurn
 } from "./orchestration-workflows/turn-ownership";
+export {
+  createAdHocRunHistoryRecord,
+  linkAdHocRunArtifact
+} from "./orchestration-workflows/ad-hoc-run-history";
 export { normalizeWorkUnit } from "./orchestration-workflows/work-unit";
