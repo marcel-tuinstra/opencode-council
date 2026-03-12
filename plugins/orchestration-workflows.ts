@@ -59,6 +59,22 @@ export type {
   ReviewReadyVerificationEntry,
   ReviewReadyVerificationStatus
 } from "./orchestration-workflows/review-ready-packet";
+export type {
+  SupervisorBlockerSnapshot,
+  SupervisorBlockerSnapshotInput,
+  SupervisorBlockerStatus,
+  SupervisorEscalationEvent,
+  SupervisorHeartbeatHealth,
+  SupervisorHeartbeatSnapshot,
+  SupervisorHeartbeatSnapshotInput,
+  SupervisorLaneObservabilityInput,
+  SupervisorLaneObservabilitySnapshot,
+  SupervisorObservabilityDashboardInput,
+  SupervisorObservabilityDashboardSnapshot,
+  SupervisorPolicyDecision,
+  SupervisorPolicyDecisionCategory,
+  SupervisorPolicyDecisionInput
+} from "./orchestration-workflows/observability-dashboard";
 export {
   assertActiveLaneCountWithinPolicy,
   assertLaneStateTransition,
@@ -93,6 +109,10 @@ export {
   assertReviewReadyTransition,
   createReviewReadyEvidencePacket
 } from "./orchestration-workflows/review-ready-packet";
+export {
+  createSupervisorObservabilityDashboard,
+  resolveHeartbeatHealth
+} from "./orchestration-workflows/observability-dashboard";
 export {
   createAdHocRunHistoryRecord,
   linkAdHocRunArtifact
