@@ -14,7 +14,7 @@ Use this template when handing a change to reviewers. It is intentionally short,
 # Evidence Packet
 
 ## Change
-- Story / ticket: `sc-...`
+- Story / ticket: `<ticket id or n/a>`
 - Repo: `<repo>`
 - Lane / workstream: `<lane or n/a>`
 - Branch / PR: `<branch>` / `<pr link>`
@@ -52,5 +52,6 @@ Use this template when handing a change to reviewers. It is intentionally short,
 
 - Use the same headings across docs-only, code, and mixed-change lanes so reviewers know where to look.
 - If a section is not relevant, mark it `n/a` instead of deleting it; that keeps packets comparable.
+- Ticket identifiers may come from Shortcut, Jira, or another tracker; use the repository or team convention instead of assuming one prefix.
 - Keep acceptance trace tied to requirements, not a generic task list.
 - Keep verification entries specific enough that another reviewer can repeat them quickly.
