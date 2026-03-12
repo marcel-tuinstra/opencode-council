@@ -13,10 +13,11 @@ Use this template when handing a change to reviewers or transferring the next tu
 
 Use the same contract for DEV, TESTER, reviewer, or mixed-role flows.
 
-- Minimum handoff fields are: current owner, next owner, transfer scope, transfer trigger, evidence, and open questions.
+- Minimum handoff fields are: current owner, next owner, transfer scope, transfer trigger, delta summary, risks, next required evidence, and open questions.
 - Ownership transfers only when the outgoing owner has linked the evidence needed for the next turn and named the next owner explicitly.
 - Evidence must be reviewable from the packet itself: acceptance trace, verification status, and any risk or rollback note needed for the receiving owner.
 - In multi-role heartbeat flows, transfer ownership only at a turn boundary or when the lead role asks for the next turn; do not switch owners mid-turn.
+- Turn ownership keeps one active role with write authority per lane at a time; repeated re-entry loops such as `DEV -> TESTER -> DEV` require a fresh handoff packet for each turn.
 - A handoff changes who owns the next action, but it does not change merge authority; manual merge stays with the named human merge owner.
 
 ## Review-Ready Packet
@@ -57,6 +58,9 @@ Use the same contract for DEV, TESTER, reviewer, or mixed-role flows.
 - Next turn owner: `<name or role>`
 - Transfer scope: `<review|test|implementation|release-readiness|n/a>`
 - Transfer trigger: `<what is complete enough to pass the turn>`
+- Delta summary: `<what changed since the previous turn>`
+- Risks: `<known reviewer or implementer concerns>`
+- Next required evidence: `<tests, docs, screenshots, logs, or review artifact needed before the next handoff>`
 - Evidence attached: `<acceptance rows, checks, screenshots, logs, or n/a>`
 - Reviewer owner: `<name or team>`
 - Merge owner: `<name or team>`

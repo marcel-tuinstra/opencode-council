@@ -54,6 +54,17 @@ Allowed v1 transitions are intentionally narrow:
 
 The typed lane lifecycle and cap contract lives in `plugins/orchestration-workflows/lane-lifecycle.ts`.
 
+## Turn ownership and handoff contract
+
+Multi-role collaboration can stay in one lane as long as turn ownership remains explicit and auditable.
+
+- A lane has exactly one active role with write authority at a time.
+- The active role may hand off to another role or re-enter the same role later, but every turn change must record a handoff contract.
+- Each handoff contract must capture a delta summary, current risks, and the next required evidence so the receiving role can continue without widening lane concurrency.
+- Re-entry loops such as `DEV -> TESTER -> DEV` stay in the same lane and remain valid as long as each hop records its own handoff packet.
+
+The typed turn ownership helper and handoff contract live in `plugins/orchestration-workflows/turn-ownership.ts`.
+
 ## Supported intake modes
 
 ### Tracker-backed
