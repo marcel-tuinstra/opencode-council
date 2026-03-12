@@ -65,6 +65,29 @@ Multi-role collaboration can stay in one lane as long as turn ownership remains 
 
 The typed turn ownership helper and handoff contract live in `plugins/orchestration-workflows/turn-ownership.ts`.
 
+### Before / after behavior
+
+Before:
+
+- Roles could coordinate in one lane only by convention.
+- A handoff could be implied by a short message such as "tester can pick this up now".
+- Reviewers or the next role often had to infer what changed, what was risky, and what evidence still mattered.
+
+After:
+
+- A lane keeps exactly one active role with write authority at a time.
+- A turn transfer must include a structured handoff contract with delta summary, risks, next required evidence, and attached evidence.
+- Re-entry loops such as `DEV -> TESTER -> DEV` stay valid, but each hop must leave a traceable contract.
+
+Prompting and messaging example:
+
+```text
+Before: "Implementation is done; QA can test now."
+After: "Current owner DEV -> next owner TESTER, scope test, trigger implementation complete, risks listed, next required evidence listed."
+```
+
+If a future change only refactors this helper without changing prompting, handoff messaging, or visible behavior, PR notes should state that clearly instead of implying a user-facing change.
+
 ## Supported intake modes
 
 ### Tracker-backed

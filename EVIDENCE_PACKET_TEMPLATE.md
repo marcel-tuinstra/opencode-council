@@ -77,3 +77,41 @@ Use the same contract for DEV, TESTER, reviewer, or mixed-role flows.
 - Keep verification entries specific enough that another reviewer can repeat them quickly.
 - If ownership stays with the same person or role, repeat that value in both handoff owner fields instead of deleting them.
 - If a transfer is blocked, leave the next owner in place, mark the trigger or evidence gap explicitly, and keep the open question short enough for the Supervisor or reviewer to resolve quickly.
+
+## Before / after examples
+
+### Example: prompt and handoff messaging
+
+Before:
+
+```text
+DEV: I changed the implementation. Tester can take a look now.
+```
+
+After:
+
+```text
+## Handoff
+- Current turn owner: DEV
+- Next turn owner: TESTER
+- Transfer scope: test
+- Transfer trigger: Implementation for the lane is complete and ready for validation.
+- Delta summary: Added the lane planning helper and tests for dependency-aware planning.
+- Risks: Planner still relies on conservative scoring defaults.
+- Next required evidence: Run npm test and verify the new lane-plan cases.
+- Evidence attached: tests/lane-plan.test.ts, README.md, SUPERVISOR_WORK_UNITS.md
+- Open questions: none
+```
+
+Noticeable behavior change:
+
+- Before, a role could signal a handoff informally and leave the next role to reconstruct context.
+- After, every turn transfer carries a structured packet that makes the next action, risks, and required evidence explicit.
+
+### Example: when there is no user-facing prompt change
+
+If a future PR only refactors internals or renames types, call that out directly in the PR summary:
+
+```text
+Before / after: no user-facing prompting or messaging change in this PR; this update is internal-only.
+```
