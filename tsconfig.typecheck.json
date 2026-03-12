@@ -9,6 +9,7 @@
     "plugins/orchestration-workflows/contracts.ts",
     "plugins/orchestration-workflows/debug.ts",
     "plugins/orchestration-workflows/intent.ts",
+    "plugins/orchestration-workflows/lane-plan.ts",
     "plugins/orchestration-workflows/mcp.ts",
     "plugins/orchestration-workflows/output.ts",
     "plugins/orchestration-workflows/roles.ts",

@@ -3,6 +3,9 @@ import { normalizeWorkUnit } from "../plugins/orchestration-workflows/work-unit"
 
 describe("work-unit", () => {
   it("normalizes tracker-backed intake into the canonical work-unit shape", () => {
+    // Arrange
+
+    // Act
     const workUnit = normalizeWorkUnit({
       objective: "Normalize Supervisor intake for ticketed work",
       constraints: ["safe-route-only", "safe-route-only", "base branch must be main"],
@@ -41,6 +44,7 @@ describe("work-unit", () => {
       }
     });
 
+    // Assert
     expect(workUnit).toEqual({
       objective: "Normalize Supervisor intake for ticketed work",
       constraints: ["safe-route-only", "base branch must be main"],
@@ -83,6 +87,9 @@ describe("work-unit", () => {
   });
 
   it("supports ad-hoc intake without requiring ticket metadata", () => {
+    // Arrange
+
+    // Act
     const workUnit = normalizeWorkUnit({
       objective: "Draft a rollout checklist from the pasted prompt",
       acceptanceCriteria: ["Checklist covers launch, rollback, and owner handoff"],
@@ -96,6 +103,7 @@ describe("work-unit", () => {
       }
     });
 
+    // Assert
     expect(workUnit).toEqual({
       objective: "Draft a rollout checklist from the pasted prompt",
       constraints: [],
@@ -116,6 +124,9 @@ describe("work-unit", () => {
   });
 
   it("falls back to the source title when a tracker-backed objective is omitted", () => {
+    // Arrange
+
+    // Act
     const workUnit = normalizeWorkUnit({
       source: {
         kind: "tracker",
@@ -126,6 +137,7 @@ describe("work-unit", () => {
       }
     });
 
+    // Assert
     expect(workUnit.objective).toBe("OpenCode Orchestration Workflows");
     expect(workUnit.source.reference).toBe("jira:epic:323");
     expect(workUnit.source.metadata).toEqual({

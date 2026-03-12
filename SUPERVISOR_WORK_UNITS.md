@@ -16,6 +16,25 @@ Every intake should normalize into a `WorkUnit` with the same minimum planning f
 
 The typed contract lives in `plugins/orchestration-workflows/work-unit.ts`.
 
+## Lane planning contract
+
+Lane planning should consume normalized `WorkUnit` records rather than tracker-native payloads.
+The planning helper remains tracker-agnostic by pairing each normalized work unit with a local planning id, dependency ids, and structural signals:
+
+- `fileOverlap`: how much source-area contention is expected across units
+- `coupling`: how many neighboring systems or modules are likely to move together
+- `blastRadius`: whether the change stays contained, touches adjacent surfaces, or spans broadly
+- `unknownCount`: unresolved questions that raise coordination or review cost
+- `testIsolation`: whether validation is isolated, partial, shared, or absent
+
+The lane planner must use those structural signals plus explicit dependency edges to produce:
+
+- a dependency graph that shows blocked versus parallelizable units
+- lane recommendations derived from dependency order and structural complexity
+- a clear statement that expected duration is not a gating input
+
+The typed lane planning contract lives in `plugins/orchestration-workflows/lane-plan.ts`.
+
 ## Supported intake modes
 
 ### Tracker-backed
@@ -50,7 +69,9 @@ Ad-hoc work must not require a ticket id. Instead, its source block can carry li
 - Missing ticket metadata must not block normalization if the work already has the required planning fields.
 - When a tracker-backed intake does not provide an explicit objective, normalization may fall back to the source title.
 - Source metadata should be preserved as raw key-value data rather than forcing any single ticket-system dependency into the core `WorkUnit` shape.
+- Lane planning must work from normalized `WorkUnit` records and explicit dependency ids, not tracker-specific fields.
+- Expected duration can be preserved elsewhere for reporting, but it must not change lane gating or dependency decisions.
 
 ## Current implementation boundary
 
-This story adds the typed `WorkUnit` contract and a minimal `normalizeWorkUnit` helper so future Supervisor wiring can reuse one canonical model. It does not introduce a full Supervisor runtime or automatic intake ingestion yet.
+This repository currently ships typed Supervisor intake and lane-planning contracts plus minimal helpers (`normalizeWorkUnit` and `planWorkUnitLanes`) so future wiring can reuse one canonical model. It does not introduce a full Supervisor runtime or automatic intake ingestion yet.
