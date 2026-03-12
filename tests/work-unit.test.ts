@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { normalizeWorkUnit } from "../plugins/orchestration-workflows/work-unit";
 
 describe("work-unit", () => {
-  it("normalizes shortcut-backed intake into the canonical work-unit shape", () => {
+  it("normalizes tracker-backed intake into the canonical work-unit shape", () => {
     const workUnit = normalizeWorkUnit({
       objective: "Normalize Supervisor intake for ticketed work",
       constraints: ["safe-route-only", "safe-route-only", "base branch must be main"],
       acceptanceCriteria: [
-        "Supervisor can create WorkUnits from Shortcut inputs",
+        "Supervisor can create WorkUnits from tracker-backed inputs",
         "Canonical schema preserves planning fields"
       ],
       dependencies: [
@@ -26,9 +26,12 @@ describe("work-unit", () => {
         }
       ],
       source: {
-        kind: "shortcut-story",
+        kind: "tracker",
+        tracker: "shortcut",
+        entityType: "story",
         id: 342,
         title: "Supervisor Intake: Ticketed + Ad-hoc Work Units",
+        reference: "SC-342",
         url: "https://app.shortcut.com/tuinstradev/story/342",
         metadata: {
           epicId: 323,
@@ -42,7 +45,7 @@ describe("work-unit", () => {
       objective: "Normalize Supervisor intake for ticketed work",
       constraints: ["safe-route-only", "base branch must be main"],
       acceptanceCriteria: [
-        "Supervisor can create WorkUnits from Shortcut inputs",
+        "Supervisor can create WorkUnits from tracker-backed inputs",
         "Canonical schema preserves planning fields"
       ],
       dependencies: [
@@ -61,16 +64,20 @@ describe("work-unit", () => {
         }
       ],
       source: {
-        kind: "shortcut-story",
+        kind: "tracker",
         title: "Supervisor Intake: Ticketed + Ad-hoc Work Units",
-        reference: "sc-342",
+        reference: "SC-342",
         url: "https://app.shortcut.com/tuinstradev/story/342",
         metadata: {
-          shortcutId: 342,
+          tracker: "shortcut",
+          trackerEntityType: "story",
+          trackerId: 342,
           epicId: 323,
           workflowStateId: 500000008,
           ownerIds: ["user-1"]
-        }
+        },
+        tracker: "shortcut",
+        trackerEntityType: "story"
       }
     });
   });
@@ -108,17 +115,25 @@ describe("work-unit", () => {
     });
   });
 
-  it("falls back to the source title when a shortcut objective is omitted", () => {
+  it("falls back to the source title when a tracker-backed objective is omitted", () => {
     const workUnit = normalizeWorkUnit({
       source: {
-        kind: "shortcut-epic",
+        kind: "tracker",
+        tracker: "jira",
+        entityType: "epic",
         id: 323,
         title: "OpenCode Orchestration Workflows"
       }
     });
 
     expect(workUnit.objective).toBe("OpenCode Orchestration Workflows");
-    expect(workUnit.source.reference).toBe("shortcut-epic:323");
-    expect(workUnit.source.metadata).toEqual({ shortcutId: 323 });
+    expect(workUnit.source.reference).toBe("jira:epic:323");
+    expect(workUnit.source.metadata).toEqual({
+      tracker: "jira",
+      trackerEntityType: "epic",
+      trackerId: 323
+    });
+    expect(workUnit.source.tracker).toBe("jira");
+    expect(workUnit.source.trackerEntityType).toBe("epic");
   });
 });

@@ -2,11 +2,12 @@ export { AgentConversations } from "./orchestration-workflows/index";
 export type {
   AdHocWorkUnitInput,
   EvidenceLink,
-  ShortcutWorkUnitInput,
+  TrackerWorkUnitInput,
   WorkUnit,
   WorkUnitDependency,
   WorkUnitInput,
   WorkUnitSource,
-  WorkUnitSourceKind
+  WorkUnitSourceKind,
+  WorkUnitTrackerKind
 } from "./orchestration-workflows/work-unit";
 export { normalizeWorkUnit } from "./orchestration-workflows/work-unit";

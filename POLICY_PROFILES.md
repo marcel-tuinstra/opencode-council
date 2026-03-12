@@ -83,7 +83,7 @@ Precedence should be: direct human instruction for the active run, then committe
 ## Implementation notes
 
 - Treat this file as the canonical reference for story work that introduces Supervisor policy wiring.
-- Keep the canonical intake model aligned with `SUPERVISOR_WORK_UNITS.md` so Shortcut-backed and ad-hoc work share the same minimum planning fields.
+- Keep the canonical intake model aligned with `SUPERVISOR_WORK_UNITS.md` so tracker-backed and ad-hoc work share the same minimum planning fields.
 - Repository tiering should feed policy selection conservatively: classification may justify stricter handling, but not silently broader automation.
 - If runtime config is added later, keep its field names aligned with the defaults and tiers defined here.
 - Do not introduce automatic merge behavior as a silent default; it must remain a repository opt-in.

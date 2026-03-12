@@ -1,6 +1,6 @@
 # Supervisor Work Units
 
-This repository still does not ship a full Supervisor runtime. This document is the reviewable v1 contract for intake normalization so future Supervisor execution can accept both ticketed and non-ticketed work without splitting the planning model.
+This repository still does not ship a full Supervisor runtime. This document is the reviewable v1 contract for intake normalization so future Supervisor execution can accept both tracker-backed and non-ticketed work without splitting the planning model.
 
 ## Canonical shape
 
@@ -12,24 +12,26 @@ Every intake should normalize into a `WorkUnit` with the same minimum planning f
 - `dependencies`: upstream work, documents, people, or systems that can block execution
 - `riskTags`: lightweight routing or caution labels like `workflow`, `reliability`, or `security`
 - `evidenceLinks`: links the Supervisor or reviewer can use to verify context or outputs
-- `source`: preserved origin metadata for Shortcut-backed and ad-hoc work alike
+- `source`: preserved origin metadata for tracker-backed and ad-hoc work alike
 
 The typed contract lives in `plugins/orchestration-workflows/work-unit.ts`.
 
 ## Supported intake modes
 
-### Shortcut-backed
+### Tracker-backed
 
-Shortcut stories, epics, and objectives normalize into the same shape. The source block should preserve any available metadata that helps trace the original planning record, such as:
+External tracker items normalize into the same shape. The source block should preserve any available metadata that helps trace the original planning record, such as:
 
-- Shortcut id
+- tracker kind (for example Shortcut, Jira, GitHub, Linear, or custom)
+- tracker entity type
+- tracker id or key
 - app URL
 - workflow state id
 - owner ids
 - label names
 - parent epic or objective ids
 
-Shortcut-specific metadata is useful when present, but the canonical planning fields should stay usable even if only a subset of metadata is available.
+Tracker-specific metadata is useful when present, but the canonical planning fields should stay usable even if only a subset of metadata is available.
 
 ### Ad-hoc
 
@@ -44,10 +46,10 @@ Ad-hoc work must not require a ticket id. Instead, its source block can carry li
 
 ## Normalization rules
 
-- The canonical planning fields are identical for Shortcut and ad-hoc intake.
+- The canonical planning fields are identical for tracker-backed and ad-hoc intake.
 - Missing ticket metadata must not block normalization if the work already has the required planning fields.
-- When a Shortcut intake does not provide an explicit objective, normalization may fall back to the source title.
-- Source metadata should be preserved as raw key-value data rather than forcing a ticket-system dependency into the core `WorkUnit` shape.
+- When a tracker-backed intake does not provide an explicit objective, normalization may fall back to the source title.
+- Source metadata should be preserved as raw key-value data rather than forcing any single ticket-system dependency into the core `WorkUnit` shape.
 
 ## Current implementation boundary
 

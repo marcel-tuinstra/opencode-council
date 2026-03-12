@@ -1,8 +1,11 @@
-export type WorkUnitSourceKind =
-  | "shortcut-story"
-  | "shortcut-epic"
-  | "shortcut-objective"
-  | "ad-hoc";
+export type WorkUnitSourceKind = "tracker" | "ad-hoc";
+
+export type WorkUnitTrackerKind =
+  | "shortcut"
+  | "jira"
+  | "github"
+  | "linear"
+  | "custom";
 
 export type EvidenceLink = {
   label: string;
@@ -22,6 +25,8 @@ export type WorkUnitSource = {
   reference?: string;
   url?: string;
   metadata: Record<string, unknown>;
+  tracker?: WorkUnitTrackerKind;
+  trackerEntityType?: string;
 };
 
 export type WorkUnit = {
@@ -43,11 +48,14 @@ type WorkUnitDraft = {
   evidenceLinks?: EvidenceLink[];
 };
 
-export type ShortcutWorkUnitInput = WorkUnitDraft & {
+export type TrackerWorkUnitInput = WorkUnitDraft & {
   source: {
-    kind: "shortcut-story" | "shortcut-epic" | "shortcut-objective";
-    id: number;
+    kind: "tracker";
+    tracker: WorkUnitTrackerKind;
+    entityType: string;
+    id: string | number;
     title: string;
+    reference?: string;
     url?: string;
     metadata?: Record<string, unknown>;
   };
@@ -64,20 +72,15 @@ export type AdHocWorkUnitInput = WorkUnitDraft & {
   };
 };
 
-export type WorkUnitInput = ShortcutWorkUnitInput | AdHocWorkUnitInput;
+export type WorkUnitInput = TrackerWorkUnitInput | AdHocWorkUnitInput;
 
 const dedupe = <T>(items: T[]): T[] => Array.from(new Set(items));
 
-const buildShortcutReference = (
-  kind: ShortcutWorkUnitInput["source"]["kind"],
-  id: number
-): string => {
-  if (kind === "shortcut-story") {
-    return `sc-${id}`;
-  }
-
-  return `${kind}:${id}`;
-};
+const buildTrackerReference = (
+  tracker: TrackerWorkUnitInput["source"]["tracker"],
+  entityType: string,
+  id: string | number
+): string => `${tracker}:${entityType}:${id}`;
 
 export const normalizeWorkUnit = (input: WorkUnitInput): WorkUnit => {
   const objective = input.objective?.trim() || input.source.title.trim();
@@ -89,16 +92,23 @@ export const normalizeWorkUnit = (input: WorkUnitInput): WorkUnit => {
     dependencies: input.dependencies ?? [],
     riskTags: dedupe(input.riskTags ?? []),
     evidenceLinks: input.evidenceLinks ?? [],
-    source: {
-      kind: input.source.kind,
-      title: input.source.title,
-      reference: input.source.kind === "ad-hoc"
-        ? input.source.reference
-        : buildShortcutReference(input.source.kind, input.source.id),
-      url: input.source.url,
-      metadata: input.source.kind === "ad-hoc"
-        ? { ...(input.source.metadata ?? {}) }
-        : { shortcutId: input.source.id, ...(input.source.metadata ?? {}) }
-    }
+      source: {
+        kind: input.source.kind,
+        title: input.source.title,
+        reference: input.source.kind === "ad-hoc"
+          ? input.source.reference
+          : (input.source.reference ?? buildTrackerReference(input.source.tracker, input.source.entityType, input.source.id)),
+        url: input.source.url,
+        metadata: input.source.kind === "ad-hoc"
+          ? { ...(input.source.metadata ?? {}) }
+          : {
+              tracker: input.source.tracker,
+              trackerEntityType: input.source.entityType,
+              trackerId: input.source.id,
+              ...(input.source.metadata ?? {})
+            },
+        tracker: input.source.kind === "tracker" ? input.source.tracker : undefined,
+        trackerEntityType: input.source.kind === "tracker" ? input.source.entityType : undefined
+      }
+    };
   };
-};
