@@ -103,6 +103,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Supervisor policy defaults: `POLICY_PROFILES.md`
 - Supervisor work-unit contract: `SUPERVISOR_WORK_UNITS.md`
 - Supervisor lane-planning helper: `plugins/orchestration-workflows/lane-plan.ts`
+- Supervisor budget-governance helper: `plugins/orchestration-workflows/budget-governance.ts`
 - Supervisor turn-ownership helper: `plugins/orchestration-workflows/turn-ownership.ts`
 - Supervisor review-ready packet helper: `plugins/orchestration-workflows/review-ready-packet.ts`
 - Supervisor merge-policy helper: `plugins/orchestration-workflows/merge-policy.ts`
@@ -122,6 +123,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Canonical typed lane turn-ownership helpers live in `plugins/orchestration-workflows/turn-ownership.ts` and align with the review-ready packet fields.
 - Canonical typed review-ready packet enforcement lives in `plugins/orchestration-workflows/review-ready-packet.ts` and blocks `review_ready` transitions when the minimum packet is missing.
 - Canonical typed merge-policy evaluation lives in `plugins/orchestration-workflows/merge-policy.ts` and keeps human approval as the default while making auto-merge an explicit, path-scoped opt-in.
+- Canonical typed budget-governance evaluation lives in `plugins/orchestration-workflows/budget-governance.ts` and keeps budget control soft by default while requiring escalation past 120% unless a repository explicitly opts into hard-stop runaway protection.
 - Context compaction uses workflow-aware profiles in `plugins/orchestration-workflows/constants.ts` (`COMPACTION_PROFILES`) and preserves goals, constraints, blockers, and open actions.
 
 ## Who this is for

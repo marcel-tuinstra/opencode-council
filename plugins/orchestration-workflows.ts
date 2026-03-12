@@ -11,6 +11,17 @@ export type {
   WorkUnitTrackerKind
 } from "./orchestration-workflows/work-unit";
 export type {
+  BudgetGovernanceConfig,
+  BudgetGovernanceDecision,
+  BudgetGovernanceInput,
+  BudgetGovernancePolicy,
+  BudgetGovernanceRecommendation,
+  BudgetGovernanceRequirement,
+  BudgetGovernanceScope,
+  BudgetGovernanceStatus,
+  BudgetGovernanceThreshold
+} from "./orchestration-workflows/budget-governance";
+export type {
   AdHocRunArtifactKind,
   AdHocRunArtifactLink,
   AdHocRunHistoryInput,
@@ -65,6 +76,13 @@ export {
   evaluateMergePolicy,
   resolveMergePolicy
 } from "./orchestration-workflows/merge-policy";
+export {
+  DEFAULT_ESCALATION_THRESHOLD_PERCENT,
+  DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
+  DEFAULT_WARNING_THRESHOLD_PERCENTS,
+  evaluateBudgetGovernance,
+  resolveBudgetGovernancePolicy
+} from "./orchestration-workflows/budget-governance";
 export {
   assertLaneTurnOwner,
   canRoleWriteToLane,

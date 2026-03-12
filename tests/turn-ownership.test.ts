@@ -16,6 +16,9 @@ const activeDevTurn: LaneTurnOwnership = {
 
 describe("turn-ownership", () => {
   it("requires structured handoff fields aligned to the evidence packet", () => {
+    // Arrange
+
+    // Act
     const handoff = createLaneTurnHandoffContract({
       laneId: "lane-1",
       currentOwner: "DEV",
@@ -29,20 +32,31 @@ describe("turn-ownership", () => {
       openQuestions: ["None"]
     });
 
+    // Assert
     expect(handoff.deltaSummary).toBe("Added the lane ownership contract and packet fields.");
     expect(handoff.risks).toEqual(["Regression coverage still depends on lane-specific validation."]);
     expect(handoff.nextRequiredEvidence).toEqual(["Run the targeted handoff and lifecycle tests."]);
   });
 
   it("enforces one active role with write authority per lane", () => {
-    expect(canRoleWriteToLane("DEV", activeDevTurn)).toBe(true);
-    expect(canRoleWriteToLane("PM", activeDevTurn)).toBe(false);
+    // Arrange
+
+    // Act
+    const devCanWrite = canRoleWriteToLane("DEV", activeDevTurn);
+    const pmCanWrite = canRoleWriteToLane("PM", activeDevTurn);
+
+    // Assert
+    expect(devCanWrite).toBe(true);
+    expect(pmCanWrite).toBe(false);
     expect(() => assertLaneTurnOwner("PM", activeDevTurn)).toThrow(
       "Role PM does not hold the active lane turn for lane-1; current owner is DEV."
     );
   });
 
   it("supports explicit re-entry loops through audited handoffs", () => {
+    // Arrange
+
+    // Act
     const testerTurn = transferLaneTurn(activeDevTurn, {
       laneId: "lane-1",
       currentOwner: "DEV",
@@ -69,6 +83,7 @@ describe("turn-ownership", () => {
       openQuestions: ["Confirm whether the follow-up needs another review pass."]
     });
 
+    // Assert
     expect(testerTurn.activeRole).toBe("TESTER");
     expect(devReentryTurn.activeRole).toBe("DEV");
     expect(devReentryTurn.writeAuthorityRole).toBe("DEV");
@@ -80,6 +95,9 @@ describe("turn-ownership", () => {
   });
 
   it("rejects handoffs that omit required risks or evidence expectations", () => {
+    // Arrange
+
+    // Act / Assert
     expect(() => createLaneTurnHandoffContract({
       laneId: "lane-1",
       currentOwner: "DEV",

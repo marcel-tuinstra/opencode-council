@@ -12,7 +12,7 @@ It is the baseline that implementation teams should assume unless a repository o
 | --- | --- | --- |
 | Lane lifecycle and caps | `lane_states: planned -> active -> waiting -> review_ready -> complete`; `max_active_lanes_by_tier: 2/3/4` for `small-high-risk`, `medium-moderate-risk`, `large-mature`; `max_concurrent_code_changes: 1`; `max_open_pull_requests: 1` | Allows limited planning concurrency without widening implementation or review concurrency by default. |
 | Merge mode | `manual`; optional `auto-merge` only by explicit repo opt-in | Keeps human approval as the default; any auto-merge path must stay behind repository policy, service-criticality checks, and path eligibility. |
-| Budget thresholds | `soft_run_tokens: 6400`, `hard_run_tokens: 8400`, `soft_step_tokens: 2800`, `hard_step_tokens: 4000`, `truncate_at_tokens: 1400` | Reuses the current budget governor defaults already implemented in `plugins/orchestration-workflows/budget.ts`. |
+| Budget thresholds | `soft_run_tokens: 6400`, `soft_step_tokens: 2800`, warning thresholds at `80%`, `100%`, and `120%`, escalation past `120%`, `truncate_at_tokens: 1400`; optional runaway hard-stop remains opt-in and can reuse `hard_run_tokens: 8400` / `hard_step_tokens: 4000` as explicit override thresholds | Keeps budget control soft by default, adds progressive warnings plus required escalation after `120%`, and preserves hard-stop only as explicit runaway protection. |
 | Escalation mode | `ask-first` | Pushes risky or ambiguous actions back to a human before the workflow continues. |
 
 ## Repository classification rubric
@@ -50,7 +50,7 @@ When evidence is mixed, use these tie-breakers:
 - scope is ambiguous and the next action could materially change the outcome
 - a change is destructive, irreversible, or affects production state
 - a secret, credential, or account-specific value is required
-- a hard budget threshold is exceeded
+- a configured hard-stop runaway threshold is exceeded
 - a merge would be required to finish the task
 - a request asks to broaden automation beyond the default policy
 
@@ -64,7 +64,7 @@ Use `v1-safe` unless a repository explicitly opts into tighter automation policy
 | --- | --- | --- |
 | Lane caps | Active lane caps follow repo tier defaults (`2/3/4`), while code changes and open PRs stay at `1` | Same or lower caps; never higher than the tier default without explicit configuration |
 | Merge mode | Manual merge only | `queue` or `auto-merge` is allowed only when the repo explicitly enables it, the repo is classified `large-mature`, and merge eligibility still passes service-criticality and path checks |
-| Budget thresholds | Current repository defaults | Lower soft and hard thresholds to force earlier compaction or escalation |
+| Budget thresholds | Soft budget governance with warnings at `80%`, `100%`, and `120%`, mandatory escalation past `120%`, and opt-in runaway hard-stop thresholds | Lower warning or hard-stop thresholds to force earlier compaction or escalation |
 | Escalation | Ask on risky actions | Ask earlier and on more categories, such as any repo-policy override or any failed validation |
 
 Stricter automation is opt-in because it changes delivery posture. It should be enabled only with an explicit repository-level policy, not inferred from a single task.
@@ -75,7 +75,7 @@ Override points are intentionally minimal.
 
 1. Runtime default: `v1-safe` from this document.
 2. Repository policy file: future Supervisor implementations should read a committed repo-local policy from `.opencode/supervisor-policy.json`.
-3. Environment overrides: budget thresholds may already be adjusted with the existing `ORCHESTRATION_WORKFLOWS_BUDGET_*` variables in `plugins/orchestration-workflows/budget.ts`.
+3. Environment overrides: runtime budget thresholds may already be adjusted with the existing `ORCHESTRATION_WORKFLOWS_BUDGET_*` variables in `plugins/orchestration-workflows/budget.ts`; future Supervisor policy wiring should map those values into the soft-governance helper in `plugins/orchestration-workflows/budget-governance.ts`.
 4. Per-run human instruction: a user may narrow the policy for a specific run; widening the policy beyond `v1-safe` requires explicit opt-in.
 
 Precedence should be: direct human instruction for the active run, then committed repository policy, then runtime defaults.
@@ -89,3 +89,4 @@ Precedence should be: direct human instruction for the active run, then committe
 - Do not introduce automatic merge behavior as a silent default; it must remain a repository opt-in.
 - Merge eligibility should treat service criticality and changed-path scope as the primary gates; labels may inform routing or intent, but should remain secondary hints.
 - Lane cap overrides should come only from explicit configuration, not from inferred repo maturity beyond the default tier mapping.
+- Budget escalation past `120%` should require a human-readable justification, a recorded scope-or-lane reduction decision, and a checkpoint review before autonomous execution resumes when hard-stop is disabled.
