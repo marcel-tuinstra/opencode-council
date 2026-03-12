@@ -93,4 +93,6 @@ Prefer short diagnostics, explicit tradeoffs, and practical next steps.
 - Keep provider policy in plugin code, not in each agent prompt.
 - Keep agent prompts role-specific and concise.
 - Prefer adding aliases in `ROLE_ALIASES` so users can mention natural names.
+- Supervisor policy defaults now live in `POLICY_PROFILES.md`; keep repo-specific overrides aligned with that contract.
+- Today, the only wired runtime overrides are the budget environment variables in `plugins/orchestration-workflows/budget.ts`.
 - After changes, run a quick prompt with multi-mentions and provider names to verify behavior.
