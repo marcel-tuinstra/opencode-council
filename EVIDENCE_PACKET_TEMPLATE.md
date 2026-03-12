@@ -22,6 +22,16 @@ Use the same contract for DEV, TESTER, reviewer, or mixed-role flows.
 
 ## Review-Ready Packet
 
+Minimum packet sections before a lane can move to `review_ready`:
+
+- acceptance criteria trace
+- scoped diff summary
+- verification results
+- risk / rollback notes
+- explicit handoff ownership
+
+The typed enforcement helper for this minimum packet lives in `plugins/orchestration-workflows/review-ready-packet.ts` and reuses the turn-ownership contract for the handoff section.
+
 ```md
 # Evidence Packet
 
