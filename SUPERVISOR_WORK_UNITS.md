@@ -35,6 +35,25 @@ The lane planner must use those structural signals plus explicit dependency edge
 
 The typed lane planning contract lives in `plugins/orchestration-workflows/lane-plan.ts`.
 
+## Lane lifecycle contract
+
+Lane execution should use one conservative lifecycle so planning, review, and cap enforcement stay auditable across repositories.
+
+- `planned`: the lane is defined but work has not started yet
+- `active`: the lane is currently consuming implementation capacity and counts toward the active lane cap
+- `waiting`: the lane is blocked on an external dependency, human decision, or upstream change and does not count toward the active lane cap
+- `review_ready`: the lane has produced a reviewable handoff, such as a PR, and no longer counts toward the active lane cap unless it re-enters active work
+- `complete`: the lane is finished and terminal
+
+Allowed v1 transitions are intentionally narrow:
+
+- `planned -> active`
+- `active -> waiting | review_ready`
+- `waiting -> active | review_ready`
+- `review_ready -> active | complete`
+
+The typed lane lifecycle and cap contract lives in `plugins/orchestration-workflows/lane-lifecycle.ts`.
+
 ## Supported intake modes
 
 ### Tracker-backed
@@ -74,4 +93,4 @@ Ad-hoc work must not require a ticket id. Instead, its source block can carry li
 
 ## Current implementation boundary
 
-This repository currently ships typed Supervisor intake and lane-planning contracts plus minimal helpers (`normalizeWorkUnit` and `planWorkUnitLanes`) so future wiring can reuse one canonical model. It does not introduce a full Supervisor runtime or automatic intake ingestion yet.
+This repository currently ships typed Supervisor intake, lane-planning, and lane-lifecycle contracts plus minimal helpers (`normalizeWorkUnit`, `planWorkUnitLanes`, and lane lifecycle/cap policy helpers) so future wiring can reuse one canonical model. It does not introduce a full Supervisor runtime or automatic intake ingestion yet.

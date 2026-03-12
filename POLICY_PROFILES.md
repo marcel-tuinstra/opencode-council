@@ -10,7 +10,7 @@ It is the baseline that implementation teams should assume unless a repository o
 
 | Area | `v1-safe` default | Why it is the default |
 | --- | --- | --- |
-| Lane caps | `max_active_workstreams: 1`, `max_concurrent_code_changes: 1`, `max_open_pull_requests: 1` | Keeps execution serial, reviewable, and easy to unwind. |
+| Lane lifecycle and caps | `lane_states: planned -> active -> waiting -> review_ready -> complete`; `max_active_lanes_by_tier: 2/3/4` for `small-high-risk`, `medium-moderate-risk`, `large-mature`; `max_concurrent_code_changes: 1`; `max_open_pull_requests: 1` | Allows limited planning concurrency without widening implementation or review concurrency by default. |
 | Merge mode | `manual` | Requires a human to merge; no auto-merge by default. |
 | Budget thresholds | `soft_run_tokens: 6400`, `hard_run_tokens: 8400`, `soft_step_tokens: 2800`, `hard_step_tokens: 4000`, `truncate_at_tokens: 1400` | Reuses the current budget governor defaults already implemented in `plugins/orchestration-workflows/budget.ts`. |
 | Escalation mode | `ask-first` | Pushes risky or ambiguous actions back to a human before the workflow continues. |
@@ -23,9 +23,9 @@ Choose the highest-risk tier that matches. Production impact, security sensitivi
 
 | Tier | When to use it | Typical signals | Policy guidance |
 | --- | --- | --- | --- |
-| Small/high-risk | Small surface area, new ownership, or limited history, but mistakes are costly | Infra or deployment repo, secrets or access-policy changes, weak test coverage, no proven rollback path, sparse ownership | Stay on `v1-safe`; keep manual merge and `1/1/1` lane caps; prefer earlier escalation and lower token thresholds if the repo opts into stricter automation |
-| Medium/moderate-risk | Established repo with bounded blast radius and workable delivery controls | Service or app repo with regular CI, at least one clear owner, repeatable review habits, and partial rollback coverage | Default to `v1-safe`; lane caps remain `1/1/1`; repo-level policy may tighten escalation or budgets, but should not widen merge or lane behavior by default |
-| Large/mature | Broad codebase with strong ownership and proven operational controls | Monorepo or shared platform with CODEOWNERS, required CI, release playbooks, stable rollback, and clear change domains | Default still starts at `v1-safe`; only an explicit repo policy may allow `queue` merge, and only when CI is required; lane caps stay at `1/1/1` unless a human explicitly overrides them |
+| Small/high-risk | Small surface area, new ownership, or limited history, but mistakes are costly | Infra or deployment repo, secrets or access-policy changes, weak test coverage, no proven rollback path, sparse ownership | Stay on `v1-safe`; keep manual merge, default to `max_active_lanes: 2`, and retain `1` concurrent code-change lane plus `1` open PR; prefer earlier escalation and lower token thresholds if the repo opts into stricter automation |
+| Medium/moderate-risk | Established repo with bounded blast radius and workable delivery controls | Service or app repo with regular CI, at least one clear owner, repeatable review habits, and partial rollback coverage | Default to `v1-safe`; default to `max_active_lanes: 3`, while concurrent code changes and open PRs remain `1`; repo-level policy may tighten escalation or budgets, but should not widen merge behavior or lane caps without explicit configuration |
+| Large/mature | Broad codebase with strong ownership and proven operational controls | Monorepo or shared platform with CODEOWNERS, required CI, release playbooks, stable rollback, and clear change domains | Default still starts at `v1-safe`; default to `max_active_lanes: 4`, keep `1` concurrent code-change lane and `1` open PR, and allow `queue` merge only when the repo explicitly enables it and CI is required |
 
 ## Examples and edge cases
 
@@ -62,7 +62,7 @@ Use `v1-safe` unless a repository explicitly opts into tighter automation policy
 
 | Area | `v1-safe` | Opt-in stricter automation |
 | --- | --- | --- |
-| Lane caps | One active workstream and one code-change lane | Same or lower caps; never higher than default without an explicit human override |
+| Lane caps | Active lane caps follow repo tier defaults (`2/3/4`), while code changes and open PRs stay at `1` | Same or lower caps; never higher than the tier default without explicit configuration |
 | Merge mode | Manual merge only | `queue` is allowed only when the repo explicitly enables it and CI is required |
 | Budget thresholds | Current repository defaults | Lower soft and hard thresholds to force earlier compaction or escalation |
 | Escalation | Ask on risky actions | Ask earlier and on more categories, such as any repo-policy override or any failed validation |
@@ -84,6 +84,7 @@ Precedence should be: direct human instruction for the active run, then committe
 
 - Treat this file as the canonical reference for story work that introduces Supervisor policy wiring.
 - Keep the canonical intake model aligned with `SUPERVISOR_WORK_UNITS.md` so tracker-backed and ad-hoc work share the same minimum planning fields.
-- Repository tiering should feed policy selection conservatively: classification may justify stricter handling, but not silently broader automation.
+- Repository tiering should feed policy selection conservatively: classification sets the default active lane cap, but does not silently widen merge behavior or code-change concurrency.
 - If runtime config is added later, keep its field names aligned with the defaults and tiers defined here.
 - Do not introduce automatic merge behavior as a silent default; it must remain a repository opt-in.
+- Lane cap overrides should come only from explicit configuration, not from inferred repo maturity beyond the default tier mapping.
