@@ -1,54 +1,57 @@
-# OpenCode Orchestration Workflows Plugin
+# OpenCode Orchestration Workflows
 
 [![CI](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Community plugin for OpenCode to run role-based orchestration workflows.
+OpenCode Orchestration Workflows brings structured multi-agent execution to OpenCode, with a live conversation plugin today and a supervisor/worktree foundation for staged parallel execution.
 
-Note: This is an independent community plugin for OpenCode and is not affiliated with or endorsed by OpenCode.
+Note: this is an independent community plugin for OpenCode and is not affiliated with or endorsed by OpenCode.
 
-## Why this plugin
+## Why This Exists
 
-This plugin adds structured multi-agent output to OpenCode using `@` mentions. It is aimed at teams that want role-based discussion, clearer debate format, and controlled MCP tool usage in one workflow.
+Vanilla multi-mention prompts often produce uneven participation, unclear ownership, and ad-hoc tool usage. This project makes those flows more deliberate:
 
-Vanilla multi-mention prompts often produce uneven role participation and unpredictable tool usage. This plugin enforces a predictable thread format and mention-scoped MCP policy so team discussions remain legible.
+- role-based discussion stays readable
+- MCP usage stays explicit and auditable
+- coordination rules become predictable instead of implicit
+- the repo now also lays the groundwork for safer supervisor/worktree execution later
 
-## What you get
+## Live Today
 
-- Single mention (`@cto`) returns a normal direct answer.
-- Single-role conversations can self-delegate to additional roles via `<<DELEGATE:...>>` when confidence is low.
-- Multi-mention prompts produce threaded output like `[n] ROLE: message`.
-- Relevance-weighted airtime for better role balance.
-- Automatic heartbeat discussion phases for 3+ mentioned roles (Frame -> Challenge -> Synthesize).
-- Mention-gated MCP behavior for installed providers like `sentry`, `github`, `shortcut`, and `nuxt`.
+- Mention-driven role orchestration in OpenCode chats
+- Numbered threaded output like `[n] ROLE: message`
+- Relevance-weighted participation and heartbeat phases for 3+ roles (`Frame -> Challenge -> Synthesize`)
+- Mention-gated MCP behavior for installed providers
+- Runtime compaction and budget controls
+- Initial runtime-visible budget, handoff, and review-ready reminders where the plugin is wired locally
 
-## Current status
+## Foundation Shipped
 
-- The core conversation plugin is live today: mention parsing, role-balanced thread output, heartbeat phases, MCP gating, budget control, and context compaction all run in the plugin.
-- The repository now also ships typed Supervisor contracts and helpers for work units, lane planning, lane lifecycle, turn ownership, review-ready evidence packets, merge policy, budget governance, observability, ad-hoc run history, and pilot operations.
-- Those Supervisor pieces are intentionally shipped first as reusable contracts, tests, and docs so teams can adopt them safely and wire them into runtime behavior in stages.
+The repository also ships typed Supervisor helpers, docs, and tests for staged adoption:
 
-## Already visible in runtime
+- work units
+- lane planning
+- lane lifecycle
+- turn ownership and handoff contracts
+- review-ready evidence packet enforcement
+- merge policy
+- budget governance
+- observability snapshots
+- ad-hoc run history
+- runbook, KPI baseline, and epic pilot packaging
 
-- Structured budget-governance checkpoints can be surfaced when a run pushes past soft-budget thresholds.
-- Delegated follow-up can carry a more explicit handoff contract with next required evidence.
-- Review-sensitive prompts can carry a review-ready checkpoint reminder instead of treating handoff/review state as implicit.
-- Debug mode can emit a unified observability snapshot for the active session.
+These are real repo assets, but they are not the same thing as a fully user-invokable supervisor/runtime mode yet.
 
-## Coming next
+## How The Orchestration Model Works
 
-- Deeper runtime wiring for the Supervisor helpers so more of the typed policy layer becomes visible in normal plugin flows.
-- A dedicated supervisor/worktree execution mode that uses the shipped lane planning, lifecycle, merge policy, and pilot contracts directly.
-- A real epic pilot using the documented safe-route worktree flow, KPI baseline, and incident/runbook guidance.
-
-## How it works
-
-1. Parse mentions and set a per-session role policy.
+1. Parse mentions and create a per-session role policy.
 2. Infer intent and calculate weighted turn targets.
-3. Enforce MCP provider access from explicit provider mentions.
-4. Normalize the final output into a readable numbered thread.
+3. For 3+ roles, guide discussion through heartbeat phases: Frame -> Challenge -> Synthesize.
+4. Gate MCP access based on explicit provider mentions.
+5. Normalize the final output into a predictable thread.
+6. Apply budget, compaction, and governance signals where relevant.
 
-## Before and after
+## What You Can Do Today
 
 Prompt:
 
@@ -56,13 +59,7 @@ Prompt:
 @cto @dev @pm Investigate why API latency regressed this week and propose a fix plan using sentry and github.
 ```
 
-Without plugin (typical):
-
-```text
-We should look at logs, traces, and maybe recent PRs. PM should track risks and CTO should align on architecture.
-```
-
-With plugin:
+Typical result with the plugin:
 
 ```text
 [1] CTO: We need to isolate whether this is compute saturation, query contention, or an external dependency regression; start with p95/p99 breakdown and release correlation.
@@ -74,94 +71,57 @@ With plugin:
 [4] CTO: Recommendation: run a short Sentry trace audit plus GitHub change diff first, then commit to either rollback or targeted fix.
 ```
 
-## MCP gating behavior
+In multi-role mode, this usually follows a heartbeat rhythm:
 
-- No provider named: MCP calls are blocked.
-- One provider named: only that provider can be used.
-- Multiple providers named: each named provider must be used at least once before reusing one provider repeatedly.
-- Call caps: default is 2 MCP calls, deep investigations can raise that cap.
+- `Frame`: set the problem and decision space
+- `Challenge`: react, test assumptions, or bring contrary evidence
+- `Synthesize`: close with a lead recommendation or next step
 
-Examples:
+## Installation And Quick Start
 
-```text
-@dev Fix the bug from today.
-# MCP blocked unless a provider is named.
+- Install: [`docs/getting-started/install.md`](./docs/getting-started/install.md)
+- Quick start: [`docs/getting-started/quickstart.md`](./docs/getting-started/quickstart.md)
+- Customization: [`docs/guides/customization.md`](./docs/guides/customization.md)
 
-@dev investigate with sentry
-# Only sentry MCP tools allowed.
+## Docs For Operators And Contributors
 
-@cto @dev compare sentry and github evidence before deciding.
-# Both sentry and github must be touched.
-```
+- Docs index: [`docs/README.md`](./docs/README.md)
+- Product positioning: [`docs/overview/product-positioning.md`](./docs/overview/product-positioning.md)
+- Architecture overview: [`docs/overview/architecture.md`](./docs/overview/architecture.md)
+- Status and roadmap: [`docs/overview/status-and-roadmap.md`](./docs/overview/status-and-roadmap.md)
+- Policy profiles: [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md)
+- Supervisor work units: [`docs/supervisor/work-units.md`](./docs/supervisor/work-units.md)
+- Operations runbook: [`docs/supervisor/operations-runbook.md`](./docs/supervisor/operations-runbook.md)
+- Pilot KPI baseline: [`docs/supervisor/pilot-kpi-baseline.md`](./docs/supervisor/pilot-kpi-baseline.md)
+- Epic pilot package: [`docs/supervisor/epic-pilot.md`](./docs/supervisor/epic-pilot.md)
+- Evidence packet template: [`docs/reference/evidence-packet-template.md`](./docs/reference/evidence-packet-template.md)
+- Testing guide: [`docs/testing/testing.md`](./docs/testing/testing.md)
 
-## Quick example
+## Roadmap And Current Limits
 
-```text
-@ceo @cto @dev @po @pm @marketing @research Launch analytics in 6 weeks; debate tradeoffs and produce a phased plan.
-```
+Live now:
 
-## Installation
+- conversation-first orchestration plugin
+- MCP gating, heartbeat phases, thread normalization, and compaction behavior
+- shipped policy/governance/runtime helper foundation
 
-For setup steps, copy commands, and a quick verification prompt, see [`INSTALL.md`](./INSTALL.md).
+Coming next:
 
-## Development and tests
+- deeper runtime wiring of the Supervisor helpers
+- dedicated supervisor/worktree execution mode
+- real pilot execution evidence and follow-up hardening
 
-```bash
-npm install
-npm test
-```
+Current limit:
 
-CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/workflows/ci.yml`).
+- the repo already contains substantial Supervisor contracts and operating docs, but that does not yet mean a full supervisor mode is available as a normal end-user runtime flow
 
-## Repository layout
+## Repository Layout
 
 - Plugin entrypoint: `plugins/orchestration-workflows.ts`
 - Plugin modules: `plugins/orchestration-workflows/*.ts`
 - Tests: `tests/*.test.ts`
 - Agent personas: `agents/*.md`
-- Supervisor policy defaults: `POLICY_PROFILES.md`
-- Supervisor work-unit contract: `SUPERVISOR_WORK_UNITS.md`
-- Supervisor lane-planning helper: `plugins/orchestration-workflows/lane-plan.ts`
-- Supervisor budget-governance helper: `plugins/orchestration-workflows/budget-governance.ts`
-- Supervisor turn-ownership helper: `plugins/orchestration-workflows/turn-ownership.ts`
-- Supervisor review-ready packet helper: `plugins/orchestration-workflows/review-ready-packet.ts`
-- Supervisor merge-policy helper: `plugins/orchestration-workflows/merge-policy.ts`
-- Supervisor observability dashboard helper: `plugins/orchestration-workflows/observability-dashboard.ts`
-- Supervisor operations runbook: `SUPERVISOR_OPERATIONS_RUNBOOK.md`
-- Supervisor pilot KPI baseline: `SUPERVISOR_PILOT_KPI_BASELINE.md`
-- Supervisor epic pilot package: `SUPERVISOR_EPIC_PILOT.md`
-- Review-ready evidence packet template: `EVIDENCE_PACKET_TEMPLATE.md`
-- Manual verification matrix: `TESTING.md`
-
-## Configuration notes
-
-- Default MCP policy is mention-gated by provider name.
-- If no provider is named, MCP calls are blocked.
-- If multiple providers are named, each must be touched at least once.
-- To add Jira (or another provider), update built-in patterns and tool prefix mapping in `plugins/orchestration-workflows/constants.ts` and `plugins/orchestration-workflows/mcp.ts`.
-- For full customization (custom MCP checks, adding roles, and authoring agents), see [`CUSTOMIZATION.md`](./CUSTOMIZATION.md).
-- Canonical Supervisor policy defaults and override guidance live in [`POLICY_PROFILES.md`](./POLICY_PROFILES.md).
-- Canonical Supervisor work-unit intake and normalization guidance live in [`SUPERVISOR_WORK_UNITS.md`](./SUPERVISOR_WORK_UNITS.md).
-- Canonical Supervisor operator guidance for normal operations, pauses, recovery, and incidents lives in [`SUPERVISOR_OPERATIONS_RUNBOOK.md`](./SUPERVISOR_OPERATIONS_RUNBOOK.md).
-- Canonical pilot success metrics, baseline capture, and comparison method for the first Supervisor rollout live in [`SUPERVISOR_PILOT_KPI_BASELINE.md`](./SUPERVISOR_PILOT_KPI_BASELINE.md).
-- Canonical safe-route pilot packaging for one real epic with multiple worktrees lives in [`SUPERVISOR_EPIC_PILOT.md`](./SUPERVISOR_EPIC_PILOT.md).
-- Reusable review-ready handoff template and turn-ownership contract live in [`EVIDENCE_PACKET_TEMPLATE.md`](./EVIDENCE_PACKET_TEMPLATE.md).
-- Canonical typed lane turn-ownership helpers live in `plugins/orchestration-workflows/turn-ownership.ts` and align with the review-ready packet fields.
-- Canonical typed review-ready packet enforcement lives in `plugins/orchestration-workflows/review-ready-packet.ts` and blocks `review_ready` transitions when the minimum packet is missing.
-- Canonical typed merge-policy evaluation lives in `plugins/orchestration-workflows/merge-policy.ts` and keeps human approval as the default while making auto-merge an explicit, path-scoped opt-in.
-- Canonical typed budget-governance evaluation lives in `plugins/orchestration-workflows/budget-governance.ts` and keeps budget control soft by default while requiring escalation past 120% unless a repository explicitly opts into hard-stop runaway protection.
-- Canonical typed supervisor observability aggregation lives in `plugins/orchestration-workflows/observability-dashboard.ts` and rolls lane state, heartbeat health, blocker state, budget signals, policy decisions, and ownership handoffs into one review-ready snapshot.
-- Context compaction uses workflow-aware profiles in `plugins/orchestration-workflows/constants.ts` (`COMPACTION_PROFILES`) and preserves goals, constraints, blockers, and open actions.
-
-## Who this is for
-
-- Teams that want deliberate, role-based technical debate in one prompt.
-- Users who want MCP calls to be explicit and auditable.
-
-Not ideal for:
-
-- Freeform brainstorming where rigid turn structure is undesirable.
-- Workflows that require unconstrained MCP usage.
+- Docs: `docs/**`
 
 ## Contact
 
