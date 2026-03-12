@@ -7,6 +7,9 @@ import {
 
 describe("merge-policy", () => {
   it("defaults to manual human approval under the safe v1 profile", () => {
+    // Arrange
+
+    // Act
     const policy = resolveMergePolicy("medium-moderate-risk");
     const decision = evaluateMergePolicy(policy, {
       serviceCriticality: "standard",
@@ -14,6 +17,7 @@ describe("merge-policy", () => {
       labels: ["automerge"]
     });
 
+    // Assert
     expect(policy.mode).toBe("manual");
     expect(policy.overrideSource).toBe("default");
     expect(decision.status).toBe("requires-human");
@@ -21,6 +25,9 @@ describe("merge-policy", () => {
   });
 
   it("only allows auto-merge opt-in for large-mature repositories", () => {
+    // Arrange
+
+    // Act / Assert
     expect(() => resolveMergePolicy("medium-moderate-risk", {
       mode: "auto-merge",
       eligiblePathPrefixes: ["docs"]
@@ -30,17 +37,21 @@ describe("merge-policy", () => {
   });
 
   it("keeps service-critical changes on human approval by default even in auto-merge mode", () => {
+    // Arrange
     const policy = resolveMergePolicy("large-mature", {
       mode: "auto-merge",
       eligiblePathPrefixes: ["docs"],
       labelHints: ["automerge"]
     });
+
+    // Act
     const decision = evaluateMergePolicy(policy, {
       serviceCriticality: "service-critical",
       changedPaths: ["docs/runbooks/merge-policy.md"],
       labels: ["automerge"]
     });
 
+    // Assert
     expect(decision.status).toBe("requires-human");
     expect(decision.matchedLabelHints).toEqual(["automerge"]);
     expect(decision.reasons).toEqual([
@@ -49,12 +60,16 @@ describe("merge-policy", () => {
   });
 
   it("requires explicit eligible paths before auto-merge can be configured", () => {
+    // Arrange
+
+    // Act / Assert
     expect(() => resolveMergePolicy("large-mature", {
       mode: "auto-merge"
     })).toThrow("Auto-merge mode requires at least one eligible path prefix.");
   });
 
   it("enforces blocked and eligible path prefixes before auto-merge", () => {
+    // Arrange
     const policy = resolveMergePolicy("large-mature", {
       mode: "auto-merge",
       eligiblePathPrefixes: ["docs", "packages/ui"],
@@ -62,6 +77,7 @@ describe("merge-policy", () => {
       labelHints: ["automerge", "safe-path"]
     });
 
+    // Act
     const blockedDecision = evaluateMergePolicy(policy, {
       serviceCriticality: "standard",
       changedPaths: ["docs/security/runbook.md"],
@@ -74,6 +90,7 @@ describe("merge-policy", () => {
       labels: ["safe-path"]
     });
 
+    // Assert
     expect(blockedDecision.status).toBe("requires-human");
     expect(blockedDecision.blockedPaths).toEqual(["docs/security/runbook.md"]);
     expect(blockedDecision.reasons).toEqual([
@@ -89,6 +106,7 @@ describe("merge-policy", () => {
   });
 
   it("allows auto-merge only after criticality and path checks pass", () => {
+    // Arrange
     const policy = resolveMergePolicy("large-mature", {
       mode: "auto-merge",
       eligiblePathPrefixes: ["docs", "packages/ui"],
@@ -100,8 +118,11 @@ describe("merge-policy", () => {
       changedPaths: ["packages/ui/button.ts"],
       labels: ["automerge", "release-note"]
     };
+
+    // Act
     const decision = evaluateMergePolicy(policy, candidate);
 
+    // Assert
     expect(decision.status).toBe("eligible-for-auto-merge");
     expect(decision.matchedLabelHints).toEqual(["automerge"]);
     expect(decision.reasons).toEqual([
@@ -111,11 +132,13 @@ describe("merge-policy", () => {
   });
 
   it("rejects merge candidates that do not include changed paths", () => {
+    // Arrange
     const policy = resolveMergePolicy("large-mature", {
       mode: "auto-merge",
       eligiblePathPrefixes: ["docs"]
     });
 
+    // Act / Assert
     expect(() => evaluateMergePolicy(policy, {
       serviceCriticality: "standard",
       changedPaths: []

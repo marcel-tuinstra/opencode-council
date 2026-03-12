@@ -46,8 +46,12 @@ const buildPacket = (): ReviewReadyEvidencePacketInput => ({
 
 describe("review-ready-packet", () => {
   it("normalizes the minimum five-part review-ready packet", () => {
+    // Arrange
+
+    // Act
     const packet = createReviewReadyEvidencePacket(buildPacket());
 
+    // Assert
     expect(packet.acceptanceCriteriaTrace).toHaveLength(1);
     expect(packet.scopedDiffSummary).toEqual([
       "Added a typed helper that validates the minimum review-ready packet before lifecycle transitions."
@@ -65,12 +69,18 @@ describe("review-ready-packet", () => {
   });
 
   it("blocks review-ready transitions when the packet is missing", () => {
+    // Arrange
+
+    // Act / Assert
     expect(() => assertReviewReadyTransition("active", "review_ready")).toThrow(
       "Lane transition to review_ready requires a review-ready evidence packet."
     );
   });
 
   it("blocks review-ready transitions when a required packet section is empty", () => {
+    // Arrange
+
+    // Act / Assert
     expect(() => assertReviewReadyTransition("waiting", "review_ready", {
       ...buildPacket(),
       scopedDiffSummary: []
@@ -78,6 +88,12 @@ describe("review-ready-packet", () => {
   });
 
   it("allows non-review-ready transitions without a packet", () => {
-    expect(assertReviewReadyTransition("review_ready", "complete")).toBeUndefined();
+    // Arrange
+
+    // Act
+    const result = assertReviewReadyTransition("review_ready", "complete");
+
+    // Assert
+    expect(result).toBeUndefined();
   });
 });

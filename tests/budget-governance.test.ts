@@ -7,6 +7,9 @@ import {
 
 describe("budget-governance", () => {
   it("defaults to soft governance with warning thresholds and no hard stop", () => {
+    // Arrange
+
+    // Act
     const policy = resolveBudgetGovernancePolicy();
     const decision = evaluateBudgetGovernance(policy, {
       scope: "run",
@@ -14,6 +17,7 @@ describe("budget-governance", () => {
       budgetTokens: 6400
     });
 
+    // Assert
     expect(policy.hardStopEnabled).toBe(false);
     expect(policy.defaultHardStopEnabled).toBe(false);
     expect(policy.warningThresholdPercents).toEqual([80, 100, 120]);
@@ -32,6 +36,9 @@ describe("budget-governance", () => {
   });
 
   it("requires escalation past 120% when hard stop is disabled", () => {
+    // Arrange
+
+    // Act
     const policy = resolveBudgetGovernancePolicy();
     const decision = evaluateBudgetGovernance(policy, {
       scope: "step",
@@ -39,6 +46,7 @@ describe("budget-governance", () => {
       budgetTokens: 2800
     });
 
+    // Assert
     expect(decision.status).toBe("escalation-required");
     expect(decision.requiredActions).toEqual([
       "justify-budget-overrun",
@@ -55,13 +63,17 @@ describe("budget-governance", () => {
   });
 
   it("keeps hard stop as explicit opt-in runaway protection", () => {
+    // Arrange
     const policy = resolveBudgetGovernancePolicy({ hardStopEnabled: true });
+
+    // Act
     const decision = evaluateBudgetGovernance(policy, {
       scope: "run",
       usedTokens: 8400,
       budgetTokens: 6400
     });
 
+    // Assert
     expect(policy.overrideSource).toBe("explicit-config");
     expect(decision.status).toBe("hard-stop");
     expect(decision.triggeredThresholds.at(-1)).toEqual({
@@ -73,6 +85,9 @@ describe("budget-governance", () => {
   });
 
   it("rejects invalid budget inputs and inverted thresholds", () => {
+    // Arrange
+
+    // Act / Assert
     expect(() => resolveBudgetGovernancePolicy({
       escalationThresholdPercent: 120,
       hardStopThresholdPercent: 110
