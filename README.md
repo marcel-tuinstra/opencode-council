@@ -107,6 +107,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Supervisor turn-ownership helper: `plugins/orchestration-workflows/turn-ownership.ts`
 - Supervisor review-ready packet helper: `plugins/orchestration-workflows/review-ready-packet.ts`
 - Supervisor merge-policy helper: `plugins/orchestration-workflows/merge-policy.ts`
+- Supervisor observability dashboard helper: `plugins/orchestration-workflows/observability-dashboard.ts`
 - Review-ready evidence packet template: `EVIDENCE_PACKET_TEMPLATE.md`
 - Manual verification matrix: `TESTING.md`
 
@@ -124,6 +125,7 @@ CI runs the same test command on Node 22 and 24 via GitHub Actions (`.github/wor
 - Canonical typed review-ready packet enforcement lives in `plugins/orchestration-workflows/review-ready-packet.ts` and blocks `review_ready` transitions when the minimum packet is missing.
 - Canonical typed merge-policy evaluation lives in `plugins/orchestration-workflows/merge-policy.ts` and keeps human approval as the default while making auto-merge an explicit, path-scoped opt-in.
 - Canonical typed budget-governance evaluation lives in `plugins/orchestration-workflows/budget-governance.ts` and keeps budget control soft by default while requiring escalation past 120% unless a repository explicitly opts into hard-stop runaway protection.
+- Canonical typed supervisor observability aggregation lives in `plugins/orchestration-workflows/observability-dashboard.ts` and rolls lane state, heartbeat health, blocker state, budget signals, policy decisions, and ownership handoffs into one review-ready snapshot.
 - Context compaction uses workflow-aware profiles in `plugins/orchestration-workflows/constants.ts` (`COMPACTION_PROFILES`) and preserves goals, constraints, blockers, and open actions.
 
 ## Who this is for
