@@ -39,6 +39,29 @@ describe("budget-governance", () => {
         explanation: "Budget usage reached 80% and stayed in warning mode, so execution can continue under watch."
       }
     ]);
+    expect(decision.decisionEvidence).toEqual({
+      overrideSource: "default",
+      hardStopEnabled: false,
+      warningThresholdPercents: [80, 100, 120],
+      escalationThresholdPercent: 120,
+      hardStopThresholdPercent: DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
+      usedTokens: 5120,
+      budgetTokens: 6400,
+      usagePercent: 80
+    });
+    expect(decision.thresholdEvents).toEqual([
+      {
+        eventId: "budget-governance:run:warning:80:80",
+        guardrail: "budget-governance",
+        thresholdKey: "run-warning-percent",
+        status: "triggered",
+        thresholdValue: 80,
+        observedValue: 80,
+        reasonCode: "budget.warning-threshold",
+        summary: "run usage crossed the early warning threshold and should stay under watch.",
+        evidence: decision.decisionEvidence
+      }
+    ]);
     expect(decision.recommendations).toEqual(["continue-with-watch", "compact-context"]);
     expect(decision.shouldPauseAutomation).toBe(false);
   });
@@ -75,6 +98,11 @@ describe("budget-governance", () => {
         explanation: "Budget usage reached 120.04% and now requires checkpoint review before more automation continues."
       }
     ]);
+    expect(decision.thresholdEvents.map((event) => event.reasonCode)).toEqual([
+      "budget.warning-threshold",
+      "budget.warning-threshold",
+      "budget.escalation-required"
+    ]);
     expect(decision.shouldPauseAutomation).toBe(true);
   });
 
@@ -105,6 +133,17 @@ describe("budget-governance", () => {
         explanation: "Budget usage reached 131.25% and hit the configured hard stop, so automation pauses here."
       }
     ]);
+    expect(decision.thresholdEvents.at(-1)).toEqual({
+      eventId: "budget-governance:run:hard-stop:131-25:131-25",
+      guardrail: "budget-governance",
+      thresholdKey: "run-hard-stop-percent",
+      status: "triggered",
+      thresholdValue: DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
+      observedValue: 131.25,
+      reasonCode: "budget.hard-stop",
+      summary: "run usage reached the explicit hard-stop runaway threshold.",
+      evidence: decision.decisionEvidence
+    });
     expect(decision.shouldPauseAutomation).toBe(true);
   });
 

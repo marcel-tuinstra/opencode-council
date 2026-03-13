@@ -39,6 +39,29 @@ describe("approval-gates", () => {
       requestedAt: "2026-03-13T16:00:00.000Z"
     });
     expect(decision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.governance-boundary"]);
+    expect(decision.decisionEvidence).toEqual({
+      boundary: "merge",
+      policyRequiresApproval: true,
+      requestOverrideApplied: false,
+      effectiveRequiresApproval: true,
+      changedPaths: ["plugins/orchestration-workflows/supervisor-scheduler.ts"],
+      targetRef: "epic/supervisor-alpha",
+      budgetUsagePercent: undefined,
+      budgetThresholdPercent: undefined
+    });
+    expect(decision.thresholdEvents).toEqual([
+      {
+        eventId: "approval-gates:lane-1:merge:true:merge-pull-request-14",
+        guardrail: "approval-gates",
+        thresholdKey: "merge-boundary",
+        status: "triggered",
+        thresholdValue: true,
+        observedValue: true,
+        reasonCode: "approval.governance-boundary",
+        summary: "Approval is required at the merge governance boundary for merge pull request #14.",
+        evidence: decision.decisionEvidence
+      }
+    ]);
   });
 
   it("resumes only after an explicit approval signal arrives", () => {
@@ -92,5 +115,41 @@ describe("approval-gates", () => {
       decisionNote: "Validated and approved for merge."
     });
     expect(decision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.resume-approved"]);
+    expect(decision.thresholdEvents[0]?.reasonCode).toBe("approval.governance-boundary");
+  });
+
+  it("records when a request stays inside the static autonomy boundary", () => {
+    // Arrange
+
+    // Act
+    const decision = evaluateSupervisorApprovalGate({
+      laneId: "lane-2",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T16:10:00.000Z",
+      request: {
+        boundary: "automation-widening",
+        requestedAction: "keep the current automation surface",
+        summary: "No widening is requested.",
+        rationale: "This step stays within the existing beta guardrails.",
+        requiresApproval: false
+      }
+    });
+
+    // Assert
+    expect(decision.status).toBe("not-required");
+    expect(decision.nextAction).toBe("continue");
+    expect(decision.thresholdEvents).toEqual([
+      {
+        eventId: "approval-gates:lane-2:automation-widening:false:keep-the-current-automation-surface",
+        guardrail: "approval-gates",
+        thresholdKey: "automation-widening-boundary",
+        status: "within-threshold",
+        thresholdValue: true,
+        observedValue: false,
+        reasonCode: undefined,
+        summary: "Approval is not required at the automation-widening governance boundary for keep the current automation surface.",
+        evidence: decision.decisionEvidence
+      }
+    ]);
   });
 });

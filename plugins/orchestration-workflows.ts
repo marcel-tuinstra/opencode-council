@@ -69,6 +69,13 @@ export type {
   BudgetGovernanceThreshold
 } from "./orchestration-workflows/budget-governance";
 export type {
+  SupervisorGuardrailArea,
+  SupervisorThresholdEvent,
+  SupervisorThresholdEvidence,
+  SupervisorThresholdEvidenceValue,
+  SupervisorThresholdObservedValue
+} from "./orchestration-workflows/guardrail-thresholds";
+export type {
   AdHocRunArtifactKind,
   AdHocRunArtifactLink,
   AdHocRunHistoryInput,
