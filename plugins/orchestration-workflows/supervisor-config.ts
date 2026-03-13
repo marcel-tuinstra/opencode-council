@@ -20,6 +20,20 @@ export type SupervisorProviderPattern = {
   toolPrefix: string;
 };
 
+export type SupervisorExecutionPath = "execute" | "coordinate" | "investigate" | "safe-hold";
+
+export type SupervisorRoutingIntentProfileInput = {
+  path?: SupervisorExecutionPath;
+  leadRole?: Role;
+  fallbackLeadRole?: Role;
+};
+
+export type SupervisorRoutingIntentProfile = {
+  path: SupervisorExecutionPath;
+  leadRole: Role;
+  fallbackLeadRole: Role;
+};
+
 export type SupervisorPolicyDiagnostics = {
   path: string;
   message: string;
@@ -69,6 +83,10 @@ export type SupervisorPolicyInput = {
       hardStopEnabled?: boolean;
       hardStopThresholdPercent?: number;
     };
+  };
+  routing?: {
+    minimumSignalScore?: number;
+    intentProfiles?: Partial<Record<Intent, SupervisorRoutingIntentProfileInput>>;
   };
   compaction?: Partial<Record<Intent, {
     triggerTokens?: number;
@@ -121,6 +139,10 @@ export type ResolvedSupervisorPolicy = {
       hardStopEnabled: boolean;
       hardStopThresholdPercent: number;
     };
+  };
+  routing: {
+    minimumSignalScore: number;
+    intentProfiles: Record<Intent, SupervisorRoutingIntentProfile>;
   };
   compaction: Record<Intent, {
     triggerTokens: number;
@@ -213,6 +235,17 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
       hardStopThresholdPercent: 131.25
     }
   },
+  routing: {
+    minimumSignalScore: 2,
+    intentProfiles: {
+      backend: { path: "execute", leadRole: "DEV", fallbackLeadRole: "CTO" },
+      design: { path: "coordinate", leadRole: "PM", fallbackLeadRole: "CTO" },
+      marketing: { path: "coordinate", leadRole: "MARKETING", fallbackLeadRole: "PM" },
+      roadmap: { path: "coordinate", leadRole: "PM", fallbackLeadRole: "CTO" },
+      research: { path: "investigate", leadRole: "RESEARCH", fallbackLeadRole: "CTO" },
+      mixed: { path: "execute", leadRole: "CTO", fallbackLeadRole: "PM" }
+    }
+  },
   compaction: {
     backend: { triggerTokens: 700, targetTokens: 420, retainRecentLines: 3 },
     design: { triggerTokens: 760, targetTokens: 460, retainRecentLines: 3 },
@@ -265,6 +298,17 @@ export const DEFAULT_SUPERVISOR_BUDGET = Object.freeze({
     warningThresholdPercents: [...DEFAULT_POLICY_INPUT.budget!.governance!.warningThresholdPercents!]
   })
 });
+export const DEFAULT_SUPERVISOR_ROUTING = Object.freeze({
+  minimumSignalScore: DEFAULT_POLICY_INPUT.routing!.minimumSignalScore!,
+  intentProfiles: Object.freeze({
+    backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.backend }),
+    design: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.design }),
+    marketing: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.marketing }),
+    roadmap: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.roadmap }),
+    research: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.research }),
+    mixed: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.mixed })
+  })
+}) as Readonly<ResolvedSupervisorPolicy["routing"]>;
 export const DEFAULT_SUPERVISOR_COMPACTION = Object.freeze({
   backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.backend }),
   design: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.design }),
@@ -325,6 +369,17 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
       warningThresholdPercents: [...DEFAULT_SUPERVISOR_BUDGET.governance.warningThresholdPercents]
     }
   },
+  routing: {
+    minimumSignalScore: DEFAULT_SUPERVISOR_ROUTING.minimumSignalScore,
+    intentProfiles: {
+      backend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.backend },
+      design: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.design },
+      marketing: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.marketing },
+      roadmap: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.roadmap },
+      research: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.research },
+      mixed: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.mixed }
+    }
+  },
   compaction: {
     backend: { ...DEFAULT_SUPERVISOR_COMPACTION.backend },
     design: { ...DEFAULT_SUPERVISOR_COMPACTION.design },
@@ -341,6 +396,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 
 const isSupportedRole = (value: string): value is Role => {
   return ["CTO", "DEV", "PO", "PM", "CEO", "MARKETING", "RESEARCH"].includes(value);
+};
+
+const isSupportedExecutionPath = (value: string): value is SupervisorExecutionPath => {
+  return ["execute", "coordinate", "investigate", "safe-hold"].includes(value);
 };
 
 const compileProviderPattern = (pattern: SupervisorProviderPatternInput): SupervisorProviderPattern => ({
@@ -658,6 +717,61 @@ export const resolveSupervisorPolicy = (
             );
             config.budget.governance.escalationThresholdPercent = DEFAULT_SUPERVISOR_BUDGET.governance.escalationThresholdPercent;
             config.budget.governance.hardStopThresholdPercent = DEFAULT_SUPERVISOR_BUDGET.governance.hardStopThresholdPercent;
+          }
+        }
+      }
+    }
+  }
+
+  if (input.routing !== undefined) {
+    if (!isRecord(input.routing)) {
+      pushDiagnostic(diagnostics, "routing", "Expected routing to be an object.");
+    } else {
+      config.routing.minimumSignalScore = readPositiveInteger(
+        input.routing.minimumSignalScore,
+        config.routing.minimumSignalScore,
+        diagnostics,
+        "routing.minimumSignalScore"
+      );
+
+      if (input.routing.intentProfiles !== undefined) {
+        if (!isRecord(input.routing.intentProfiles)) {
+          pushDiagnostic(diagnostics, "routing.intentProfiles", "Expected routing.intentProfiles to be an object.");
+        } else {
+          for (const intent of Object.keys(config.routing.intentProfiles) as Intent[]) {
+            const override = input.routing.intentProfiles[intent];
+            if (override === undefined) {
+              continue;
+            }
+
+            if (!isRecord(override)) {
+              pushDiagnostic(diagnostics, `routing.intentProfiles.${intent}`, "Expected each routing profile to be an object.");
+              continue;
+            }
+
+            if (override.path !== undefined) {
+              if (typeof override.path === "string" && isSupportedExecutionPath(override.path)) {
+                config.routing.intentProfiles[intent].path = override.path;
+              } else {
+                pushDiagnostic(diagnostics, `routing.intentProfiles.${intent}.path`, `Unsupported execution path '${String(override.path)}'.`);
+              }
+            }
+
+            if (override.leadRole !== undefined) {
+              if (typeof override.leadRole === "string" && isSupportedRole(override.leadRole)) {
+                config.routing.intentProfiles[intent].leadRole = override.leadRole;
+              } else {
+                pushDiagnostic(diagnostics, `routing.intentProfiles.${intent}.leadRole`, `Unsupported role '${String(override.leadRole)}'.`);
+              }
+            }
+
+            if (override.fallbackLeadRole !== undefined) {
+              if (typeof override.fallbackLeadRole === "string" && isSupportedRole(override.fallbackLeadRole)) {
+                config.routing.intentProfiles[intent].fallbackLeadRole = override.fallbackLeadRole;
+              } else {
+                pushDiagnostic(diagnostics, `routing.intentProfiles.${intent}.fallbackLeadRole`, `Unsupported role '${String(override.fallbackLeadRole)}'.`);
+              }
+            }
           }
         }
       }

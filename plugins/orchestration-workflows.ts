@@ -1,12 +1,21 @@
 export { AgentConversations } from "./orchestration-workflows/index";
 export type {
+  SupervisorExecutionPath,
   ResolvedSupervisorPolicy,
   SupervisorPolicyDiagnostics,
   SupervisorPolicyInput,
   SupervisorPolicyLoadResult,
   SupervisorProviderPattern,
-  SupervisorProviderPatternInput
+  SupervisorProviderPatternInput,
+  SupervisorRoutingIntentProfile,
+  SupervisorRoutingIntentProfileInput
 } from "./orchestration-workflows/supervisor-config";
+export type {
+  RouteSupervisorWorkUnitInput,
+  RouteSupervisorWorkUnitResult,
+  SupervisorRoutingAction,
+  SupervisorRoutingConfidence
+} from "./orchestration-workflows/supervisor-routing";
 export type {
   AdHocWorkUnitInput,
   EvidenceLink,
@@ -154,17 +163,19 @@ export type {
 export {
   DEFAULT_SUPERVISOR_APPROVAL_GATES,
   DEFAULT_SUPERVISOR_BUDGET,
-  DEFAULT_SUPERVISOR_COMPACTION,
-  DEFAULT_SUPERVISOR_LIMITS,
-  DEFAULT_SUPERVISOR_PROFILE,
-  DEFAULT_SUPERVISOR_ROLE_ALIASES,
-  DEFAULT_SUPERVISOR_POLICY_PATH,
-  getSupervisorPolicy,
-  getSupervisorPolicyDiagnostics,
-  loadSupervisorPolicy,
-  resetSupervisorPolicyCache,
-  resolveSupervisorPolicy
+   DEFAULT_SUPERVISOR_COMPACTION,
+   DEFAULT_SUPERVISOR_LIMITS,
+   DEFAULT_SUPERVISOR_PROFILE,
+   DEFAULT_SUPERVISOR_ROLE_ALIASES,
+   DEFAULT_SUPERVISOR_ROUTING,
+   DEFAULT_SUPERVISOR_POLICY_PATH,
+   getSupervisorPolicy,
+   getSupervisorPolicyDiagnostics,
+   loadSupervisorPolicy,
+   resetSupervisorPolicyCache,
+   resolveSupervisorPolicy
 } from "./orchestration-workflows/supervisor-config";
+export { routeSupervisorWorkUnit } from "./orchestration-workflows/supervisor-routing";
 export {
   assertActiveLaneCountWithinPolicy,
   assertLaneStateTransition,
