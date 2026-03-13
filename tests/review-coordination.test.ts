@@ -274,6 +274,16 @@ describe("review-coordination", () => {
     expect(bundle.pullRequest.labels).toEqual(["automation", "phase:alpha"]);
     expect(bundle.laneOutput?.laneId).toBe("lane-review");
     expect(bundle.handoffValidation.outcome).toBe("accepted");
+    expect(bundle.reviewRouting).toEqual({
+      outcome: "accept",
+      reasons: ["Lane produced a validated review-ready handoff."],
+      handoffValidationOutcome: "accepted",
+      laneOutputStatus: "ready",
+      policy: {
+        evaluator: undefined,
+        applied: false
+      }
+    });
     expect(bundle.reviewPacket.handoff.deltaSummary).toBe("Adds Alpha review coordination and PR prep helpers.");
     expect(Object.isFrozen(bundle.reviewArtifacts)).toBe(true);
   });
@@ -362,7 +372,205 @@ describe("review-coordination", () => {
     expect(body).toContain("External tracker remains the source of truth: shortcut sc-400");
     expect(body).toContain("Base / head: epic/supervisor-alpha <- marceltuinstra/sc-400-review-coordination-pr-prep");
     expect(body).toContain("Requested reviewers: none specified");
+    expect(body).toContain("Review routing: accept");
+    expect(body).toContain("Review routing reason: Lane produced a validated review-ready handoff.");
     expect(body).toContain("Handoff validation: accepted");
+  });
+
+  it("keeps blocked lane output routing metadata available for review bundle prep", () => {
+    // Arrange
+    const bundleInput: ReviewCoordinationBundleInput = {
+      run: {
+        runId: "run-403",
+        status: "active" as const,
+        objective: "Route blocked review output without losing bundle metadata.",
+        sourceOfTruth: "control-plane-state" as const,
+        createdAt: "2026-03-13T14:30:00.000Z",
+        updatedAt: "2026-03-13T14:35:00.000Z"
+      },
+      lane: {
+        laneId: "lane-blocked",
+        state: "waiting" as const,
+        branch: "marceltuinstra/sc-441-review-routing",
+        updatedAt: "2026-03-13T14:35:00.000Z"
+      },
+      reviewPacket: {
+        acceptanceCriteriaTrace: [{ requirement: "Blocked handoffs stay explicit.", evidence: "tests/review-coordination.test.ts", status: "done" as const }],
+        scopedDiffSummary: ["Preserves blocked handoff reasons in review bundle metadata."],
+        verificationResults: [{ check: "vitest", result: "pass" as const, notes: "Blocked bundle metadata is covered." }],
+        riskRollbackNotes: ["Remove blocked bundle metadata if the routing layer changes."],
+        handoff: {
+          laneId: "lane-blocked",
+          currentOwner: "DEV",
+          nextOwner: "REVIEWER",
+          transferScope: "review",
+          transferTrigger: "Implementation finished but known blockers remain.",
+          deltaSummary: "Carries blocked review routing metadata into PR prep.",
+          risks: ["Review might start before blockers are resolved if the routing result is hidden."],
+          nextRequiredEvidence: ["Blocking issue resolution"],
+          evidenceAttached: ["tests/review-coordination.test.ts"]
+        },
+        laneOutput: {
+          runId: "run-403",
+          laneId: "lane-blocked",
+          status: "blocked" as const,
+          handoff: {
+            laneId: "lane-blocked",
+            currentOwner: "DEV",
+            nextOwner: "REVIEWER",
+            transferScope: "review",
+            transferTrigger: "Implementation finished but known blockers remain.",
+            deltaSummary: "Carries blocked review routing metadata into PR prep.",
+            risks: ["Review might start before blockers are resolved if the routing result is hidden."],
+            nextRequiredEvidence: ["Blocking issue resolution"],
+            evidenceAttached: ["tests/review-coordination.test.ts"]
+          },
+          artifacts: [
+            {
+              laneId: "lane-blocked",
+              kind: "branch" as const,
+              uri: "branch:marceltuinstra/sc-441-review-routing",
+              label: "Lane branch"
+            },
+            {
+              laneId: "lane-blocked",
+              kind: "review-packet" as const,
+              uri: "docs/review-packets/run-403-lane-blocked.md",
+              label: "Review packet"
+            }
+          ],
+          evidence: ["vitest tests/review-coordination.test.ts"],
+          producedAt: "2026-03-13T14:35:00.000Z",
+          blockingIssues: ["Waiting for API contract sign-off."]
+        },
+        ownership: {
+          reviewerOwner: "REVIEWER",
+          mergeOwner: "Marcel Tuinstra",
+          followUpOwner: "DEV"
+        }
+      },
+      externalTracker: {
+        system: "shortcut" as const,
+        reference: "sc-441",
+        url: "https://app.shortcut.com/tuinstradev/story/441"
+      },
+      originatingRun: {
+        href: "state://run-403/lane-blocked"
+      },
+      pullRequest: {
+        title: "Preserve blocked review routing metadata",
+        baseRef: "beta",
+        headRef: "marceltuinstra/sc-441-review-routing",
+        summary: ["Carries blocked routing metadata into the review coordination bundle."],
+        before: "Blocked handoff context was implicit outside the review packet.",
+        after: "Blocked handoff context is now explicit in the bundle and PR body.",
+        example: ["Review prep can show why a blocked handoff stayed out of review_ready."],
+        validation: ["vitest tests/review-coordination.test.ts"]
+      }
+    };
+
+    // Act
+    const bundle = createReviewCoordinationBundle(bundleInput);
+
+    // Assert
+    expect(bundle.reviewRouting).toEqual({
+      outcome: "block",
+      reasons: ["Waiting for API contract sign-off."],
+      handoffValidationOutcome: "accepted",
+      laneOutputStatus: "blocked",
+      policy: {
+        evaluator: undefined,
+        applied: false
+      }
+    });
+  });
+
+  it("preserves an explicit scheduler review routing decision in the review bundle", () => {
+    // Arrange
+    const bundle = createReviewCoordinationBundle({
+      run: {
+        runId: "run-404",
+        status: "waiting",
+        objective: "Keep scheduler review routing visible in PR prep.",
+        sourceOfTruth: "control-plane-state",
+        createdAt: "2026-03-13T14:40:00.000Z",
+        updatedAt: "2026-03-13T14:45:00.000Z"
+      },
+      lane: {
+        laneId: "lane-1",
+        state: "waiting",
+        branch: "marceltuinstra/sc-441-governance-policy-engine-review-routing",
+        updatedAt: "2026-03-13T14:45:00.000Z"
+      },
+      reviewPacket: {
+        acceptanceCriteriaTrace: [{ requirement: "Scheduler routing stays visible.", evidence: "tests/review-coordination.test.ts", status: "done" }],
+        scopedDiffSummary: ["Pass an explicit scheduler review routing decision into the bundle."],
+        verificationResults: [{ check: "npm test", result: "pass", notes: "Scheduler routing preservation is covered." }],
+        riskRollbackNotes: ["Remove the explicit review routing input if the scheduler no longer emits review routing metadata."],
+        handoff: {
+          laneId: "lane-1",
+          currentOwner: "DEV",
+          nextOwner: "REVIEWER",
+          transferScope: "review",
+          transferTrigger: "A human decision is required before review starts.",
+          deltaSummary: "Preserves an escalated scheduler routing decision.",
+          risks: ["Reviewers could miss the need for escalation if the scheduler decision is dropped."],
+          nextRequiredEvidence: ["Approval decision"],
+          evidenceAttached: ["tests/review-coordination.test.ts"]
+        },
+        ownership: {
+          reviewerOwner: "PM",
+          mergeOwner: "Marcel Tuinstra",
+          followUpOwner: "DEV"
+        }
+      },
+      reviewRouting: {
+        outcome: "escalate",
+        reasons: [
+          "Applied explicit governance policy at review-ready and routed the checkpoint to escalate. Matched rules: review-owner-mismatch-escalate.",
+          "Review checkpoint owner 'PM' must match the handoff next owner 'REVIEWER'."
+        ],
+        handoffValidationOutcome: "escalate",
+        laneOutputStatus: "ready",
+        policy: {
+          evaluator: "governance-policy:explicit-policy",
+          applied: true
+        }
+      },
+      externalTracker: {
+        system: "shortcut",
+        reference: "sc-441",
+        url: "https://app.shortcut.com/tuinstradev/story/441"
+      },
+      originatingRun: {
+        href: "state://run-404/lane-1"
+      },
+      pullRequest: {
+        title: "Preserve scheduler review routing in bundle prep",
+        baseRef: "beta",
+        headRef: "marceltuinstra/sc-441-governance-policy-engine-review-routing",
+        summary: ["Carries the scheduler review routing decision into the bundle."],
+        before: "Bundle prep recomputed review routing without the scheduler's final governance decision.",
+        after: "Bundle prep can preserve the scheduler's final governance decision for reviewers.",
+        example: ["Escalated review routing stays visible in the generated PR body."],
+        validation: ["npm test"]
+      }
+    });
+
+    // Assert
+    expect(bundle.reviewRouting).toEqual({
+      outcome: "escalate",
+      reasons: [
+        "Applied explicit governance policy at review-ready and routed the checkpoint to escalate. Matched rules: review-owner-mismatch-escalate.",
+        "Review checkpoint owner 'PM' must match the handoff next owner 'REVIEWER'."
+      ],
+      handoffValidationOutcome: "escalate",
+      laneOutputStatus: "ready",
+      policy: {
+        evaluator: "governance-policy:explicit-policy",
+        applied: true
+      }
+    });
   });
 
   it("rejects pull request prep when required review sections are missing", () => {

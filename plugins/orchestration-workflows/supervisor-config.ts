@@ -5,6 +5,39 @@ import type { Intent, Role } from "./types";
 
 type RepoRiskTier = "small-high-risk" | "medium-moderate-risk" | "large-mature";
 type MergeMode = "manual" | "auto-merge";
+export type SupervisorGovernancePolicyOutcome = "accept" | "repair" | "escalate" | "block";
+
+export type SupervisorGovernanceCheckpointRuleInput = {
+  ruleId: string;
+  description?: string;
+  match?: {
+    violationCodes?: string[];
+    violationFields?: string[];
+  };
+  outcome: SupervisorGovernancePolicyOutcome;
+};
+
+export type SupervisorGovernanceCheckpointRule = {
+  ruleId: string;
+  description?: string;
+  match: {
+    violationCodes: readonly string[];
+    violationFields: readonly string[];
+  };
+  outcome: SupervisorGovernancePolicyOutcome;
+};
+
+export type SupervisorGovernanceCheckpointPolicyInput = {
+  checkpoint: string;
+  defaultOutcome?: SupervisorGovernancePolicyOutcome;
+  rules?: SupervisorGovernanceCheckpointRuleInput[];
+};
+
+export type SupervisorGovernanceCheckpointPolicy = {
+  checkpoint: string;
+  defaultOutcome: SupervisorGovernancePolicyOutcome;
+  rules: readonly SupervisorGovernanceCheckpointRule[];
+};
 
 export type SupervisorProviderPatternInput = {
   key: string;
@@ -96,6 +129,9 @@ export type SupervisorPolicyInput = {
     minimumSignalScore?: number;
     intentProfiles?: Partial<Record<Intent, SupervisorRoutingIntentProfileInput>>;
   };
+  governance?: {
+    checkpoints?: SupervisorGovernanceCheckpointPolicyInput[];
+  };
   compaction?: Partial<Record<Intent, {
     triggerTokens?: number;
     targetTokens?: number;
@@ -159,6 +195,9 @@ export type ResolvedSupervisorPolicy = {
   routing: {
     minimumSignalScore: number;
     intentProfiles: Record<Intent, SupervisorRoutingIntentProfile>;
+  };
+  governance: {
+    checkpoints: readonly SupervisorGovernanceCheckpointPolicy[];
   };
   compaction: Record<Intent, {
     triggerTokens: number;
@@ -270,6 +309,75 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
       mixed: { path: "execute", leadRole: "CTO", fallbackLeadRole: "PM" }
     }
   },
+  governance: {
+    checkpoints: [
+      {
+        checkpoint: "lane-handoff",
+        defaultOutcome: "accept",
+        rules: [
+          {
+            ruleId: "lane-id-mismatch-block",
+            description: "Never continue when the handoff lane id drifts away from the lane contract.",
+            match: {
+              violationCodes: ["lane-id-mismatch"]
+            },
+            outcome: "block"
+          },
+          {
+            ruleId: "artifact-lane-mismatch-repair",
+            description: "Repair artifact ownership drift before handoff continues.",
+            match: {
+              violationCodes: ["artifact-lane-mismatch"]
+            },
+            outcome: "repair"
+          },
+          {
+            ruleId: "review-owner-mismatch-escalate",
+            description: "Escalate when the next owner and checkpoint reviewer diverge.",
+            match: {
+              violationCodes: ["review-owner-mismatch"]
+            },
+            outcome: "escalate"
+          }
+        ]
+      },
+      {
+        checkpoint: "review-ready",
+        defaultOutcome: "accept",
+        rules: [
+          {
+            ruleId: "review-owner-mismatch-escalate",
+            description: "Escalate review routing whenever reviewer ownership needs a human decision.",
+            match: {
+              violationCodes: ["review-owner-mismatch"]
+            },
+            outcome: "escalate"
+          },
+          {
+            ruleId: "unexpected-blocking-issues-block",
+            description: "Block review-ready checkpoints that claim ready status while still listing blockers.",
+            match: {
+              violationCodes: ["unexpected-blocking-issues"]
+            },
+            outcome: "block"
+          },
+          {
+            ruleId: "review-artifacts-repair",
+            description: "Repair incomplete review evidence before the checkpoint can advance.",
+            match: {
+              violationCodes: [
+                "missing-branch-artifact",
+                "missing-review-packet-artifact",
+                "missing-blocking-issues",
+                "artifact-lane-mismatch"
+              ]
+            },
+            outcome: "repair"
+          }
+        ]
+      }
+    ]
+  },
   compaction: {
     backend: { triggerTokens: 700, targetTokens: 420, retainRecentLines: 3 },
     design: { triggerTokens: 760, targetTokens: 460, retainRecentLines: 3 },
@@ -333,6 +441,25 @@ export const DEFAULT_SUPERVISOR_ROUTING = Object.freeze({
     mixed: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.mixed })
   })
 }) as Readonly<ResolvedSupervisorPolicy["routing"]>;
+export const DEFAULT_SUPERVISOR_GOVERNANCE = Object.freeze({
+  checkpoints: Object.freeze(
+    (DEFAULT_POLICY_INPUT.governance?.checkpoints ?? []).map((checkpoint) => Object.freeze({
+      checkpoint: checkpoint.checkpoint,
+      defaultOutcome: checkpoint.defaultOutcome ?? "accept",
+      rules: Object.freeze(
+        (checkpoint.rules ?? []).map((rule) => Object.freeze({
+          ruleId: rule.ruleId,
+          description: rule.description,
+          match: Object.freeze({
+            violationCodes: Object.freeze([...(rule.match?.violationCodes ?? [])]),
+            violationFields: Object.freeze([...(rule.match?.violationFields ?? [])])
+          }),
+          outcome: rule.outcome
+        }))
+      )
+    }))
+  )
+}) as Readonly<ResolvedSupervisorPolicy["governance"]>;
 export const DEFAULT_SUPERVISOR_COMPACTION = Object.freeze({
   backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.backend }),
   design: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.design }),
@@ -412,6 +539,21 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
       mixed: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.mixed }
     }
   },
+  governance: {
+    checkpoints: DEFAULT_SUPERVISOR_GOVERNANCE.checkpoints.map((checkpoint) => ({
+      checkpoint: checkpoint.checkpoint,
+      defaultOutcome: checkpoint.defaultOutcome,
+      rules: checkpoint.rules.map((rule) => ({
+        ruleId: rule.ruleId,
+        description: rule.description,
+        match: {
+          violationCodes: [...rule.match.violationCodes],
+          violationFields: [...rule.match.violationFields]
+        },
+        outcome: rule.outcome
+      }))
+    }))
+  },
   compaction: {
     backend: { ...DEFAULT_SUPERVISOR_COMPACTION.backend },
     design: { ...DEFAULT_SUPERVISOR_COMPACTION.design },
@@ -434,6 +576,10 @@ const isSupportedExecutionPath = (value: string): value is SupervisorExecutionPa
   return ["execute", "coordinate", "investigate", "safe-hold"].includes(value);
 };
 
+const isSupportedGovernanceOutcome = (value: string): value is SupervisorGovernancePolicyOutcome => {
+  return ["accept", "repair", "escalate", "block"].includes(value);
+};
+
 const compileProviderPattern = (pattern: SupervisorProviderPatternInput): SupervisorProviderPattern => ({
   key: pattern.key,
   regex: new RegExp(pattern.pattern, "i"),
@@ -448,6 +594,12 @@ const pushDiagnostic = (
 ) => {
   diagnostics.push({ path, message });
 };
+
+const normalizeStringList = (values: readonly string[]): string[] => Array.from(new Set(
+  values
+    .map((value) => value.trim())
+    .filter(Boolean)
+));
 
 const readPositiveNumber = (
   value: unknown,
@@ -833,6 +985,104 @@ export const resolveSupervisorPolicy = (
               }
             }
           }
+        }
+      }
+    }
+  }
+
+  if (input.governance !== undefined) {
+    if (!isRecord(input.governance)) {
+      pushDiagnostic(diagnostics, "governance", "Expected governance to be an object.");
+    } else if (input.governance.checkpoints !== undefined) {
+      if (!Array.isArray(input.governance.checkpoints)) {
+        pushDiagnostic(diagnostics, "governance.checkpoints", "Expected governance.checkpoints to be an array.");
+      } else {
+        const checkpoints: SupervisorGovernanceCheckpointPolicy[] = [];
+
+        for (const [index, entry] of input.governance.checkpoints.entries()) {
+          if (!isRecord(entry)) {
+            pushDiagnostic(diagnostics, `governance.checkpoints.${index}`, "Expected each governance checkpoint to be an object.");
+            continue;
+          }
+
+          const checkpoint = typeof entry.checkpoint === "string" ? entry.checkpoint.trim() : "";
+          if (!checkpoint) {
+            pushDiagnostic(diagnostics, `governance.checkpoints.${index}.checkpoint`, "Expected a non-empty checkpoint name.");
+            continue;
+          }
+
+          let defaultOutcome = config.governance.checkpoints.find((candidate) => candidate.checkpoint === checkpoint)?.defaultOutcome ?? "accept";
+          if (entry.defaultOutcome !== undefined) {
+            if (typeof entry.defaultOutcome === "string" && isSupportedGovernanceOutcome(entry.defaultOutcome)) {
+              defaultOutcome = entry.defaultOutcome;
+            } else {
+              pushDiagnostic(diagnostics, `governance.checkpoints.${index}.defaultOutcome`, `Unsupported governance outcome '${String(entry.defaultOutcome)}'.`);
+            }
+          }
+
+          const rules: SupervisorGovernanceCheckpointRule[] = [];
+          if (entry.rules !== undefined) {
+            if (!Array.isArray(entry.rules)) {
+              pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules`, "Expected governance checkpoint rules to be an array.");
+            } else {
+              for (const [ruleIndex, ruleEntry] of entry.rules.entries()) {
+                if (!isRecord(ruleEntry)) {
+                  pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules.${ruleIndex}`, "Expected each governance rule to be an object.");
+                  continue;
+                }
+
+                const ruleId = typeof ruleEntry.ruleId === "string" ? ruleEntry.ruleId.trim() : "";
+                if (!ruleId) {
+                  pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules.${ruleIndex}.ruleId`, "Expected a non-empty governance ruleId.");
+                  continue;
+                }
+
+                if (typeof ruleEntry.outcome !== "string" || !isSupportedGovernanceOutcome(ruleEntry.outcome)) {
+                  pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules.${ruleIndex}.outcome`, `Unsupported governance outcome '${String(ruleEntry.outcome)}'.`);
+                  continue;
+                }
+
+                const match = isRecord(ruleEntry.match) ? ruleEntry.match : {};
+                const violationCodes = Array.isArray(match.violationCodes)
+                  ? normalizeStringList(match.violationCodes.filter((value): value is string => typeof value === "string"))
+                  : [];
+                const violationFields = Array.isArray(match.violationFields)
+                  ? normalizeStringList(match.violationFields.filter((value): value is string => typeof value === "string"))
+                  : [];
+
+                if (violationCodes.length === 0 && violationFields.length === 0) {
+                  pushDiagnostic(
+                    diagnostics,
+                    `governance.checkpoints.${index}.rules.${ruleIndex}.match`,
+                    "Governance rules require at least one violationCodes or violationFields matcher."
+                  );
+                  continue;
+                }
+
+                rules.push({
+                  ruleId,
+                  description: typeof ruleEntry.description === "string" && ruleEntry.description.trim()
+                    ? ruleEntry.description.trim()
+                    : undefined,
+                  match: {
+                    violationCodes,
+                    violationFields
+                  },
+                  outcome: ruleEntry.outcome
+                });
+              }
+            }
+          }
+
+          checkpoints.push({
+            checkpoint,
+            defaultOutcome,
+            rules
+          });
+        }
+
+        if (checkpoints.length > 0) {
+          config.governance.checkpoints = checkpoints;
         }
       }
     }
