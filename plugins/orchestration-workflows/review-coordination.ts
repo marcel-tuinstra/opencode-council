@@ -6,6 +6,8 @@ import type {
   SupervisorSessionRecord,
   SupervisorWorktreeRecord
 } from "./durable-state-store";
+import type { LaneCompletionContract, LaneCompletionContractInput } from "./lane-contract";
+import { assertValidLaneCompletionContract } from "./lane-contract";
 import {
   createReviewReadyEvidencePacket,
   type ReviewReadyEvidencePacket,
@@ -97,6 +99,7 @@ export type ReviewCoordinationBundleInput = {
   approvals?: readonly SupervisorApprovalRecord[];
   artifacts?: readonly SupervisorArtifactRecord[];
   reviewPacket: ReviewReadyEvidencePacketInput | ReviewReadyEvidencePacket;
+  laneOutput?: LaneCompletionContractInput | LaneCompletionContract;
   externalTracker: ReviewCoordinationTrackerReferenceInput;
   originatingRun: ReviewCoordinationOriginatingRunInput;
   pullRequest: ReviewCoordinationPullRequestPrepInput;
@@ -111,6 +114,7 @@ export type ReviewCoordinationBundle = {
   approvals: readonly SupervisorApprovalRecord[];
   artifacts: readonly SupervisorArtifactRecord[];
   reviewPacket: ReviewReadyEvidencePacket;
+  laneOutput?: LaneCompletionContract;
   sourceOfTruth: "external-tracker";
   externalTracker: ReviewCoordinationTrackerReference;
   originatingRun: ReviewCoordinationOriginatingRun;
@@ -176,6 +180,23 @@ const mapArtifactKind = (kind: SupervisorArtifactRecord["kind"]): ReviewCoordina
   }
 };
 
+const mapLaneOutputArtifactKind = (kind: LaneCompletionContract["artifacts"][number]["kind"]): ReviewCoordinationArtifactLinkKind => {
+  switch (kind) {
+    case "pull-request":
+      return "pull-request";
+    case "review-packet":
+      return "review-packet";
+    case "session-log":
+      return "session-log";
+    case "validation":
+      return "validation";
+    case "diff":
+      return "diff";
+    default:
+      return "other";
+  }
+};
+
 const normalizePullRequestPrep = (
   input: ReviewCoordinationPullRequestPrepInput
 ): ReviewCoordinationPullRequestPrep => freezeRecord({
@@ -197,6 +218,9 @@ export const createReviewCoordinationBundle = (
   input: ReviewCoordinationBundleInput
 ): ReviewCoordinationBundle => {
   const reviewPacket = createReviewReadyEvidencePacket(input.reviewPacket);
+  const laneOutput = input.laneOutput
+    ? assertValidLaneCompletionContract(input.laneOutput)
+    : reviewPacket.laneOutput;
   const approvals = freezeList((input.approvals ?? []).filter((approval) => approval.laneId === input.lane.laneId));
   const artifacts = freezeList((input.artifacts ?? []).filter((artifact) => artifact.laneId === input.lane.laneId));
   const originatingRun = freezeRecord({
@@ -218,6 +242,11 @@ export const createReviewCoordinationBundle = (
     href: artifact.uri,
     kind: mapArtifactKind(artifact.kind)
   }));
+  const laneOutputArtifacts = (laneOutput?.artifacts ?? []).map((artifact) => ({
+    label: artifact.label,
+    href: artifact.uri,
+    kind: mapLaneOutputArtifactKind(artifact.kind)
+  }));
   const reviewArtifacts = normalizeArtifactLinks([
     {
       label: originatingRun.label,
@@ -230,6 +259,7 @@ export const createReviewCoordinationBundle = (
       kind: "external-tracker"
     },
     ...persistedArtifacts,
+    ...laneOutputArtifacts,
     ...approvalArtifacts,
     ...(input.additionalArtifacts ?? [])
   ]);
@@ -242,6 +272,7 @@ export const createReviewCoordinationBundle = (
     approvals,
     artifacts,
     reviewPacket,
+    laneOutput,
     sourceOfTruth: "external-tracker",
     externalTracker,
     originatingRun,

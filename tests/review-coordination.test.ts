@@ -126,6 +126,39 @@ describe("review-coordination", () => {
           followUpOwner: "DEV"
         }
       },
+      laneOutput: {
+        runId: "run-400",
+        laneId: "lane-review",
+        status: "ready" as const,
+        handoff: {
+          laneId: "lane-review",
+          currentOwner: "DEV",
+          nextOwner: "REVIEWER",
+          transferScope: "review" as const,
+          transferTrigger: "Review bundle, PR metadata, and validation are ready.",
+          deltaSummary: "Adds Alpha review coordination and PR prep helpers.",
+          risks: ["PR prep could drift if run artifacts are not linked back into the bundle."],
+          nextRequiredEvidence: ["PR body", "validation commands"],
+          evidenceAttached: ["tests/review-coordination.test.ts"],
+          openQuestions: []
+        },
+        artifacts: [
+          {
+            laneId: "lane-review",
+            kind: "branch" as const,
+            uri: "refs/heads/marceltuinstra/sc-400-review-coordination-pr-prep",
+            label: "Lane branch"
+          },
+          {
+            laneId: "lane-review",
+            kind: "review-packet" as const,
+            uri: "docs/review-packets/run-400-lane-review.md",
+            label: "Lane review packet"
+          }
+        ],
+        evidence: ["npm test", "npm run typecheck"],
+        producedAt: "2026-03-13T12:10:00.000Z"
+      },
       externalTracker: {
         system: "shortcut" as const,
         reference: "sc-400",
@@ -211,6 +244,16 @@ describe("review-coordination", () => {
         kind: "other"
       },
       {
+        label: "Lane branch",
+        href: "refs/heads/marceltuinstra/sc-400-review-coordination-pr-prep",
+        kind: "other"
+      },
+      {
+        label: "Lane review packet",
+        href: "docs/review-packets/run-400-lane-review.md",
+        kind: "review-packet"
+      },
+      {
         label: "Approval approval-400",
         href: "approval:approval-400",
         kind: "approval"
@@ -229,6 +272,7 @@ describe("review-coordination", () => {
     expect(bundle.pullRequest.reviewers).toEqual(["marceltuinstra"]);
     expect(bundle.pullRequest.reviewTeams).toEqual(["platform"]);
     expect(bundle.pullRequest.labels).toEqual(["automation", "phase:alpha"]);
+    expect(bundle.laneOutput?.laneId).toBe("lane-review");
     expect(bundle.reviewPacket.handoff.deltaSummary).toBe("Adds Alpha review coordination and PR prep helpers.");
     expect(Object.isFrozen(bundle.reviewArtifacts)).toBe(true);
   });
