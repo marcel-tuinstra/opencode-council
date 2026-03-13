@@ -42,7 +42,7 @@ The repository also ships typed Supervisor helpers, docs, and tests for staged a
 - budget governance
 - observability snapshots
 - ad-hoc run history
-- runbook, KPI baseline, and epic pilot packaging
+- runbook, KPI baseline, epic pilot packaging, and alpha end-to-end validation evidence
 
 These are real repo assets, but they are not the same thing as a fully user-invokable supervisor/runtime mode yet.
 
@@ -115,6 +115,7 @@ See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the
 - Operations runbook: [`docs/supervisor/operations-runbook.md`](./docs/supervisor/operations-runbook.md)
 - Pilot KPI baseline: [`docs/supervisor/pilot-kpi-baseline.md`](./docs/supervisor/pilot-kpi-baseline.md)
 - Epic pilot package: [`docs/supervisor/epic-pilot.md`](./docs/supervisor/epic-pilot.md)
+- Alpha end-to-end validation: [`docs/supervisor/alpha-end-to-end-validation.md`](./docs/supervisor/alpha-end-to-end-validation.md)
 - Evidence packet template: [`docs/reference/evidence-packet-template.md`](./docs/reference/evidence-packet-template.md)
 - Testing guide: [`docs/testing/testing.md`](./docs/testing/testing.md)
 
