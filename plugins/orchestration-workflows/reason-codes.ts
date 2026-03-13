@@ -6,6 +6,7 @@ export type SupervisorReasonCategory =
   | "fallback"
   | "budget-escalation"
   | "approval-pause"
+  | "governance-policy"
   | "blocked-action";
 
 export type SupervisorReasonCode =
@@ -35,6 +36,9 @@ export type SupervisorReasonCode =
   | "approval.governance-boundary"
   | "approval.resume-approved"
   | "approval.rejected-hold"
+  | "governance.explicit-policy"
+  | "governance.policy-default"
+  | "governance.policy-missing"
   | "blocked.missing-mcp-provider"
   | "blocked.mcp-access";
 
@@ -58,6 +62,7 @@ type SupervisorReasonContext = {
   laneId?: string;
   owner?: string;
   confidence?: string;
+  policyId?: string;
 };
 
 const formatRoleList = (roles: readonly Role[]): string => roles.join(", ");
@@ -295,6 +300,37 @@ export const createSupervisorReasonDetail = (
         category: "approval-pause",
         short: "Approval rejected.",
         explanation: `Kept execution paused because human review rejected ${action} at the ${boundary} governance boundary.`
+      };
+    }
+    case "governance.explicit-policy": {
+      const checkpoint = context.path ?? "checkpoint";
+      const outcome = context.actionReason ?? "accept";
+      const ruleSummary = context.policyId ? ` Matched rules: ${context.policyId}.` : "";
+      return {
+        code,
+        category: "governance-policy",
+        short: "Explicit governance policy matched.",
+        explanation: `Applied explicit governance policy at ${checkpoint} and routed the checkpoint to ${outcome}.${ruleSummary}`.trim()
+      };
+    }
+    case "governance.policy-default": {
+      const checkpoint = context.path ?? "checkpoint";
+      const outcome = context.actionReason ?? "accept";
+      return {
+        code,
+        category: "governance-policy",
+        short: "Checkpoint default applied.",
+        explanation: `No explicit governance rule matched at ${checkpoint}, so the configured default routed the checkpoint to ${outcome}.`
+      };
+    }
+    case "governance.policy-missing": {
+      const checkpoint = context.path ?? "checkpoint";
+      const outcome = context.actionReason ?? "accept";
+      return {
+        code,
+        category: "governance-policy",
+        short: "Governance policy missing.",
+        explanation: `No governance policy is configured for ${checkpoint}, so the evaluator failed open to ${outcome} and recorded a warning.`
       };
     }
     case "blocked.missing-mcp-provider": {

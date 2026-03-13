@@ -61,6 +61,25 @@ export type ReviewCoordinationOriginatingRun = {
   label: string;
 };
 
+export type ReviewRoutingOutcome = "accept" | "repair" | "escalate" | "block";
+
+export type ReviewRoutingPolicyDecision = {
+  outcome: ReviewRoutingOutcome;
+  reasons: readonly string[];
+  evaluator?: string;
+};
+
+export type ReviewRoutingDecision = {
+  outcome: ReviewRoutingOutcome;
+  reasons: readonly string[];
+  handoffValidationOutcome: ReviewReadyEvidencePacket["handoffValidation"]["outcome"];
+  laneOutputStatus?: LaneCompletionContract["status"];
+  policy: {
+    evaluator?: string;
+    applied: boolean;
+  };
+};
+
 export type ReviewCoordinationPullRequestPrepInput = {
   title: string;
   baseRef: string;
@@ -103,6 +122,7 @@ export type ReviewCoordinationBundleInput = {
   externalTracker: ReviewCoordinationTrackerReferenceInput;
   originatingRun: ReviewCoordinationOriginatingRunInput;
   pullRequest: ReviewCoordinationPullRequestPrepInput;
+  reviewRouting?: ReviewRoutingDecision;
   additionalArtifacts?: readonly ReviewCoordinationArtifactLinkInput[];
 };
 
@@ -116,6 +136,7 @@ export type ReviewCoordinationBundle = {
   reviewPacket: ReviewReadyEvidencePacket;
   laneOutput?: LaneCompletionContract;
   handoffValidation: ReviewReadyEvidencePacket["handoffValidation"];
+  reviewRouting: ReviewRoutingDecision;
   sourceOfTruth: "external-tracker";
   externalTracker: ReviewCoordinationTrackerReference;
   originatingRun: ReviewCoordinationOriginatingRun;
@@ -126,6 +147,13 @@ export type ReviewCoordinationBundle = {
 const freezeRecord = <T extends Record<string, unknown>>(value: T): Readonly<T> => Object.freeze({ ...value });
 
 const freezeList = <T>(items: readonly T[]): readonly T[] => Object.freeze([...items]);
+
+const REVIEW_ROUTING_OUTCOME_PRIORITY: Record<ReviewRoutingOutcome, number> = {
+  accept: 0,
+  repair: 1,
+  escalate: 2,
+  block: 3
+};
 
 const assertNonEmpty = (value: string, field: string): string => {
   const normalized = value.trim();
@@ -149,6 +177,10 @@ const normalizeNonEmptyList = (values: readonly string[], field: string): readon
 
 const normalizeOptionalList = (values: readonly string[] | undefined): readonly string[] => freezeList(
   Array.from(new Set((values ?? []).map((value) => value.trim()).filter(Boolean)))
+);
+
+const normalizeReviewRoutingReasons = (reasons: readonly string[]): readonly string[] => freezeList(
+  Array.from(new Set(reasons.map((reason) => reason.trim()).filter(Boolean)))
 );
 
 const normalizeArtifactLinks = (
@@ -215,6 +247,44 @@ const normalizePullRequestPrep = (
   draft: input.draft ?? false
 });
 
+export const resolveReviewRoutingDecision = (input: {
+  reviewPacket: ReviewReadyEvidencePacket;
+  laneOutput?: LaneCompletionContract;
+  policyDecision?: ReviewRoutingPolicyDecision;
+}): ReviewRoutingDecision => {
+  const laneOutput = input.laneOutput ?? input.reviewPacket.laneOutput;
+  const baseOutcome: ReviewRoutingOutcome = laneOutput?.status === "blocked"
+    ? "block"
+    : input.reviewPacket.handoffValidation.outcome === "accepted"
+      ? "accept"
+      : input.reviewPacket.handoffValidation.outcome;
+  const baseReasons = laneOutput?.status === "blocked"
+    ? laneOutput.blockingIssues.length > 0
+      ? laneOutput.blockingIssues
+      : ["Lane handoff is blocked until the declared blocking issues are cleared."]
+    : input.reviewPacket.handoffValidation.violations.length > 0
+      ? input.reviewPacket.handoffValidation.violations.map((violation) => violation.message)
+      : ["Lane produced a validated review-ready handoff."];
+  const policyDecision = input.policyDecision;
+  const usePolicyOutcome = policyDecision !== undefined
+    && REVIEW_ROUTING_OUTCOME_PRIORITY[policyDecision.outcome] >= REVIEW_ROUTING_OUTCOME_PRIORITY[baseOutcome];
+
+  return freezeRecord({
+    outcome: usePolicyOutcome ? policyDecision.outcome : baseOutcome,
+    reasons: normalizeReviewRoutingReasons(
+      usePolicyOutcome
+        ? [...(policyDecision.reasons.length > 0 ? policyDecision.reasons : baseReasons), ...baseReasons]
+        : baseReasons
+    ),
+    handoffValidationOutcome: input.reviewPacket.handoffValidation.outcome,
+    laneOutputStatus: laneOutput?.status,
+    policy: freezeRecord({
+      evaluator: policyDecision?.evaluator?.trim() || undefined,
+      applied: policyDecision !== undefined
+    })
+  });
+};
+
 export const createReviewCoordinationBundle = (
   input: ReviewCoordinationBundleInput
 ): ReviewCoordinationBundle => {
@@ -264,6 +334,18 @@ export const createReviewCoordinationBundle = (
     ...approvalArtifacts,
     ...(input.additionalArtifacts ?? [])
   ]);
+  const reviewRouting = input.reviewRouting
+    ? freezeRecord({
+        outcome: input.reviewRouting.outcome,
+        reasons: normalizeReviewRoutingReasons(input.reviewRouting.reasons),
+        handoffValidationOutcome: input.reviewRouting.handoffValidationOutcome,
+        laneOutputStatus: input.reviewRouting.laneOutputStatus,
+        policy: freezeRecord({
+          evaluator: input.reviewRouting.policy.evaluator?.trim() || undefined,
+          applied: input.reviewRouting.policy.applied
+        })
+      })
+    : resolveReviewRoutingDecision({ reviewPacket, laneOutput });
 
   return freezeRecord({
     run: input.run,
@@ -275,6 +357,7 @@ export const createReviewCoordinationBundle = (
     reviewPacket,
     laneOutput,
     handoffValidation: reviewPacket.handoffValidation,
+    reviewRouting,
     sourceOfTruth: "external-tracker",
     externalTracker,
     originatingRun,
@@ -294,6 +377,7 @@ export const renderReviewCoordinationPullRequestBody = (bundle: ReviewCoordinati
   const reviewTeams = bundle.pullRequest.reviewTeams.length > 0
     ? `- Requested teams: ${bundle.pullRequest.reviewTeams.join(", ")}`
     : "- Requested teams: none specified";
+  const reviewRoutingReasons = bundle.reviewRouting.reasons.map((reason) => `- Review routing reason: ${reason}`);
 
   return [
     "## Summary",
@@ -313,6 +397,8 @@ export const renderReviewCoordinationPullRequestBody = (bundle: ReviewCoordinati
     reviewers,
     reviewTeams,
     artifactSummary,
+    `- Review routing: ${bundle.reviewRouting.outcome}`,
+    ...reviewRoutingReasons,
     `- Handoff validation: ${bundle.handoffValidation.outcome}`,
     "",
     "## Validation",
