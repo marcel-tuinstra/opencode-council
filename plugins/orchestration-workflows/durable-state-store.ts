@@ -78,7 +78,24 @@ export type SupervisorApprovalRecord = {
   approvalId: string;
   laneId: string;
   status: SupervisorPersistedApprovalStatus;
+  boundary: "merge" | "release" | "destructive" | "security-sensitive" | "budget-exception" | "automation-widening";
+  requestedAction: string;
   summary: string;
+  rationale: string;
+  requestedBy: string;
+  requestedAt: string;
+  decidedBy?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+  context?: {
+    changedPaths?: readonly string[];
+    targetRef?: string;
+    budgetUsagePercent?: number;
+    budgetThresholdPercent?: number;
+    automationChangeSummary?: string;
+    riskSummary?: string;
+    metadata?: Readonly<Record<string, string>>;
+  };
   updatedAt: string;
 };
 
@@ -233,7 +250,29 @@ const normalizeApprovalRecord = (input: SupervisorApprovalRecord): SupervisorApp
   approvalId: assertNonEmpty(input.approvalId, "approval id"),
   laneId: assertNonEmpty(input.laneId, "approval lane id"),
   status: input.status,
+  boundary: input.boundary,
+  requestedAction: assertNonEmpty(input.requestedAction, "approval requested action"),
   summary: assertNonEmpty(input.summary, "approval summary"),
+  rationale: assertNonEmpty(input.rationale, "approval rationale"),
+  requestedBy: assertNonEmpty(input.requestedBy, "approval requester"),
+  requestedAt: assertTimestamp(input.requestedAt, "approval requested timestamp"),
+  decidedBy: input.decidedBy ? assertNonEmpty(input.decidedBy, "approval decider") : undefined,
+  decidedAt: input.decidedAt ? assertTimestamp(input.decidedAt, "approval decided timestamp") : undefined,
+  decisionNote: input.decisionNote ? assertNonEmpty(input.decisionNote, "approval decision note") : undefined,
+  context: input.context === undefined ? undefined : freezeRecord({
+    changedPaths: freezeList((input.context.changedPaths ?? []).map((value) => assertNonEmpty(value, "approval changed path"))),
+    targetRef: input.context.targetRef ? assertNonEmpty(input.context.targetRef, "approval target ref") : undefined,
+    budgetUsagePercent: input.context.budgetUsagePercent,
+    budgetThresholdPercent: input.context.budgetThresholdPercent,
+    automationChangeSummary: input.context.automationChangeSummary
+      ? assertNonEmpty(input.context.automationChangeSummary, "approval automation summary")
+      : undefined,
+    riskSummary: input.context.riskSummary ? assertNonEmpty(input.context.riskSummary, "approval risk summary") : undefined,
+    metadata: input.context.metadata === undefined ? undefined : freezeRecord(Object.fromEntries(
+      Object.entries(input.context.metadata)
+        .map(([key, value]) => [assertNonEmpty(key, "approval metadata key"), assertNonEmpty(value, "approval metadata value")])
+    ))
+  }),
   updatedAt: assertTimestamp(input.updatedAt, "approval updated timestamp")
 });
 

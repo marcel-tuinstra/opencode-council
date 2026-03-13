@@ -79,6 +79,16 @@ export type ResumeSupervisorSessionInput = {
   summary?: string;
 };
 
+export type PauseSupervisorSessionInput = {
+  runId: string;
+  laneId: string;
+  actor: string;
+  mutationId: string;
+  occurredAt: string;
+  sessionId?: string;
+  summary?: string;
+};
+
 export type ReplaceSupervisorSessionInput = {
   runId: string;
   laneId: string;
@@ -116,6 +126,7 @@ export type DetectStalledSupervisorSessionInput = {
 
 export type SupervisorSessionLifecycleResultAction =
   | "launched"
+  | "paused"
   | "resumed"
   | "replaced"
   | "heartbeat-recorded"
@@ -133,6 +144,7 @@ export type SupervisorSessionLifecycleResult = {
 export type SupervisorSessionLifecycle = {
   getLaneSessionBinding(runId: string, laneId: string): SupervisorSessionBinding;
   launchSession(input: LaunchSupervisorSessionInput): SupervisorSessionLifecycleResult;
+  pauseSession(input: PauseSupervisorSessionInput): SupervisorSessionLifecycleResult;
   resumeSession(input: ResumeSupervisorSessionInput): SupervisorSessionLifecycleResult;
   replaceSession(input: ReplaceSupervisorSessionInput): SupervisorSessionLifecycleResult;
   recordHeartbeat(input: RecordSupervisorSessionHeartbeatInput): SupervisorSessionLifecycleResult;
@@ -405,6 +417,44 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
+  const pauseSession = (input: PauseSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+    const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
+    const state = resolveRunState(store, input.runId);
+    const binding = resolveLaneSessionBinding(state, input.laneId);
+    const existingSession = resolveExistingSession(binding, state, input.sessionId);
+
+    if (existingSession.status === "paused") {
+      return {
+        action: "unchanged",
+        lane: binding.lane,
+        worktree: binding.worktree,
+        session: existingSession
+      };
+    }
+
+    const pausedSession = replaceSessionRecord(existingSession, "paused", occurredAt, {
+      owner: existingSession.owner,
+      attachedAt: existingSession.attachedAt,
+      lastHeartbeatAt: existingSession.lastHeartbeatAt
+    });
+
+    store.commitMutation(state.run.runId, {
+      mutationId: input.mutationId,
+      actor: input.actor,
+      summary: input.summary ?? `Pause runtime session for lane '${binding.lane.laneId}'.`,
+      occurredAt,
+      sessionUpserts: [pausedSession],
+      sideEffects: ["paused-session"]
+    });
+
+    return {
+      action: "paused",
+      lane: binding.lane,
+      worktree: binding.worktree,
+      session: pausedSession
+    };
+  };
+
   const replaceSession = (input: ReplaceSupervisorSessionInput): SupervisorSessionLifecycleResult => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
     const owner = assertNonEmpty(input.owner, "session owner");
@@ -543,6 +593,7 @@ export const createSupervisorSessionLifecycle = (
   return {
     getLaneSessionBinding,
     launchSession,
+    pauseSession,
     resumeSession,
     replaceSession,
     recordHeartbeat,

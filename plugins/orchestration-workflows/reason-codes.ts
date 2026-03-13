@@ -32,6 +32,9 @@ export type SupervisorReasonCode =
   | "approval.blocked-path-review"
   | "approval.eligible-path-review"
   | "approval.auto-merge-allowed"
+  | "approval.governance-boundary"
+  | "approval.resume-approved"
+  | "approval.rejected-hold"
   | "blocked.missing-mcp-provider"
   | "blocked.mcp-access";
 
@@ -264,6 +267,36 @@ export const createSupervisorReasonDetail = (
         short: "Auto-merge checks passed.",
         explanation: "Allowed auto-merge because criticality, path, and opt-in policy checks all passed."
       };
+    case "approval.governance-boundary": {
+      const boundary = context.path ?? "governance";
+      const action = context.actionReason ?? "the requested action";
+      return {
+        code,
+        category: "approval-pause",
+        short: "Governance boundary requires approval.",
+        explanation: `Paused at the ${boundary} governance boundary until a human approves ${action}.`
+      };
+    }
+    case "approval.resume-approved": {
+      const boundary = context.path ?? "governance";
+      const action = context.actionReason ?? "the requested action";
+      return {
+        code,
+        category: "approval-pause",
+        short: "Human approval received.",
+        explanation: `Resumed only after an explicit human approval event cleared ${action} at the ${boundary} governance boundary.`
+      };
+    }
+    case "approval.rejected-hold": {
+      const boundary = context.path ?? "governance";
+      const action = context.actionReason ?? "the requested action";
+      return {
+        code,
+        category: "approval-pause",
+        short: "Approval rejected.",
+        explanation: `Kept execution paused because human review rejected ${action} at the ${boundary} governance boundary.`
+      };
+    }
     case "blocked.missing-mcp-provider": {
       const providers = context.missingProviders?.join(", ") ?? "the required providers";
       return {

@@ -23,6 +23,14 @@ describe("supervisor-config", () => {
     expect(result.config.limits.worktrees.maxActive).toBe(1);
     expect(result.config.limits.sessions.maxPerWorktree).toBe(1);
     expect(result.config.approvalGates.mergeMode).toBe("manual");
+    expect(result.config.approvalGates.boundaries).toEqual({
+      merge: true,
+      release: true,
+      destructive: true,
+      securitySensitive: true,
+      budgetExceptions: true,
+      automationWidening: true
+    });
     expect(result.config.budget.governance.warningThresholdPercents).toEqual([80, 100, 120]);
     expect(result.config.routing.minimumSignalScore).toBe(2);
     expect(result.config.routing.intentProfiles.backend).toEqual({
@@ -70,7 +78,11 @@ describe("supervisor-config", () => {
       },
       approvalGates: {
         mergeMode: "auto-merge",
-        allowServiceCriticalAutoMerge: true
+        allowServiceCriticalAutoMerge: true,
+        boundaries: {
+          release: false,
+          automationWidening: false
+        }
       },
       budget: {
         runtime: {
@@ -115,6 +127,8 @@ describe("supervisor-config", () => {
     expect(result.config.limits.mcp.defaultCallCap).toBe(4);
     expect(result.config.approvalGates.mergeMode).toBe("auto-merge");
     expect(result.config.approvalGates.allowServiceCriticalAutoMerge).toBe(true);
+    expect(result.config.approvalGates.boundaries.release).toBe(false);
+    expect(result.config.approvalGates.boundaries.automationWidening).toBe(false);
     expect(result.config.budget.runtime.softRunTokens).toBe(7000);
     expect(result.config.budget.governance.warningThresholdPercents).toEqual([70, 90]);
     expect(result.config.routing.minimumSignalScore).toBe(3);

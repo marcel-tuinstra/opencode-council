@@ -195,6 +195,37 @@ describe("session-runtime-adapter", () => {
     ]);
   });
 
+  it("marks an active lane session as paused while waiting for approval", () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-session",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Act
+    const result = lifecycle.pauseSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-pause-session",
+      occurredAt: "2026-03-13T14:02:00.000Z"
+    });
+
+    // Assert
+    expect(result.action).toBe("paused");
+    expect(result.session.status).toBe("paused");
+    expect(result.session.updatedAt).toBe("2026-03-13T14:02:00.000Z");
+  });
+
   it("replaces a failed lane session and keeps replacement lineage in durable state", () => {
     // Arrange
     const rootDir = createTempRoot();

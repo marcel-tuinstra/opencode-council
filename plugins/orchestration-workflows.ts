@@ -69,6 +69,15 @@ export type {
   SupervisorLaneRecord
 } from "./orchestration-workflows/durable-state-store";
 export type {
+  EvaluateSupervisorApprovalGateInput,
+  SupervisorApprovalBoundary,
+  SupervisorApprovalContext,
+  SupervisorApprovalGateDecision,
+  SupervisorApprovalGateRequest,
+  SupervisorApprovalNextAction,
+  SupervisorApprovalSignal
+} from "./orchestration-workflows/approval-gates";
+export type {
   LaneCapPolicyConfig,
   LaneLifecyclePolicy,
   LaneLifecycleState,
@@ -102,6 +111,7 @@ export type {
   SupervisorLaneWorktreeSystem
 } from "./orchestration-workflows/lane-worktree-provisioner";
 export type {
+  PauseSupervisorSessionInput,
   AttachSupervisorRuntimeSessionInput,
   CreateSupervisorSessionLifecycleOptions,
   DetectStalledSupervisorSessionInput,
@@ -228,6 +238,10 @@ export {
   DEFAULT_SUPERVISOR_STATE_ROOT,
   SUPERVISOR_STATE_STORE_SCHEMA_VERSION
 } from "./orchestration-workflows/durable-state-store";
+export {
+  evaluateSupervisorApprovalGate,
+  resolveSupervisorApprovalId
+} from "./orchestration-workflows/approval-gates";
 export {
   buildSupervisorSessionId,
   createSupervisorSessionLifecycle,
