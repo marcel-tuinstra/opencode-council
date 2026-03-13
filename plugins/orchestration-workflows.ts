@@ -235,6 +235,19 @@ export type {
   SupervisorPolicyDecisionCategory,
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
+export type {
+  CreateSupervisorDataLifecycleReportInput,
+  SupervisorAdHocRunLifecycleInput,
+  SupervisorDataLifecyclePolicy,
+  SupervisorDataLifecycleRecommendation,
+  SupervisorDataLifecycleReport,
+  SupervisorDataLifecycleStage,
+  SupervisorDurableRunLifecycleInput,
+  SupervisorLifecycleAssessment,
+  SupervisorLifecycleInventory,
+  SupervisorLifecyclePolicyWindow,
+  SupervisorLifecycleRecordType
+} from "./orchestration-workflows/data-lifecycle";
 export {
   createSupervisorDispatchPlan
 } from "./orchestration-workflows/supervisor-dispatch-planning";
@@ -316,6 +329,10 @@ export {
   createSupervisorObservabilityDashboard,
   resolveHeartbeatHealth
 } from "./orchestration-workflows/observability-dashboard";
+export {
+  createSupervisorDataLifecycleReport,
+  DEFAULT_SUPERVISOR_DATA_LIFECYCLE_POLICY
+} from "./orchestration-workflows/data-lifecycle";
 export {
   createAdHocRunHistoryRecord,
   linkAdHocRunArtifact
