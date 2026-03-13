@@ -69,6 +69,19 @@ The lane planner must use those structural signals plus explicit dependency edge
 
 The typed lane planning contract lives in `plugins/orchestration-workflows/lane-plan.ts`.
 
+### Goal-plan to lane-plan bridge
+
+Beta intake now has a thin bridge between delegated goal planning and dependency-safe lane planning.
+
+- `planSupervisorGoal` classifies whether a delegated goal is safe to plan, then returns intent, confidence, budget class, advisory lane count, role recommendations, and approval boundaries.
+- `decomposeSupervisorGoalIntoLanes` takes that supported goal-plan result plus explicit normalized planning work units and produces:
+  - the dependency-safe `LanePlan`
+  - a scheduler-facing lane-definition preview
+  - warnings when advisory lane count diverges from dependency-safe decomposition
+- This bridge is intentionally conservative: it does not infer work units from freeform text yet, and it fails closed when goal planning is unsupported or no explicit work units are provided.
+
+The typed bridge helper lives in `plugins/orchestration-workflows/lane-decomposition.ts`.
+
 ## Lane lifecycle contract
 
 Lane execution should use one conservative lifecycle so planning, review, and cap enforcement stay auditable across repositories.

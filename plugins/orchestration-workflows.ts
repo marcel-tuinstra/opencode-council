@@ -11,6 +11,11 @@ export type {
   SupervisorRoutingIntentProfileInput
 } from "./orchestration-workflows/supervisor-config";
 export type {
+  DecomposeSupervisorGoalIntoLanesInput,
+  SupervisorLaneDecompositionResult,
+  SupervisorLaneDecompositionStatus
+} from "./orchestration-workflows/lane-decomposition";
+export type {
   PlanSupervisorGoalInput,
   PlanSupervisorGoalResult,
   SupervisorGoalBudgetClass,
@@ -206,6 +211,9 @@ export type {
   SupervisorPolicyDecisionCategory,
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
+export {
+  decomposeSupervisorGoalIntoLanes
+} from "./orchestration-workflows/lane-decomposition";
 export {
   planSupervisorGoal
 } from "./orchestration-workflows/supervisor-goal-plan";
