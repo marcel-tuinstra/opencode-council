@@ -33,6 +33,7 @@ The repository also ships typed Supervisor helpers, docs, and tests for staged a
 - lane planning
 - lane lifecycle
 - durable run state store
+- supervisor scheduler and dispatch loop
 - lane worktree provisioner and reconciler
 - session runtime adapter and lifecycle
 - turn ownership and handoff contracts
@@ -109,6 +110,7 @@ See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the
 - Durable state store: [`docs/supervisor/durable-state-store.md`](./docs/supervisor/durable-state-store.md)
 - Lane worktree provisioner: [`docs/supervisor/lane-worktree-provisioner.md`](./docs/supervisor/lane-worktree-provisioner.md)
 - Session runtime adapter: [`docs/supervisor/session-runtime-adapter.md`](./docs/supervisor/session-runtime-adapter.md)
+- Scheduler and dispatch loop: [`docs/supervisor/scheduler-dispatch-loop.md`](./docs/supervisor/scheduler-dispatch-loop.md)
 - Operations runbook: [`docs/supervisor/operations-runbook.md`](./docs/supervisor/operations-runbook.md)
 - Pilot KPI baseline: [`docs/supervisor/pilot-kpi-baseline.md`](./docs/supervisor/pilot-kpi-baseline.md)
 - Epic pilot package: [`docs/supervisor/epic-pilot.md`](./docs/supervisor/epic-pilot.md)
