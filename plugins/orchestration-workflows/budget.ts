@@ -1,5 +1,6 @@
 import type { Intent } from "./types";
 import { debugLog } from "./debug";
+import { getSupervisorPolicy } from "./supervisor-config";
 
 export type WorkflowStep = "plan" | "execute" | "summarize";
 type BudgetAction = "allow" | "compact" | "truncate" | "halt";
@@ -35,16 +36,6 @@ type BaselineStats = {
   runs: number;
 };
 
-const DEFAULT_CONFIG: BudgetConfig = {
-  softRunTokens: 6400,
-  hardRunTokens: 8400,
-  softStepTokens: 2800,
-  hardStepTokens: 4000,
-  truncateAtTokens: 1400,
-  costPer1kTokensUsd: 0.002,
-  stepExecutionTokenCost: 120
-};
-
 const WORKFLOW_MULTIPLIERS: Record<Intent, number> = {
   backend: 1.1,
   design: 0.95,
@@ -63,13 +54,13 @@ const readNumber = (value: string | undefined, fallback: number) => {
 };
 
 const getConfig = (): BudgetConfig => ({
-  softRunTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_RUN_TOKENS, DEFAULT_CONFIG.softRunTokens),
-  hardRunTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_RUN_TOKENS, DEFAULT_CONFIG.hardRunTokens),
-  softStepTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_STEP_TOKENS, DEFAULT_CONFIG.softStepTokens),
-  hardStepTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS, DEFAULT_CONFIG.hardStepTokens),
-  truncateAtTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_TRUNCATE_TOKENS, DEFAULT_CONFIG.truncateAtTokens),
-  costPer1kTokensUsd: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_COST_PER_1K_USD, DEFAULT_CONFIG.costPer1kTokensUsd),
-  stepExecutionTokenCost: readNumber(process.env.ORCHESTRATION_WORKFLOWS_EXECUTE_STEP_TOKEN_COST, DEFAULT_CONFIG.stepExecutionTokenCost)
+  softRunTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_RUN_TOKENS, getSupervisorPolicy().budget.runtime.softRunTokens),
+  hardRunTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_RUN_TOKENS, getSupervisorPolicy().budget.runtime.hardRunTokens),
+  softStepTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_STEP_TOKENS, getSupervisorPolicy().budget.runtime.softStepTokens),
+  hardStepTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS, getSupervisorPolicy().budget.runtime.hardStepTokens),
+  truncateAtTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_TRUNCATE_TOKENS, getSupervisorPolicy().budget.runtime.truncateAtTokens),
+  costPer1kTokensUsd: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_COST_PER_1K_USD, getSupervisorPolicy().budget.runtime.costPer1kTokensUsd),
+  stepExecutionTokenCost: readNumber(process.env.ORCHESTRATION_WORKFLOWS_EXECUTE_STEP_TOKEN_COST, getSupervisorPolicy().budget.runtime.stepExecutionTokenCost)
 });
 
 const percentile = (values: number[], p: number): number => {

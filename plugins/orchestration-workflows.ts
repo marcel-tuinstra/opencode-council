@@ -1,5 +1,13 @@
 export { AgentConversations } from "./orchestration-workflows/index";
 export type {
+  ResolvedSupervisorPolicy,
+  SupervisorPolicyDiagnostics,
+  SupervisorPolicyInput,
+  SupervisorPolicyLoadResult,
+  SupervisorProviderPattern,
+  SupervisorProviderPatternInput
+} from "./orchestration-workflows/supervisor-config";
+export type {
   AdHocWorkUnitInput,
   EvidenceLink,
   TrackerWorkUnitInput,
@@ -75,6 +83,20 @@ export type {
   SupervisorPolicyDecisionCategory,
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
+export {
+  DEFAULT_SUPERVISOR_APPROVAL_GATES,
+  DEFAULT_SUPERVISOR_BUDGET,
+  DEFAULT_SUPERVISOR_COMPACTION,
+  DEFAULT_SUPERVISOR_LIMITS,
+  DEFAULT_SUPERVISOR_PROFILE,
+  DEFAULT_SUPERVISOR_ROLE_ALIASES,
+  DEFAULT_SUPERVISOR_POLICY_PATH,
+  getSupervisorPolicy,
+  getSupervisorPolicyDiagnostics,
+  loadSupervisorPolicy,
+  resetSupervisorPolicyCache,
+  resolveSupervisorPolicy
+} from "./orchestration-workflows/supervisor-config";
 export {
   assertActiveLaneCountWithinPolicy,
   assertLaneStateTransition,

@@ -1,4 +1,5 @@
 import type { RepoRiskTier } from "./lane-lifecycle";
+import { getSupervisorPolicy } from "./supervisor-config";
 
 export type MergePolicyMode = "manual" | "auto-merge";
 
@@ -85,7 +86,8 @@ export const resolveMergePolicy = (
   repoRiskTier: RepoRiskTier,
   config?: MergePolicyConfig
 ): MergePolicy => {
-  const mode = config?.mode ?? DEFAULT_MERGE_POLICY_MODE;
+  const supervisorPolicy = getSupervisorPolicy();
+  const mode = config?.mode ?? supervisorPolicy.approvalGates.mergeMode;
   const eligiblePathPrefixes = normalizeStringList(config?.eligiblePathPrefixes);
   const blockedPathPrefixes = normalizeStringList(config?.blockedPathPrefixes);
   const labelHints = normalizeStringList(config?.labelHints);
@@ -100,7 +102,7 @@ export const resolveMergePolicy = (
     defaultMode: DEFAULT_MERGE_POLICY_MODE,
     mode,
     overrideSource: config?.mode === undefined ? "default" : "explicit-config",
-    allowServiceCriticalAutoMerge: config?.allowServiceCriticalAutoMerge ?? false,
+    allowServiceCriticalAutoMerge: config?.allowServiceCriticalAutoMerge ?? supervisorPolicy.approvalGates.allowServiceCriticalAutoMerge,
     eligiblePathPrefixes,
     blockedPathPrefixes,
     labelHints

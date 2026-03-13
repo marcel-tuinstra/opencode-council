@@ -74,8 +74,8 @@ Stricter automation is opt-in because it changes delivery posture. It should be 
 Override points are intentionally minimal.
 
 1. Runtime default: `v1-safe` from this document.
-2. Repository policy file: future Supervisor implementations should read a committed repo-local policy from `.opencode/supervisor-policy.json`.
-3. Environment overrides: runtime budget thresholds may already be adjusted with the existing `ORCHESTRATION_WORKFLOWS_BUDGET_*` variables in `plugins/orchestration-workflows/budget.ts`; future Supervisor policy wiring should map those values into the soft-governance helper in `plugins/orchestration-workflows/budget-governance.ts`.
+2. Repository policy file: the runtime now reads a committed repo-local policy from `.opencode/supervisor-policy.json`.
+3. Environment overrides: runtime budget thresholds may still be adjusted with the existing `ORCHESTRATION_WORKFLOWS_BUDGET_*` variables in `plugins/orchestration-workflows/budget.ts`; those values win over the repo policy file for the live budget governor.
 4. Per-run human instruction: a user may narrow the policy for a specific run; widening the policy beyond `v1-safe` requires explicit opt-in.
 
 Precedence should be: direct human instruction for the active run, then committed repository policy, then runtime defaults.
@@ -85,8 +85,9 @@ Precedence should be: direct human instruction for the active run, then committe
 - Treat this file as the canonical reference for story work that introduces Supervisor policy wiring.
 - Keep the canonical intake model aligned with `SUPERVISOR_WORK_UNITS.md` so tracker-backed and ad-hoc work share the same minimum planning fields.
 - Repository tiering should feed policy selection conservatively: classification sets the default active lane cap, but does not silently widen merge behavior or code-change concurrency.
-- If runtime config is added later, keep its field names aligned with the defaults and tiers defined here.
+- Keep the repo policy file field names aligned with the defaults and tiers defined here.
 - Do not introduce automatic merge behavior as a silent default; it must remain a repository opt-in.
 - Merge eligibility should treat service criticality and changed-path scope as the primary gates; labels may inform routing or intent, but should remain secondary hints.
 - Lane cap overrides should come only from explicit configuration, not from inferred repo maturity beyond the default tier mapping.
 - Budget escalation past `120%` should require a human-readable justification, a recorded scope-or-lane reduction decision, and a checkpoint review before autonomous execution resumes when hard-stop is disabled.
+- Invalid repo policy config should fail safe: keep the `v1-safe` defaults for any invalid field and surface diagnostics for operators.

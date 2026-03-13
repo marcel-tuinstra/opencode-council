@@ -4,8 +4,7 @@ import {
   MARKER_PREFIX,
   MARKER_REMOVAL_REGEX,
   MARKER_SUFFIX,
-  STALE_SENSITIVE_REGEX,
-  MCP_CAPS
+  STALE_SENSITIVE_REGEX
 } from "./constants";
 import { buildSystemInstruction, enforceUserContract } from "./contracts";
 import { debugLog, previewText } from "./debug";
@@ -36,6 +35,7 @@ import {
   stripControlLeakage
 } from "./output";
 import { detectRolesFromMentions, detectRolesFromText } from "./roles";
+import { getSupervisorPolicy } from "./supervisor-config";
 import {
   resetSessionState,
   sessionPolicy,
@@ -245,7 +245,9 @@ export const AgentConversations: Plugin = async () => {
         provider,
         tool: input.tool,
         mcpCallCount: policy.mcpCallCount,
-        cap: policy.allowDeepMcp ? MCP_CAPS.deep : MCP_CAPS.default
+        cap: policy.allowDeepMcp
+          ? getSupervisorPolicy().limits.mcp.deepCallCap
+          : getSupervisorPolicy().limits.mcp.defaultCallCap
       });
     },
 
