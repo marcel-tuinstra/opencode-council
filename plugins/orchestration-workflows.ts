@@ -11,6 +11,14 @@ export type {
   SupervisorRoutingIntentProfileInput
 } from "./orchestration-workflows/supervisor-config";
 export type {
+  PlanSupervisorGoalInput,
+  PlanSupervisorGoalResult,
+  SupervisorGoalBudgetClass,
+  SupervisorGoalPlanningConfidence,
+  SupervisorGoalPlanningStatus,
+  SupervisorGoalRoleRecommendation
+} from "./orchestration-workflows/supervisor-goal-plan";
+export type {
   RouteSupervisorWorkUnitInput,
   RouteSupervisorWorkUnitResult,
   SupervisorRoutingAction,
@@ -199,19 +207,22 @@ export type {
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
 export {
+  planSupervisorGoal
+} from "./orchestration-workflows/supervisor-goal-plan";
+export {
   DEFAULT_SUPERVISOR_APPROVAL_GATES,
   DEFAULT_SUPERVISOR_BUDGET,
-   DEFAULT_SUPERVISOR_COMPACTION,
-   DEFAULT_SUPERVISOR_LIMITS,
-   DEFAULT_SUPERVISOR_PROFILE,
-   DEFAULT_SUPERVISOR_ROLE_ALIASES,
-   DEFAULT_SUPERVISOR_ROUTING,
-   DEFAULT_SUPERVISOR_POLICY_PATH,
-   getSupervisorPolicy,
-   getSupervisorPolicyDiagnostics,
-   loadSupervisorPolicy,
-   resetSupervisorPolicyCache,
-   resolveSupervisorPolicy
+  DEFAULT_SUPERVISOR_COMPACTION,
+  DEFAULT_SUPERVISOR_LIMITS,
+  DEFAULT_SUPERVISOR_PROFILE,
+  DEFAULT_SUPERVISOR_ROLE_ALIASES,
+  DEFAULT_SUPERVISOR_ROUTING,
+  DEFAULT_SUPERVISOR_POLICY_PATH,
+  getSupervisorPolicy,
+  getSupervisorPolicyDiagnostics,
+  loadSupervisorPolicy,
+  resetSupervisorPolicyCache,
+  resolveSupervisorPolicy
 } from "./orchestration-workflows/supervisor-config";
 export { routeSupervisorWorkUnit } from "./orchestration-workflows/supervisor-routing";
 export {
