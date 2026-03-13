@@ -9,9 +9,15 @@ export type SupervisorReasonCategory =
   | "blocked-action";
 
 export type SupervisorReasonCode =
+  | "route.intent-profile"
+  | "route.lane-match"
   | "route.multi-role-thread"
   | "route.delegated-thread"
+  | "assignment.sticky-session-owner"
+  | "assignment.deterministic-owner"
   | "assignment.weighted-turns"
+  | "fallback.missing-prerequisites"
+  | "fallback.low-confidence"
   | "fallback.compaction-guardrail"
   | "fallback.compaction-critical-slots"
   | "fallback.compaction-continuity"
@@ -26,6 +32,9 @@ export type SupervisorReasonCode =
   | "approval.blocked-path-review"
   | "approval.eligible-path-review"
   | "approval.auto-merge-allowed"
+  | "approval.governance-boundary"
+  | "approval.resume-approved"
+  | "approval.rejected-hold"
   | "blocked.missing-mcp-provider"
   | "blocked.mcp-access";
 
@@ -42,7 +51,13 @@ type SupervisorReasonContext = {
   targets?: Partial<Record<Role, number>>;
   usagePercent?: number;
   missingProviders?: readonly string[];
+  missingPrerequisites?: readonly string[];
   actionReason?: string;
+  intent?: string;
+  path?: string;
+  laneId?: string;
+  owner?: string;
+  confidence?: string;
 };
 
 const formatRoleList = (roles: readonly Role[]): string => roles.join(", ");
@@ -57,6 +72,26 @@ export const createSupervisorReasonDetail = (
   context: SupervisorReasonContext = {}
 ): SupervisorReasonDetail => {
   switch (code) {
+    case "route.intent-profile": {
+      const path = context.path ?? "the default execution path";
+      const intent = context.intent ? ` from the ${context.intent} intent profile` : "";
+      return {
+        code,
+        category: "route-selection",
+        short: "Intent profile selected the route.",
+        explanation: `Routed this work unit to ${path}${intent}.`.trim()
+      };
+    }
+    case "route.lane-match": {
+      const laneId = context.laneId ?? "the selected lane";
+      const path = context.path ? ` on the ${context.path} path` : "";
+      return {
+        code,
+        category: "route-selection",
+        short: "Lane matched for execution.",
+        explanation: `Matched this work unit to ${laneId}${path} so the supervisor can continue deterministically.`
+      };
+    }
     case "route.multi-role-thread": {
       const roles = context.roles ?? [];
       return {
@@ -79,6 +114,24 @@ export const createSupervisorReasonDetail = (
           : "Expanded a single-role response into a threaded route after delegation activated additional roles."
       };
     }
+    case "assignment.sticky-session-owner": {
+      const owner = context.owner ?? "the existing lane owner";
+      return {
+        code,
+        category: "assignment",
+        short: "Existing owner kept.",
+        explanation: `Kept ${owner} assigned because the lane already has an attached runtime owner.`
+      };
+    }
+    case "assignment.deterministic-owner": {
+      const owner = context.owner ?? "the selected owner";
+      return {
+        code,
+        category: "assignment",
+        short: "Deterministic owner assigned.",
+        explanation: `Assigned ${owner} with a stable deterministic selection so repeated routing keeps the same owner.`
+      };
+    }
     case "assignment.weighted-turns": {
       const roles = context.roles ?? [];
       const plan = context.targets && roles.length > 0 ? formatTurnPlan(context.targets, roles) : "";
@@ -92,6 +145,24 @@ export const createSupervisorReasonDetail = (
           : `Assigned turns with the detected role weighting.${lead}`.trim()
       };
     }
+    case "fallback.missing-prerequisites": {
+      const prerequisites = context.missingPrerequisites?.join(", ") ?? "required prerequisites";
+      return {
+        code,
+        category: "fallback",
+        short: "Prerequisites still missing.",
+        explanation: `Held execution on a safe fallback path because prerequisite references are still missing: ${prerequisites}.`
+      };
+    }
+    case "fallback.low-confidence":
+      return {
+        code,
+        category: "fallback",
+        short: "Routing confidence is low.",
+        explanation: context.confidence
+          ? `Held execution on a safe fallback path because routing confidence stayed ${context.confidence}.`
+          : "Held execution on a safe fallback path because routing confidence stayed too low."
+      };
     case "fallback.compaction-guardrail":
       return {
         code,
@@ -196,6 +267,36 @@ export const createSupervisorReasonDetail = (
         short: "Auto-merge checks passed.",
         explanation: "Allowed auto-merge because criticality, path, and opt-in policy checks all passed."
       };
+    case "approval.governance-boundary": {
+      const boundary = context.path ?? "governance";
+      const action = context.actionReason ?? "the requested action";
+      return {
+        code,
+        category: "approval-pause",
+        short: "Governance boundary requires approval.",
+        explanation: `Paused at the ${boundary} governance boundary until a human approves ${action}.`
+      };
+    }
+    case "approval.resume-approved": {
+      const boundary = context.path ?? "governance";
+      const action = context.actionReason ?? "the requested action";
+      return {
+        code,
+        category: "approval-pause",
+        short: "Human approval received.",
+        explanation: `Resumed only after an explicit human approval event cleared ${action} at the ${boundary} governance boundary.`
+      };
+    }
+    case "approval.rejected-hold": {
+      const boundary = context.path ?? "governance";
+      const action = context.actionReason ?? "the requested action";
+      return {
+        code,
+        category: "approval-pause",
+        short: "Approval rejected.",
+        explanation: `Kept execution paused because human review rejected ${action} at the ${boundary} governance boundary.`
+      };
+    }
     case "blocked.missing-mcp-provider": {
       const providers = context.missingProviders?.join(", ") ?? "the required providers";
       return {

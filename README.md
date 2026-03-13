@@ -32,13 +32,17 @@ The repository also ships typed Supervisor helpers, docs, and tests for staged a
 - work units
 - lane planning
 - lane lifecycle
+- durable run state store
+- supervisor scheduler and dispatch loop
+- lane worktree provisioner and reconciler
+- session runtime adapter and lifecycle
 - turn ownership and handoff contracts
 - review-ready evidence packet enforcement
 - merge policy
 - budget governance
 - observability snapshots
 - ad-hoc run history
-- runbook, KPI baseline, and epic pilot packaging
+- runbook, KPI baseline, epic pilot packaging, and alpha end-to-end validation evidence
 
 These are real repo assets, but they are not the same thing as a fully user-invokable supervisor/runtime mode yet.
 
@@ -103,9 +107,15 @@ See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the
 - Status and roadmap: [`docs/overview/status-and-roadmap.md`](./docs/overview/status-and-roadmap.md)
 - Policy profiles: [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md)
 - Supervisor work units: [`docs/supervisor/work-units.md`](./docs/supervisor/work-units.md)
+- Durable state store: [`docs/supervisor/durable-state-store.md`](./docs/supervisor/durable-state-store.md)
+- Lane worktree provisioner: [`docs/supervisor/lane-worktree-provisioner.md`](./docs/supervisor/lane-worktree-provisioner.md)
+- Session runtime adapter: [`docs/supervisor/session-runtime-adapter.md`](./docs/supervisor/session-runtime-adapter.md)
+- Recovery and repair playbooks: [`docs/supervisor/recovery-repair-playbooks.md`](./docs/supervisor/recovery-repair-playbooks.md)
+- Scheduler and dispatch loop: [`docs/supervisor/scheduler-dispatch-loop.md`](./docs/supervisor/scheduler-dispatch-loop.md)
 - Operations runbook: [`docs/supervisor/operations-runbook.md`](./docs/supervisor/operations-runbook.md)
 - Pilot KPI baseline: [`docs/supervisor/pilot-kpi-baseline.md`](./docs/supervisor/pilot-kpi-baseline.md)
 - Epic pilot package: [`docs/supervisor/epic-pilot.md`](./docs/supervisor/epic-pilot.md)
+- Alpha end-to-end validation: [`docs/supervisor/alpha-end-to-end-validation.md`](./docs/supervisor/alpha-end-to-end-validation.md)
 - Evidence packet template: [`docs/reference/evidence-packet-template.md`](./docs/reference/evidence-packet-template.md)
 - Testing guide: [`docs/testing/testing.md`](./docs/testing/testing.md)
 

@@ -88,6 +88,18 @@ Allowed v1 transitions are intentionally narrow:
 
 The typed lane lifecycle and cap contract lives in `plugins/orchestration-workflows/lane-lifecycle.ts`.
 
+## Scheduler and dispatch loop contract
+
+Lane planning, worktree provisioning, and runtime session lifecycle now connect through one scheduler/dispatch abstraction.
+
+- lane definitions are materialized from a dependency-aware `LanePlan`
+- dependency-complete lanes can activate only when the active lane cap allows them to start
+- active lanes receive deterministic worktree and session assignments
+- blocked, waiting, review-ready, and complete outcomes are derived from durable state plus explicit lane intent
+- post-merge completion can release managed worktrees without operator babysitting between approval boundaries
+
+The typed scheduler and dispatch loop live in `plugins/orchestration-workflows/supervisor-scheduler.ts`.
+
 ## Turn ownership and handoff contract
 
 Multi-role collaboration can stay in one lane as long as turn ownership remains explicit and auditable.

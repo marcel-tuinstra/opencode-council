@@ -20,6 +20,9 @@ The repo now also ships typed helpers and contracts for a future supervisor/work
 - `work-unit.ts`
 - `lane-plan.ts`
 - `lane-lifecycle.ts`
+- `durable-state-store.ts`
+- `lane-worktree-provisioner.ts`
+- `session-runtime-adapter.ts`
 - `turn-ownership.ts`
 - `review-ready-packet.ts`
 - `merge-policy.ts`
