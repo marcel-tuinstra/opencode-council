@@ -130,6 +130,20 @@ export type {
   SupervisorSessionRuntimeKind
 } from "./orchestration-workflows/session-runtime-adapter";
 export type {
+  ClassifySupervisorRecoveryPlaybookInput,
+  SupervisorLaneRecoveryContext,
+  SupervisorMergeConflictSignal,
+  SupervisorPartialCompletionGap,
+  SupervisorPartialCompletionSignal,
+  SupervisorRecoveryAction,
+  SupervisorRecoveryActionKind,
+  SupervisorRecoveryClassification,
+  SupervisorRecoveryDisposition,
+  SupervisorRecoveryFailureClass,
+  SupervisorRecoveryPlaybook,
+  SupervisorToolOutageSignal
+} from "./orchestration-workflows/recovery-repair-playbooks";
+export type {
   MergePolicy,
   MergePolicyCandidate,
   MergePolicyConfig,
@@ -265,4 +279,10 @@ export {
   createSupervisorSessionLifecycle,
   DEFAULT_SUPERVISOR_SESSION_STALL_TIMEOUT_MS
 } from "./orchestration-workflows/session-runtime-adapter";
+export {
+  classifySupervisorRecoveryPlaybook,
+  DEFAULT_SUPERVISOR_RECOVERY_STALL_TIMEOUT_MS,
+  detectSupervisorPartialCompletionGap,
+  getSupervisorLaneRecoveryContext
+} from "./orchestration-workflows/recovery-repair-playbooks";
 export { normalizeWorkUnit } from "./orchestration-workflows/work-unit";

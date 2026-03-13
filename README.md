@@ -110,6 +110,7 @@ See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the
 - Durable state store: [`docs/supervisor/durable-state-store.md`](./docs/supervisor/durable-state-store.md)
 - Lane worktree provisioner: [`docs/supervisor/lane-worktree-provisioner.md`](./docs/supervisor/lane-worktree-provisioner.md)
 - Session runtime adapter: [`docs/supervisor/session-runtime-adapter.md`](./docs/supervisor/session-runtime-adapter.md)
+- Recovery and repair playbooks: [`docs/supervisor/recovery-repair-playbooks.md`](./docs/supervisor/recovery-repair-playbooks.md)
 - Scheduler and dispatch loop: [`docs/supervisor/scheduler-dispatch-loop.md`](./docs/supervisor/scheduler-dispatch-loop.md)
 - Operations runbook: [`docs/supervisor/operations-runbook.md`](./docs/supervisor/operations-runbook.md)
 - Pilot KPI baseline: [`docs/supervisor/pilot-kpi-baseline.md`](./docs/supervisor/pilot-kpi-baseline.md)
