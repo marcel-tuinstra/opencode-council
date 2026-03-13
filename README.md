@@ -33,6 +33,7 @@ The repository also ships typed Supervisor helpers, docs, and tests for staged a
 - lane planning
 - lane lifecycle
 - durable run state store
+- lane worktree provisioner and reconciler
 - turn ownership and handoff contracts
 - review-ready evidence packet enforcement
 - merge policy
@@ -105,6 +106,7 @@ See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the
 - Policy profiles: [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md)
 - Supervisor work units: [`docs/supervisor/work-units.md`](./docs/supervisor/work-units.md)
 - Durable state store: [`docs/supervisor/durable-state-store.md`](./docs/supervisor/durable-state-store.md)
+- Lane worktree provisioner: [`docs/supervisor/lane-worktree-provisioner.md`](./docs/supervisor/lane-worktree-provisioner.md)
 - Operations runbook: [`docs/supervisor/operations-runbook.md`](./docs/supervisor/operations-runbook.md)
 - Pilot KPI baseline: [`docs/supervisor/pilot-kpi-baseline.md`](./docs/supervisor/pilot-kpi-baseline.md)
 - Epic pilot package: [`docs/supervisor/epic-pilot.md`](./docs/supervisor/epic-pilot.md)
