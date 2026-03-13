@@ -5,10 +5,12 @@ This repository does not yet ship a full Supervisor runtime. This runbook define
 ## Operating baseline
 
 - Default policy is `v1-safe`: ask-first escalation, manual merge, and conservative concurrency.
-- Start every implementation lane from fresh `main`; do not chain work from another feature branch.
+- Start every implementation lane from fresh `beta`; do not chain work from another feature branch.
 - Keep exactly one active write owner per lane at a time, even when multiple roles participate.
 - Treat `review_ready` as the handoff point where the lane has a reviewable packet and an open PR or equivalent artifact.
 - Use observability snapshots to confirm lane state, heartbeat health, blocker state, policy decisions, ownership transitions, and budget status before changing course.
+- In supervisor mode, delegate all product-code changes to bound implementation agents; keep the supervisor out of direct edits.
+- Record a delegation log for each implementation run, including agent label, story or lane, branch, worktree path, and a separate integration agent when outputs must be merged.
 
 ## Normal operations
 
@@ -20,13 +22,16 @@ Before starting work:
 - Confirm dependencies, acceptance criteria, evidence links, and risk tags are recorded.
 - Choose the smallest safe lane plan; expected duration is not a gating input.
 - Keep code-change concurrency at `1` and open-PR concurrency at `1` unless an explicit repo policy says otherwise.
+- Create the delegation log before implementation begins so each code-changing agent has a named branch and worktree binding.
 
 Checklist:
 
 - [ ] Work unit has objective, constraints, acceptance criteria, dependencies, risk tags, evidence links, and source metadata.
 - [ ] Lane dependencies and blocked vs parallelizable work are clear.
 - [ ] Active lane count fits the repository tier cap.
-- [ ] The implementation branch starts from fresh `main`.
+- [ ] The implementation branch starts from fresh `beta`.
+- [ ] Each implementation agent has a distinct worktree.
+- [ ] Integration ownership is assigned to a dedicated integration agent when multiple code-changing agents run in parallel.
 
 ### 2. Active execution
 
@@ -36,6 +41,7 @@ While a lane is active:
 - Record every ownership handoff with delta summary, current risks, next required evidence, and attached evidence.
 - Use the observability view as the source of truth for heartbeat freshness, blocker status, and recent policy decisions.
 - Pause for a human decision when the next action is risky, ambiguous, destructive, or would broaden automation beyond `v1-safe`.
+- If multiple implementation agents are active, keep integration work separate; the supervisor coordinates but does not resolve code conflicts directly.
 
 Checklist:
 
@@ -44,6 +50,7 @@ Checklist:
 - [ ] Latest handoff contract names the next owner and required evidence.
 - [ ] Heartbeat is healthy or explicitly explained.
 - [ ] No merge occurs without human approval.
+- [ ] Delegation log still matches the active agents, branches, and worktrees.
 
 ### 3. Review-ready handoff
 
@@ -51,7 +58,7 @@ Before moving a lane to `review_ready`:
 
 - Build the minimum review-ready packet from `EVIDENCE_PACKET_TEMPLATE.md`.
 - Include acceptance trace, scoped diff summary, verification results, risk or rollback notes, and explicit ownership.
-- Open the PR against `main` and treat that artifact as part of the handoff evidence.
+- Open the PR against `beta` and treat that artifact as part of the handoff evidence.
 - Keep the lane in `active` or `waiting` if the packet is incomplete.
 
 Checklist:
