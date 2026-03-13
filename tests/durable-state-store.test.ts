@@ -70,7 +70,16 @@ describe("durable-state-store", () => {
           approvalId: "approval-1",
           laneId: "lane-1",
           status: "pending",
+          boundary: "merge",
+          requestedAction: "merge lane branch",
           summary: "Awaiting human review before merge.",
+          rationale: "Merge is a governance boundary in alpha.",
+          requestedBy: "supervisor",
+          requestedAt: "2026-03-13T10:01:00.000Z",
+          context: {
+            changedPaths: ["plugins/orchestration-workflows/supervisor-scheduler.ts"],
+            targetRef: "epic/supervisor-alpha"
+          },
           updatedAt: "2026-03-13T10:01:00.000Z"
         }
       ],
@@ -115,6 +124,8 @@ describe("durable-state-store", () => {
     expect(state?.worktrees[0]?.path).toBe("/tmp/worktrees/run-001/lane-1");
     expect(state?.sessions[0]?.lastHeartbeatAt).toBe("2026-03-13T10:00:05.000Z");
     expect(state?.approvals[0]?.status).toBe("pending");
+    expect(state?.approvals[0]?.boundary).toBe("merge");
+    expect(state?.approvals[0]?.requestedBy).toBe("supervisor");
     expect(state?.artifacts[0]?.uri).toBe("docs/review-packets/run-001.md");
     expect(state?.auditLog).toEqual([
       {

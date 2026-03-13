@@ -66,6 +66,14 @@ export type SupervisorPolicyInput = {
     escalationMode?: "ask-first";
     mergeMode?: MergeMode;
     allowServiceCriticalAutoMerge?: boolean;
+    boundaries?: {
+      merge?: boolean;
+      release?: boolean;
+      destructive?: boolean;
+      securitySensitive?: boolean;
+      budgetExceptions?: boolean;
+      automationWidening?: boolean;
+    };
   };
   budget?: {
     runtime?: {
@@ -122,6 +130,14 @@ export type ResolvedSupervisorPolicy = {
     escalationMode: "ask-first";
     mergeMode: MergeMode;
     allowServiceCriticalAutoMerge: boolean;
+    boundaries: {
+      merge: boolean;
+      release: boolean;
+      destructive: boolean;
+      securitySensitive: boolean;
+      budgetExceptions: boolean;
+      automationWidening: boolean;
+    };
   };
   budget: {
     runtime: {
@@ -216,7 +232,15 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
   approvalGates: {
     escalationMode: "ask-first",
     mergeMode: "manual",
-    allowServiceCriticalAutoMerge: false
+    allowServiceCriticalAutoMerge: false,
+    boundaries: {
+      merge: true,
+      release: true,
+      destructive: true,
+      securitySensitive: true,
+      budgetExceptions: true,
+      automationWidening: true
+    }
   },
   budget: {
     runtime: {
@@ -350,7 +374,15 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
   approvalGates: {
     escalationMode: DEFAULT_SUPERVISOR_APPROVAL_GATES.escalationMode,
     mergeMode: DEFAULT_SUPERVISOR_APPROVAL_GATES.mergeMode,
-    allowServiceCriticalAutoMerge: DEFAULT_SUPERVISOR_APPROVAL_GATES.allowServiceCriticalAutoMerge
+    allowServiceCriticalAutoMerge: DEFAULT_SUPERVISOR_APPROVAL_GATES.allowServiceCriticalAutoMerge,
+    boundaries: {
+      merge: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.merge,
+      release: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.release,
+      destructive: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.destructive,
+      securitySensitive: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.securitySensitive,
+      budgetExceptions: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.budgetExceptions,
+      automationWidening: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.automationWidening
+    }
   },
   budget: {
     runtime: {
@@ -644,6 +676,34 @@ export const resolveSupervisorPolicy = (
           config.approvalGates.allowServiceCriticalAutoMerge = input.approvalGates.allowServiceCriticalAutoMerge;
         } else {
           pushDiagnostic(diagnostics, "approvalGates.allowServiceCriticalAutoMerge", "Expected a boolean value.");
+        }
+      }
+
+      if (input.approvalGates.boundaries !== undefined) {
+        if (!isRecord(input.approvalGates.boundaries)) {
+          pushDiagnostic(diagnostics, "approvalGates.boundaries", "Expected approvalGates.boundaries to be an object.");
+        } else {
+          const boundaryEntries = [
+            ["merge", "merge"],
+            ["release", "release"],
+            ["destructive", "destructive"],
+            ["securitySensitive", "securitySensitive"],
+            ["budgetExceptions", "budgetExceptions"],
+            ["automationWidening", "automationWidening"]
+          ] as const;
+
+          for (const [inputKey, configKey] of boundaryEntries) {
+            const value = input.approvalGates.boundaries[inputKey];
+            if (value === undefined) {
+              continue;
+            }
+
+            if (typeof value === "boolean") {
+              config.approvalGates.boundaries[configKey] = value;
+            } else {
+              pushDiagnostic(diagnostics, `approvalGates.boundaries.${inputKey}`, "Expected a boolean value.");
+            }
+          }
         }
       }
     }

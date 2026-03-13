@@ -433,4 +433,125 @@ describe("supervisor-scheduler", () => {
       }
     ]);
   });
+
+  it("pauses at approval gates and resumes only after an explicit approval event", () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const system = createFakeSystem();
+    const runtime = createFakeRuntime();
+    const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
+    const sessions = createSupervisorSessionLifecycle({ store, runtime });
+    const scheduler = createSupervisorDispatchLoop({ store, provisioner, sessions });
+    const lane = {
+      definition: {
+        laneId: "lane-1",
+        sequence: 1,
+        workUnitIds: ["sc-403-core"],
+        dependsOnLaneIds: [],
+        branch: "marceltuinstra/sc-403/lane-01"
+      }
+    } as const;
+
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T15:01:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: [lane],
+      sessionOwners: ["developer-a"],
+      baseRef: "epic/supervisor-alpha"
+    });
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T15:02:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: [lane],
+      sessionOwners: ["developer-a"],
+      baseRef: "epic/supervisor-alpha"
+    });
+
+    // Act
+    const pausePass = scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T15:03:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: [{
+        ...lane,
+        approvalGate: {
+          request: {
+            boundary: "merge",
+            requestedAction: "merge lane PR",
+            summary: "Pause before merging the lane pull request.",
+            rationale: "Merge is a governance boundary in alpha.",
+            context: {
+              targetRef: "epic/supervisor-alpha"
+            }
+          }
+        }
+      }],
+      sessionOwners: ["developer-a"],
+      baseRef: "epic/supervisor-alpha"
+    });
+    const resumePass = scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T15:04:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: [{
+        ...lane,
+        approvalGate: {
+          request: {
+            boundary: "merge",
+            requestedAction: "merge lane PR",
+            summary: "Pause before merging the lane pull request.",
+            rationale: "Merge is a governance boundary in alpha.",
+            context: {
+              targetRef: "epic/supervisor-alpha"
+            }
+          },
+          signal: {
+            status: "approved",
+            actor: "marceltuinstra",
+            occurredAt: "2026-03-13T15:04:30.000Z",
+            note: "Validated and approved."
+          }
+        }
+      }],
+      sessionOwners: ["developer-a"],
+      baseRef: "epic/supervisor-alpha"
+    });
+    const state = store.getRunState("run-alpha");
+
+    // Assert
+    expect(pausePass.decisions).toMatchObject([
+      {
+        laneId: "lane-1",
+        status: "blocked",
+        action: "pause-session",
+        nextAction: "pause",
+        reasons: ["Human approval is required at the merge governance boundary before merge lane PR."]
+      }
+    ]);
+    expect(resumePass.decisions).toMatchObject([
+      {
+        laneId: "lane-1",
+        status: "active",
+        action: "resume-session",
+        nextAction: "resume",
+        reasons: ["Explicit human approval cleared merge lane PR to resume execution."]
+      }
+    ]);
+    expect(state?.approvals).toMatchObject([
+      {
+        laneId: "lane-1",
+        boundary: "merge",
+        status: "approved",
+        decidedBy: "marceltuinstra"
+      }
+    ]);
+    expect(state?.sessions[0]?.status).toBe("active");
+  });
 });

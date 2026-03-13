@@ -1,4 +1,12 @@
+import {
+  evaluateSupervisorApprovalGate,
+  resolveSupervisorApprovalId,
+  type SupervisorApprovalGateRequest,
+  type SupervisorApprovalSignal,
+  type SupervisorApprovalNextAction
+} from "./approval-gates";
 import type {
+  SupervisorApprovalRecord,
   SupervisorLaneRecord,
   SupervisorRunState,
   SupervisorSessionRecord,
@@ -40,6 +48,10 @@ export type SupervisorDispatchLaneInput = {
   waitingOn?: string[];
   reviewReady?: boolean;
   complete?: boolean;
+  approvalGate?: {
+    request: SupervisorApprovalGateRequest;
+    signal?: SupervisorApprovalSignal;
+  };
 };
 
 export type SupervisorDispatchLaneStatus =
@@ -51,6 +63,7 @@ export type SupervisorDispatchLaneStatus =
 
 export type SupervisorDispatchAction =
   | "none"
+  | "pause-session"
   | "provision-worktree"
   | "launch-session"
   | "resume-session"
@@ -62,6 +75,7 @@ export type SupervisorDispatchLaneDecision = {
   status: SupervisorDispatchLaneStatus;
   targetState: LaneLifecycleState;
   action: SupervisorDispatchAction;
+  nextAction: SupervisorApprovalNextAction;
   assignedOwner?: string;
   reasons: readonly string[];
   lane: SupervisorLaneRecord;
@@ -114,6 +128,22 @@ const findWorktree = (state: SupervisorRunState, worktreeId?: string): Superviso
 const findSession = (state: SupervisorRunState, sessionId?: string): SupervisorSessionRecord | undefined => (
   sessionId ? state.sessions.find((session) => session.sessionId === sessionId) : undefined
 );
+
+const findApproval = (state: SupervisorRunState, approvalId: string): SupervisorApprovalRecord | undefined => (
+  state.approvals.find((approval) => approval.approvalId === approvalId)
+);
+
+const sameApprovalRecord = (left?: SupervisorApprovalRecord, right?: SupervisorApprovalRecord | null): boolean => {
+  if (!left && !right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return false;
+  }
+
+  return JSON.stringify(left) === JSON.stringify(right);
+};
 
 const commitLaneState = (
   store: SupervisorStateStore,
@@ -329,6 +359,7 @@ export const createSupervisorDispatchLoop = (
           status: "complete",
           targetState: "complete",
           action: worktree?.status === "released" ? "release-worktree" : "none",
+          nextAction: "continue",
           assignedOwner,
           reasons: freezeList(reasons),
           lane,
@@ -355,6 +386,7 @@ export const createSupervisorDispatchLoop = (
           status: "review_ready",
           targetState: "review_ready",
           action: "none",
+          nextAction: "continue",
           assignedOwner,
           reasons: freezeList(reasons),
           lane,
@@ -371,6 +403,7 @@ export const createSupervisorDispatchLoop = (
           status: "blocked",
           targetState: lane.state,
           action: "none",
+          nextAction: "pause",
           assignedOwner,
           reasons: freezeList(reasons),
           lane,
@@ -400,6 +433,7 @@ export const createSupervisorDispatchLoop = (
           status: "blocked",
           targetState: lane.state,
           action: "none",
+          nextAction: "pause",
           assignedOwner,
           reasons: freezeList(reasons),
           lane,
@@ -407,6 +441,139 @@ export const createSupervisorDispatchLoop = (
           session
         });
         continue;
+      }
+
+      if (laneInput.approvalGate) {
+        const approvalId = resolveSupervisorApprovalId(lane.laneId, laneInput.approvalGate.request);
+        const existingApproval = findApproval(state, approvalId);
+        const approvalDecision = evaluateSupervisorApprovalGate({
+          laneId: lane.laneId,
+          actor,
+          occurredAt,
+          request: laneInput.approvalGate.request,
+          existingApproval,
+          signal: laneInput.approvalGate.signal
+        });
+
+        if (!sameApprovalRecord(existingApproval, approvalDecision.approval)) {
+          store.commitMutation(runId, {
+            mutationId: `dispatch:${lane.laneId}:approval:${occurredAt}`,
+            actor,
+            summary: `Persist approval state for lane '${lane.laneId}'.`,
+            occurredAt,
+            approvalUpserts: approvalDecision.approval ? [approvalDecision.approval] : [],
+            sideEffects: [approvalDecision.nextAction === "resume" ? "approval-resolved" : "approval-requested"]
+          });
+          state = store.getRunState(runId)!;
+          lane = findLane(state, laneInput.definition.laneId)!;
+          worktree = findWorktree(state, lane.worktreeId);
+          session = findSession(state, lane.sessionId);
+        }
+
+        if (session?.status === "paused" && laneInput.approvalGate.signal?.status !== "approved") {
+          reasons.push(...approvalDecision.reasons, "Execution stays paused until an explicit approval event arrives.");
+          decisions.push({
+            laneId: lane.laneId,
+            status: "blocked",
+            targetState: lane.state,
+            action: "none",
+            nextAction: "pause",
+            assignedOwner,
+            reasons: freezeList(reasons),
+            lane,
+            worktree,
+            session
+          });
+          continue;
+        }
+
+        if (approvalDecision.nextAction === "pause") {
+          if (session?.status === "active") {
+            const pauseResult = sessions.pauseSession({
+              runId,
+              laneId: lane.laneId,
+              actor,
+              mutationId: `dispatch:${lane.laneId}:pause:${occurredAt}`,
+              occurredAt,
+              summary: `Pause lane session for approval on '${lane.laneId}'.`
+            });
+            session = pauseResult.session;
+          }
+
+          if (lane.state === "active") {
+            lane = commitLaneState(
+              store,
+              runId,
+              actor,
+              occurredAt,
+              lane,
+              "waiting",
+              `dispatch:${lane.laneId}:approval-wait:${occurredAt}`,
+              `Hold lane '${lane.laneId}' at an approval boundary.`
+            );
+          }
+
+          reasons.push(...approvalDecision.reasons);
+          decisions.push({
+            laneId: lane.laneId,
+            status: "blocked",
+            targetState: lane.state,
+            action: session?.status === "paused" ? "pause-session" : "none",
+            nextAction: "pause",
+            assignedOwner,
+            reasons: freezeList(reasons),
+            lane,
+            worktree,
+            session
+          });
+          continue;
+        }
+
+        if (approvalDecision.nextAction === "resume") {
+          if (lane.state === "waiting") {
+            lane = commitLaneState(
+              store,
+              runId,
+              actor,
+              occurredAt,
+              lane,
+              "active",
+              `dispatch:${lane.laneId}:approval-resume:${occurredAt}`,
+              `Resume lane '${lane.laneId}' after explicit approval.`
+            );
+            state = store.getRunState(runId)!;
+            worktree = findWorktree(state, lane.worktreeId);
+            session = findSession(state, lane.sessionId);
+          }
+
+          if (session?.status === "paused") {
+            const sessionResult = sessions.resumeSession({
+              runId,
+              laneId: lane.laneId,
+              owner: assignedOwner,
+              actor,
+              mutationId: `dispatch:${lane.laneId}:resume:${occurredAt}`,
+              occurredAt,
+              summary: `Resume paused lane session for '${lane.laneId}' after approval.`
+            });
+            session = sessionResult.session;
+            lane = sessionResult.lane;
+            reasons.push(...approvalDecision.reasons);
+            decisions.push({
+              laneId: lane.laneId,
+              status: "active",
+              targetState: "active",
+              action: "resume-session",
+              nextAction: "resume",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+        }
       }
 
       if (lane.state !== "active") {
@@ -418,6 +585,7 @@ export const createSupervisorDispatchLoop = (
             status: "at-lane-cap",
             targetState: lane.state,
             action: "none",
+            nextAction: "pause",
             assignedOwner,
             reasons: freezeList(reasons),
             lane,
@@ -463,6 +631,7 @@ export const createSupervisorDispatchLoop = (
           status: "active",
           targetState: "active",
           action: provisionResult.action === "blocked" ? "none" : "provision-worktree",
+          nextAction: "continue",
           assignedOwner,
           reasons: freezeList(reasons),
           lane,
@@ -489,6 +658,7 @@ export const createSupervisorDispatchLoop = (
           status: "active",
           targetState: "active",
           action: "launch-session",
+          nextAction: "continue",
           assignedOwner,
           reasons: freezeList(reasons),
           lane,
@@ -526,6 +696,7 @@ export const createSupervisorDispatchLoop = (
           status: "active",
           targetState: "active",
           action: session.status === "active" && sessionResult.action === "resumed" ? "resume-session" : "replace-session",
+          nextAction: session.status === "active" && sessionResult.action === "resumed" ? "resume" : "continue",
           assignedOwner,
           reasons: freezeList(reasons),
           lane,
@@ -540,6 +711,7 @@ export const createSupervisorDispatchLoop = (
         status: "active",
         targetState: "active",
         action: "none",
+        nextAction: "continue",
         assignedOwner,
         reasons: freezeList(reasons),
         lane,
