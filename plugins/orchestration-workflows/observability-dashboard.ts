@@ -1,5 +1,6 @@
 import type { BudgetGovernanceDecision, BudgetGovernanceStatus } from "./budget-governance";
 import type { LaneLifecycleState } from "./lane-lifecycle";
+import type { SupervisorReasonDetail } from "./reason-codes";
 import type { LaneTurnHandoffContract, LaneTurnRole } from "./turn-ownership";
 
 export type SupervisorHeartbeatHealth = "healthy" | "stale" | "missing";
@@ -46,6 +47,7 @@ export type SupervisorPolicyDecisionInput = {
   summary: string;
   outcome: string;
   occurredAt: string;
+  reasonDetails?: readonly SupervisorReasonDetail[];
 };
 
 export type SupervisorPolicyDecision = {
@@ -54,6 +56,7 @@ export type SupervisorPolicyDecision = {
   summary: string;
   outcome: string;
   occurredAt: string;
+  reasonDetails: readonly SupervisorReasonDetail[];
 };
 
 export type SupervisorEscalationEvent = {
@@ -199,7 +202,8 @@ const normalizePolicyDecision = (
   laneId: assertNonEmptyValue(input.laneId, "policy decision lane id"),
   summary: assertNonEmptyValue(input.summary, "policy decision summary"),
   outcome: assertNonEmptyValue(input.outcome, "policy decision outcome"),
-  occurredAt: assertTimestamp(input.occurredAt, "policy decision timestamp")
+  occurredAt: assertTimestamp(input.occurredAt, "policy decision timestamp"),
+  reasonDetails: Object.freeze([...(input.reasonDetails ?? [])])
 });
 
 const buildEscalationEvent = (

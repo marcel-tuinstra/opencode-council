@@ -22,6 +22,7 @@ describe("merge-policy", () => {
     expect(policy.overrideSource).toBe("default");
     expect(decision.status).toBe("requires-human");
     expect(decision.reasons).toEqual(["Merge policy defaults to manual human approval."]);
+    expect(decision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.manual-review-default"]);
   });
 
   it("only allows auto-merge opt-in for large-mature repositories", () => {
@@ -57,6 +58,7 @@ describe("merge-policy", () => {
     expect(decision.reasons).toEqual([
       "Service-critical changes require human approval unless the repository explicitly opts in."
     ]);
+    expect(decision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.service-critical-review"]);
   });
 
   it("requires explicit eligible paths before auto-merge can be configured", () => {
@@ -96,6 +98,7 @@ describe("merge-policy", () => {
     expect(blockedDecision.reasons).toEqual([
       "Blocked paths require human approval even when auto-merge is enabled."
     ]);
+    expect(blockedDecision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.blocked-path-review"]);
 
     expect(outOfPolicyDecision.status).toBe("requires-human");
     expect(outOfPolicyDecision.outOfPolicyPaths).toEqual(["src/index.ts"]);
@@ -103,6 +106,7 @@ describe("merge-policy", () => {
     expect(outOfPolicyDecision.reasons).toEqual([
       "Changed paths must stay within the configured eligible path prefixes for auto-merge."
     ]);
+    expect(outOfPolicyDecision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.eligible-path-review"]);
   });
 
   it("allows auto-merge only after criticality and path checks pass", () => {
@@ -128,6 +132,7 @@ describe("merge-policy", () => {
     expect(decision.reasons).toEqual([
       "Label hints matched, but path and criticality checks remained the primary merge gate."
     ]);
+    expect(decision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.auto-merge-allowed"]);
     expect(() => assertMergePolicyAllowsAutoMerge(policy, candidate)).not.toThrow();
   });
 

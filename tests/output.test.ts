@@ -3,6 +3,7 @@ import {
   appendMcpSuggestion,
   appendMcpWarnings,
   appendMissingProviderNotice,
+  appendSupervisorDecisionNotes,
   applyBudgetAction,
   extractDelegatedRoles,
   normalizeThreadOutput,
@@ -71,7 +72,7 @@ describe("output", () => {
     const updated = appendMissingProviderNotice(text, "CTO", true, ["github"]);
 
     // Assert
-    expect(updated).toContain("[2] CTO: Need at least one MCP check for: github before final recommendation.");
+    expect(updated).toContain("[2] CTO: [Supervisor] blocked.missing-mcp-provider: Blocked the final recommendation until at least one MCP check covers: github.");
   });
 
   it("appends MCP warning block", () => {
@@ -81,8 +82,22 @@ describe("output", () => {
     const updated = appendMcpWarnings("done", ["blocked one", "blocked two"]);
 
     // Assert
-    expect(updated).toContain("[MCP] blocked one");
-    expect(updated).toContain("[MCP] blocked two");
+    expect(updated).toContain("[MCP] blocked.mcp-access");
+    expect(updated).toContain("blocked one");
+    expect(updated).toContain("blocked two");
+  });
+
+  it("appends compact supervisor decision notes for threaded routes", () => {
+    // Arrange
+    const text = "[1] CTO: Investigate\n\n[2] DEV: Validate";
+
+    // Act
+    const updated = appendSupervisorDecisionNotes(text, ["CTO", "DEV"], targets, "multi-role-thread");
+
+    // Assert
+    expect(updated).toContain("route.multi-role-thread");
+    expect(updated).toContain("assignment.weighted-turns");
+    expect(updated).toContain("CTO:2 DEV:1");
   });
 
   it("extracts delegated roles and removes marker", () => {
@@ -161,8 +176,8 @@ describe("output", () => {
     const halted = applyBudgetAction("anything", "halt", "hard budget exceeded on summarize", 200);
 
     // Assert
-    expect(compacted).toContain("[Budget] Compact mode enabled");
-    expect(halted).toContain("budget governor");
+    expect(compacted).toContain("budget.output-compact");
+    expect(halted).toContain("budget.output-halt");
     expect(halted).toContain("hard budget exceeded");
   });
 });

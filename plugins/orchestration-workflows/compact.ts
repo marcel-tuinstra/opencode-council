@@ -1,4 +1,5 @@
 import { debugLog } from "./debug";
+import { createSupervisorReasonDetail, formatSupervisorReason } from "./reason-codes";
 import { getSupervisorPolicy } from "./supervisor-config";
 import type { Intent } from "./types";
 
@@ -129,7 +130,7 @@ export const compactWorkflowContext = (text: string, intent: Intent): Compaction
       text,
       compacted: false,
       summary: null,
-      fallbackReason: "fallback: reduction guardrail not met"
+      fallbackReason: formatSupervisorReason(createSupervisorReasonDetail("fallback.compaction-guardrail"), "[Compaction]")
     };
   }
 
@@ -144,7 +145,7 @@ export const compactWorkflowContext = (text: string, intent: Intent): Compaction
       text,
       compacted: false,
       summary: null,
-      fallbackReason: "fallback: critical slots could not be preserved"
+      fallbackReason: formatSupervisorReason(createSupervisorReasonDetail("fallback.compaction-critical-slots"), "[Compaction]")
     };
   }
 
@@ -169,5 +170,6 @@ export const appendCompactionNotice = (text: string, notice: string | null): str
   if (!notice) {
     return text;
   }
-  return `${text}\n\n[Compaction] ${notice}`;
+  const normalizedNotice = notice.startsWith("[Compaction]") ? notice : `[Compaction] ${notice}`;
+  return `${text}\n\n${normalizedNotice}`;
 };

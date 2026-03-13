@@ -1,4 +1,5 @@
 import type { Role } from "./types";
+import { createSupervisorReasonDetail, formatSupervisorReason } from "./reason-codes";
 import { normalizeRole } from "./roles";
 
 const DELEGATION_REGEX = /<<DELEGATE:([^>]+)>>/i;
@@ -213,8 +214,9 @@ export const appendMissingProviderNotice = (
     return text;
   }
 
-  const missingList = missingProviders.join(", ");
-  const notice = `Need at least one MCP check for: ${missingList} before final recommendation.`;
+  const notice = formatSupervisorReason(
+    createSupervisorReasonDetail("blocked.missing-mcp-provider", { missingProviders })
+  );
 
   if (!numbered) {
     return `${text}\n\n${notice}`;
@@ -237,7 +239,9 @@ export const appendMcpWarnings = (text: string, warnings: string[]): string => {
     return text;
   }
 
-  const warningBlock = warnings.map((warning) => `[MCP] ${warning}`).join("\n");
+  const warningBlock = warnings
+    .map((warning) => formatSupervisorReason(createSupervisorReasonDetail("blocked.mcp-access", { actionReason: warning }), "[MCP]"))
+    .join("\n");
   return `${text}\n\n---\n${warningBlock}`;
 };
 
@@ -248,7 +252,8 @@ export const applyBudgetAction = (
   tokenLimit: number
 ): string => {
   if (action === "halt") {
-    return `Output paused by orchestration budget governor: ${reason}. Retry with fewer roles, a narrower scope, or a deeper-investigation instruction with explicit budget override.`;
+    const detail = createSupervisorReasonDetail("budget.output-halt", { actionReason: reason });
+    return `${formatSupervisorReason(detail)} Retry with fewer roles, a narrower scope, or a deeper-investigation instruction with explicit budget override.`;
   }
 
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
@@ -258,14 +263,35 @@ export const applyBudgetAction = (
 
   if (action === "compact") {
     const compacted = lines.slice(0, 8).join("\n");
-    return `${compacted}\n\n[Budget] Compact mode enabled: ${reason}. Kept the highest-signal lines to stay within budget.`;
+    return `${compacted}\n\n${formatSupervisorReason(createSupervisorReasonDetail("budget.output-compact", { actionReason: reason }))}`;
   }
 
   const maxChars = Math.max(40, tokenLimit * 4);
   if (text.length <= maxChars) {
-    return `${text}\n\n[Budget] Truncation threshold reached: ${reason}.`;
+    return `${text}\n\n${formatSupervisorReason(createSupervisorReasonDetail("budget.output-truncate", { actionReason: reason }))}`;
   }
 
   const truncated = `${text.slice(0, maxChars).trimEnd()}...`;
-  return `${truncated}\n\n[Budget] Output truncated: ${reason}.`;
+  return `${truncated}\n\n${formatSupervisorReason(createSupervisorReasonDetail("budget.output-truncate", { actionReason: reason }))}`;
+};
+
+export const appendSupervisorDecisionNotes = (
+  text: string,
+  roles: Role[],
+  targets: Record<Role, number>,
+  route: "multi-role-thread" | "delegated-thread"
+): string => {
+  if (roles.length <= 1) {
+    return text;
+  }
+
+  const routeCode = route === "delegated-thread" ? "route.delegated-thread" : "route.multi-role-thread";
+  const routeLine = formatSupervisorReason(createSupervisorReasonDetail(routeCode, { roles }));
+  const assignmentLine = formatSupervisorReason(createSupervisorReasonDetail("assignment.weighted-turns", {
+    leadRole: roles[0],
+    roles,
+    targets
+  }));
+
+  return `${text}\n\n---\n${routeLine}\n${assignmentLine}`;
 };
