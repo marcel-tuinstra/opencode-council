@@ -82,6 +82,24 @@ export type {
   SupervisorLaneWorktreeSystem
 } from "./orchestration-workflows/lane-worktree-provisioner";
 export type {
+  AttachSupervisorRuntimeSessionInput,
+  CreateSupervisorSessionLifecycleOptions,
+  DetectStalledSupervisorSessionInput,
+  LaunchSupervisorRuntimeSessionInput,
+  LaunchSupervisorSessionInput,
+  RecordSupervisorSessionHeartbeatInput,
+  ReplaceSupervisorSessionInput,
+  ResumeSupervisorSessionInput,
+  SupervisorRuntimeSessionSnapshot,
+  SupervisorRuntimeSessionStatus,
+  SupervisorSessionBinding,
+  SupervisorSessionLifecycle,
+  SupervisorSessionLifecycleResult,
+  SupervisorSessionLifecycleResultAction,
+  SupervisorSessionRuntimeAdapter,
+  SupervisorSessionRuntimeKind
+} from "./orchestration-workflows/session-runtime-adapter";
+export type {
   MergePolicy,
   MergePolicyCandidate,
   MergePolicyConfig,
@@ -184,4 +202,9 @@ export {
   DEFAULT_SUPERVISOR_STATE_ROOT,
   SUPERVISOR_STATE_STORE_SCHEMA_VERSION
 } from "./orchestration-workflows/durable-state-store";
+export {
+  buildSupervisorSessionId,
+  createSupervisorSessionLifecycle,
+  DEFAULT_SUPERVISOR_SESSION_STALL_TIMEOUT_MS
+} from "./orchestration-workflows/session-runtime-adapter";
 export { normalizeWorkUnit } from "./orchestration-workflows/work-unit";

@@ -15,7 +15,7 @@ export type SupervisorPersistedRunStatus =
   | "failed";
 
 export type SupervisorPersistedWorktreeStatus = "active" | "parked" | "released";
-export type SupervisorPersistedSessionStatus = "active" | "paused" | "completed" | "failed";
+export type SupervisorPersistedSessionStatus = "launching" | "active" | "paused" | "stalled" | "completed" | "failed" | "replaced";
 export type SupervisorPersistedApprovalStatus = "pending" | "approved" | "rejected" | "expired";
 export type SupervisorPersistedArtifactStatus = "pending" | "ready" | "superseded";
 export type SupervisorPersistedArtifactKind = "branch" | "pull-request" | "review-packet" | "session-log" | "other";
@@ -63,7 +63,14 @@ export type SupervisorSessionRecord = {
   laneId: string;
   worktreeId: string;
   status: SupervisorPersistedSessionStatus;
+  runtime?: string;
+  owner?: string;
+  startedAt?: string;
+  attachedAt?: string;
   lastHeartbeatAt?: string;
+  failureReason?: string;
+  replacementOfSessionId?: string;
+  replacedBySessionId?: string;
   updatedAt: string;
 };
 
@@ -207,7 +214,18 @@ const normalizeSessionRecord = (input: SupervisorSessionRecord): SupervisorSessi
   laneId: assertNonEmpty(input.laneId, "session lane id"),
   worktreeId: assertNonEmpty(input.worktreeId, "session worktree id"),
   status: input.status,
+  runtime: input.runtime ? assertNonEmpty(input.runtime, "session runtime") : undefined,
+  owner: input.owner ? assertNonEmpty(input.owner, "session owner") : undefined,
+  startedAt: input.startedAt ? assertTimestamp(input.startedAt, "session started timestamp") : undefined,
+  attachedAt: input.attachedAt ? assertTimestamp(input.attachedAt, "session attached timestamp") : undefined,
   lastHeartbeatAt: input.lastHeartbeatAt ? assertTimestamp(input.lastHeartbeatAt, "session heartbeat timestamp") : undefined,
+  failureReason: input.failureReason ? assertNonEmpty(input.failureReason, "session failure reason") : undefined,
+  replacementOfSessionId: input.replacementOfSessionId
+    ? assertNonEmpty(input.replacementOfSessionId, "session replacement source id")
+    : undefined,
+  replacedBySessionId: input.replacedBySessionId
+    ? assertNonEmpty(input.replacedBySessionId, "session replacement target id")
+    : undefined,
   updatedAt: assertTimestamp(input.updatedAt, "session updated timestamp")
 });
 
