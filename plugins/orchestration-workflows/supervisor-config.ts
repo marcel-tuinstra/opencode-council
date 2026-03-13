@@ -34,6 +34,26 @@ export type SupervisorRoutingIntentProfile = {
   fallbackLeadRole: Role;
 };
 
+export type SupervisorExecutionMode = "delegate-only" | "delegate-with-manual-override";
+
+export type SupervisorExecutionPolicyInput = {
+  mode?: SupervisorExecutionMode;
+  allowSupervisorDirectEdits?: boolean;
+  requireDelegationLog?: boolean;
+  requireAgentWorktreeBinding?: boolean;
+  requireDedicatedIntegrationAgent?: boolean;
+  integrationAgentLabel?: string;
+};
+
+export type SupervisorExecutionPolicy = {
+  mode: SupervisorExecutionMode;
+  allowSupervisorDirectEdits: boolean;
+  requireDelegationLog: boolean;
+  requireAgentWorktreeBinding: boolean;
+  requireDedicatedIntegrationAgent: boolean;
+  integrationAgentLabel: string;
+};
+
 export type SupervisorPolicyDiagnostics = {
   path: string;
   message: string;
@@ -96,6 +116,7 @@ export type SupervisorPolicyInput = {
     minimumSignalScore?: number;
     intentProfiles?: Partial<Record<Intent, SupervisorRoutingIntentProfileInput>>;
   };
+  execution?: SupervisorExecutionPolicyInput;
   compaction?: Partial<Record<Intent, {
     triggerTokens?: number;
     targetTokens?: number;
@@ -160,6 +181,7 @@ export type ResolvedSupervisorPolicy = {
     minimumSignalScore: number;
     intentProfiles: Record<Intent, SupervisorRoutingIntentProfile>;
   };
+  execution: SupervisorExecutionPolicy;
   compaction: Record<Intent, {
     triggerTokens: number;
     targetTokens: number;
@@ -270,6 +292,14 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
       mixed: { path: "execute", leadRole: "CTO", fallbackLeadRole: "PM" }
     }
   },
+  execution: {
+    mode: "delegate-only",
+    allowSupervisorDirectEdits: false,
+    requireDelegationLog: true,
+    requireAgentWorktreeBinding: true,
+    requireDedicatedIntegrationAgent: true,
+    integrationAgentLabel: "INTEGRATION"
+  },
   compaction: {
     backend: { triggerTokens: 700, targetTokens: 420, retainRecentLines: 3 },
     design: { triggerTokens: 760, targetTokens: 460, retainRecentLines: 3 },
@@ -333,6 +363,14 @@ export const DEFAULT_SUPERVISOR_ROUTING = Object.freeze({
     mixed: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.mixed })
   })
 }) as Readonly<ResolvedSupervisorPolicy["routing"]>;
+export const DEFAULT_SUPERVISOR_EXECUTION = Object.freeze({
+  mode: DEFAULT_POLICY_INPUT.execution!.mode!,
+  allowSupervisorDirectEdits: DEFAULT_POLICY_INPUT.execution!.allowSupervisorDirectEdits!,
+  requireDelegationLog: DEFAULT_POLICY_INPUT.execution!.requireDelegationLog!,
+  requireAgentWorktreeBinding: DEFAULT_POLICY_INPUT.execution!.requireAgentWorktreeBinding!,
+  requireDedicatedIntegrationAgent: DEFAULT_POLICY_INPUT.execution!.requireDedicatedIntegrationAgent!,
+  integrationAgentLabel: DEFAULT_POLICY_INPUT.execution!.integrationAgentLabel!
+}) as Readonly<ResolvedSupervisorPolicy["execution"]>;
 export const DEFAULT_SUPERVISOR_COMPACTION = Object.freeze({
   backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.backend }),
   design: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.design }),
@@ -412,6 +450,14 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
       mixed: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.mixed }
     }
   },
+  execution: {
+    mode: DEFAULT_SUPERVISOR_EXECUTION.mode,
+    allowSupervisorDirectEdits: DEFAULT_SUPERVISOR_EXECUTION.allowSupervisorDirectEdits,
+    requireDelegationLog: DEFAULT_SUPERVISOR_EXECUTION.requireDelegationLog,
+    requireAgentWorktreeBinding: DEFAULT_SUPERVISOR_EXECUTION.requireAgentWorktreeBinding,
+    requireDedicatedIntegrationAgent: DEFAULT_SUPERVISOR_EXECUTION.requireDedicatedIntegrationAgent,
+    integrationAgentLabel: DEFAULT_SUPERVISOR_EXECUTION.integrationAgentLabel
+  },
   compaction: {
     backend: { ...DEFAULT_SUPERVISOR_COMPACTION.backend },
     design: { ...DEFAULT_SUPERVISOR_COMPACTION.design },
@@ -432,6 +478,10 @@ const isSupportedRole = (value: string): value is Role => {
 
 const isSupportedExecutionPath = (value: string): value is SupervisorExecutionPath => {
   return ["execute", "coordinate", "investigate", "safe-hold"].includes(value);
+};
+
+const isSupportedSupervisorExecutionMode = (value: string): value is SupervisorExecutionMode => {
+  return ["delegate-only", "delegate-with-manual-override"].includes(value);
 };
 
 const compileProviderPattern = (pattern: SupervisorProviderPatternInput): SupervisorProviderPattern => ({
@@ -834,6 +884,57 @@ export const resolveSupervisorPolicy = (
             }
           }
         }
+      }
+    }
+  }
+
+  if (input.execution !== undefined) {
+    if (!isRecord(input.execution)) {
+      pushDiagnostic(diagnostics, "execution", "Expected execution to be an object.");
+    } else {
+      if (input.execution.mode !== undefined) {
+        if (typeof input.execution.mode === "string" && isSupportedSupervisorExecutionMode(input.execution.mode)) {
+          config.execution.mode = input.execution.mode;
+        } else {
+          pushDiagnostic(diagnostics, "execution.mode", `Unsupported execution mode '${String(input.execution.mode)}'.`);
+        }
+      }
+
+      const booleanEntries = [
+        ["allowSupervisorDirectEdits", "allowSupervisorDirectEdits"],
+        ["requireDelegationLog", "requireDelegationLog"],
+        ["requireAgentWorktreeBinding", "requireAgentWorktreeBinding"],
+        ["requireDedicatedIntegrationAgent", "requireDedicatedIntegrationAgent"]
+      ] as const;
+
+      for (const [inputKey, configKey] of booleanEntries) {
+        const value = input.execution[inputKey];
+        if (value === undefined) {
+          continue;
+        }
+
+        if (typeof value === "boolean") {
+          config.execution[configKey] = value;
+        } else {
+          pushDiagnostic(diagnostics, `execution.${inputKey}`, "Expected a boolean value.");
+        }
+      }
+
+      if (input.execution.integrationAgentLabel !== undefined) {
+        if (typeof input.execution.integrationAgentLabel === "string" && input.execution.integrationAgentLabel.trim()) {
+          config.execution.integrationAgentLabel = input.execution.integrationAgentLabel.trim();
+        } else {
+          pushDiagnostic(diagnostics, "execution.integrationAgentLabel", "Expected a non-empty integration agent label.");
+        }
+      }
+
+      if (config.execution.mode === "delegate-only" && config.execution.allowSupervisorDirectEdits) {
+        pushDiagnostic(
+          diagnostics,
+          "execution.allowSupervisorDirectEdits",
+          "Delegate-only mode cannot allow direct supervisor edits; reverting to false."
+        );
+        config.execution.allowSupervisorDirectEdits = false;
       }
     }
   }

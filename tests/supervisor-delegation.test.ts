@@ -1,0 +1,98 @@
+import { describe, expect, it } from "vitest";
+import {
+  createSupervisorDelegationPlan,
+  validateSupervisorDelegationPlan
+} from "../plugins/orchestration-workflows/supervisor-delegation";
+
+describe("supervisor-delegation", () => {
+  it("accepts a delegate-only plan with separate implementation and integration agents", () => {
+    // Arrange
+    const plan = createSupervisorDelegationPlan({
+      assignments: [
+        {
+          storyId: "sc-328",
+          role: "DEV",
+          agentLabel: "DEV-A",
+          branch: "marceltuinstra/sc-328-parallel",
+          worktreePath: "/tmp/wt-sc328",
+          responsibilities: ["Implement sc-328", "Run targeted tests"]
+        },
+        {
+          storyId: "sc-439",
+          role: "DEV",
+          agentLabel: "DEV-B",
+          branch: "marceltuinstra/sc-439-parallel",
+          worktreePath: "/tmp/wt-sc439",
+          responsibilities: ["Implement sc-439", "Run targeted tests"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        role: "DEV",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Resolve integration issues", "Run full validation"]
+      }
+    });
+
+    // Act
+    const result = validateSupervisorDelegationPlan(plan);
+
+    // Assert
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
+    expect(result.plan.policy.mode).toBe("delegate-only");
+  });
+
+  it("rejects delegate-only execution when supervisor direct edits are requested", () => {
+    // Arrange
+    const input = {
+      directEditsRequested: true,
+      assignments: [{
+        storyId: "sc-328",
+        role: "DEV" as const,
+        agentLabel: "DEV-A",
+        worktreePath: "/tmp/wt-sc328",
+        responsibilities: ["Implement sc-328"]
+      }],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Run integration"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toContain("Supervisor direct product-code edits are disabled in delegate-only mode.");
+  });
+
+  it("rejects missing worktree bindings and a reused integration agent", () => {
+    // Arrange
+    const input = {
+      assignments: [{
+        storyId: "sc-328",
+        role: "DEV" as const,
+        agentLabel: "DEV-A",
+        responsibilities: ["Implement sc-328"]
+      }],
+      integration: {
+        agentLabel: "DEV-A",
+        responsibilities: ["Integrate outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'DEV-A' is missing a bound worktree path.",
+      "Integration agent 'DEV-A' is missing a bound worktree path.",
+      "Integration agent must stay distinct from implementation agents when dedicated integration is required."
+    ]));
+  });
+});
