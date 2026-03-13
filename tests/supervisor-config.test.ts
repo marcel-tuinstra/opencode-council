@@ -25,6 +25,13 @@ describe("supervisor-config", () => {
       integrationAgentLabel: "INTEGRATION"
     });
     expect(result.config.approvalGates.mergeMode).toBe("manual");
+    expect(result.config.protectedPaths.defaultOutcome).toBe("deny");
+    expect(result.config.protectedPaths.rules.map((rule) => rule.ruleId)).toEqual([
+      "deny-vcs-internals",
+      "deny-secret-material",
+      "review-governance-and-runtime-policy",
+      "allow-default-repository-scope"
+    ]);
     expect(result.config.compaction.backend.retainRecentLines).toBe(3);
   });
 
@@ -38,6 +45,14 @@ describe("supervisor-config", () => {
         requireAgentWorktreeBinding: false,
         requireDedicatedIntegrationAgent: false,
         integrationAgentLabel: "MERGE"
+      },
+      protectedPaths: {
+        defaultOutcome: "requires-human",
+        rules: [{
+          ruleId: "allow-docs",
+          pathPrefixes: ["docs"],
+          outcome: "allow"
+        }]
       }
     };
 
@@ -52,6 +67,16 @@ describe("supervisor-config", () => {
       requireDedicatedIntegrationAgent: false,
       integrationAgentLabel: "MERGE"
     });
+    expect(result.config.protectedPaths).toEqual({
+      defaultOutcome: "requires-human",
+      rules: [{
+        ruleId: "allow-docs",
+        description: undefined,
+        pathPrefixes: ["docs"],
+        outcome: "allow",
+        auditExpectation: undefined
+      }]
+    });
   });
 
   it("falls back safely and reports diagnostics for invalid execution config", () => {
@@ -61,6 +86,14 @@ describe("supervisor-config", () => {
         mode: "solo-hacker",
         allowSupervisorDirectEdits: true,
         integrationAgentLabel: ""
+      },
+      protectedPaths: {
+        defaultOutcome: "ship-it",
+        rules: [{
+          ruleId: "",
+          pathPrefixes: [],
+          outcome: "allow"
+        }]
       },
       budget: {
         governance: {
@@ -78,6 +111,8 @@ describe("supervisor-config", () => {
       "execution.mode",
       "execution.allowSupervisorDirectEdits",
       "execution.integrationAgentLabel",
+      "protectedPaths.defaultOutcome",
+      "protectedPaths.rules.0.ruleId",
       "budget.governance.hardStopThresholdPercent"
     ]));
     expect(result.config.profile).toBe("v1-safe");
@@ -89,6 +124,7 @@ describe("supervisor-config", () => {
       requireDedicatedIntegrationAgent: true,
       integrationAgentLabel: "INTEGRATION"
     });
+    expect(result.config.protectedPaths.defaultOutcome).toBe("deny");
     expect(result.config.budget.governance.escalationThresholdPercent).toBe(120);
     expect(result.config.budget.governance.hardStopThresholdPercent).toBe(131.25);
   });

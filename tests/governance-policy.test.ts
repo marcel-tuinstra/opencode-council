@@ -129,4 +129,30 @@ describe("governance-policy", () => {
       }]
     });
   });
+
+  it("routes protected-path violations through the default governance policy", () => {
+    // Arrange
+    const policy = resolveSupervisorPolicy(undefined).config.governance;
+    const violations: LaneContractViolation[] = [{
+      code: "protected-path-denied",
+      field: "changedPaths",
+      message: "Protected-path policy denied the requested path."
+    }];
+
+    // Act
+    const decision = evaluateGovernancePolicy({
+      checkpoint: "review-ready",
+      violations,
+      policy
+    });
+
+    // Assert
+    expect(decision).toMatchObject({
+      checkpoint: "review-ready",
+      outcome: "block",
+      route: "block-checkpoint",
+      source: "explicit-policy",
+      matchedRules: [{ ruleId: "protected-path-deny-block", outcome: "block" }]
+    });
+  });
 });

@@ -33,6 +33,9 @@ export type SupervisorReasonCode =
   | "approval.blocked-path-review"
   | "approval.eligible-path-review"
   | "approval.auto-merge-allowed"
+  | "approval.protected-path-review"
+  | "approval.protected-path-denied"
+  | "approval.protected-path-allowed"
   | "approval.governance-boundary"
   | "approval.resume-approved"
   | "approval.rejected-hold"
@@ -271,6 +274,27 @@ export const createSupervisorReasonDetail = (
         category: "approval-pause",
         short: "Auto-merge checks passed.",
         explanation: "Allowed auto-merge because criticality, path, and opt-in policy checks all passed."
+      };
+    case "approval.protected-path-review":
+      return {
+        code,
+        category: "approval-pause",
+        short: "Protected paths need review.",
+        explanation: "Paused for human approval because one or more changed paths matched a protected-path rule that requires review and audit evidence."
+      };
+    case "approval.protected-path-denied":
+      return {
+        code,
+        category: "blocked-action",
+        short: "Protected paths denied.",
+        explanation: "Blocked the action because one or more changed paths matched a protected-path rule that does not allow autonomous writes or merges."
+      };
+    case "approval.protected-path-allowed":
+      return {
+        code,
+        category: "approval-pause",
+        short: "Protected-path checks passed.",
+        explanation: "Allowed the action because every changed path stayed inside the currently allowed protected-path policy scope."
       };
     case "approval.governance-boundary": {
       const boundary = context.path ?? "governance";
