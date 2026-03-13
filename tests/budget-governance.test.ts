@@ -31,6 +31,14 @@ describe("budget-governance", () => {
         reason: "run usage crossed the early warning threshold and should stay under watch."
       }
     ]);
+    expect(decision.reasonDetails).toEqual([
+      {
+        code: "budget.warning-threshold",
+        category: "budget-escalation",
+        short: "Budget warning threshold crossed.",
+        explanation: "Budget usage reached 80% and stayed in warning mode, so execution can continue under watch."
+      }
+    ]);
     expect(decision.recommendations).toEqual(["continue-with-watch", "compact-context"]);
     expect(decision.shouldPauseAutomation).toBe(false);
   });
@@ -59,6 +67,14 @@ describe("budget-governance", () => {
       "request-checkpoint-review",
       "enable-hard-stop-for-runaway-risk"
     ]);
+    expect(decision.reasonDetails).toEqual([
+      {
+        code: "budget.escalation-required",
+        category: "budget-escalation",
+        short: "Budget escalation required.",
+        explanation: "Budget usage reached 120.04% and now requires checkpoint review before more automation continues."
+      }
+    ]);
     expect(decision.shouldPauseAutomation).toBe(true);
   });
 
@@ -81,6 +97,14 @@ describe("budget-governance", () => {
       usagePercent: DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
       reason: "run usage reached the explicit hard-stop runaway threshold."
     });
+    expect(decision.reasonDetails).toEqual([
+      {
+        code: "budget.hard-stop",
+        category: "budget-escalation",
+        short: "Budget hard stop triggered.",
+        explanation: "Budget usage reached 131.25% and hit the configured hard stop, so automation pauses here."
+      }
+    ]);
     expect(decision.shouldPauseAutomation).toBe(true);
   });
 

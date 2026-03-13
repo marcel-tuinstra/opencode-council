@@ -1,4 +1,5 @@
 import { DEFAULT_SUPERVISOR_BUDGET, getSupervisorPolicy } from "./supervisor-config";
+import { createSupervisorReasonDetail, type SupervisorReasonDetail } from "./reason-codes";
 
 export type BudgetGovernanceScope = "run" | "step";
 
@@ -59,6 +60,7 @@ export type BudgetGovernanceDecision = {
   recommendations: readonly BudgetGovernanceRecommendation[];
   requiredActions: readonly BudgetGovernanceRequirement[];
   shouldPauseAutomation: boolean;
+  reasonDetails: readonly SupervisorReasonDetail[];
 };
 
 export const DEFAULT_WARNING_THRESHOLD_PERCENTS = Object.freeze([...DEFAULT_SUPERVISOR_BUDGET.governance.warningThresholdPercents]);
@@ -189,7 +191,8 @@ export const evaluateBudgetGovernance = (
       triggeredThresholds,
       recommendations: ["enable-hard-stop-for-runaway-risk"],
       requiredActions: [],
-      shouldPauseAutomation: true
+      shouldPauseAutomation: true,
+      reasonDetails: [createSupervisorReasonDetail("budget.hard-stop", { usagePercent })]
     };
   }
 
@@ -212,7 +215,8 @@ export const evaluateBudgetGovernance = (
         "record-scope-or-lane-reduction",
         "schedule-checkpoint-review"
       ],
-      shouldPauseAutomation: true
+      shouldPauseAutomation: true,
+      reasonDetails: [createSupervisorReasonDetail("budget.escalation-required", { usagePercent })]
     };
   }
 
@@ -230,7 +234,8 @@ export const evaluateBudgetGovernance = (
       triggeredThresholds,
       recommendations,
       requiredActions: [],
-      shouldPauseAutomation: false
+      shouldPauseAutomation: false,
+      reasonDetails: [createSupervisorReasonDetail("budget.warning-threshold", { usagePercent })]
     };
   }
 
@@ -243,6 +248,7 @@ export const evaluateBudgetGovernance = (
     triggeredThresholds: [],
     recommendations: ["continue-with-watch"],
     requiredActions: [],
-    shouldPauseAutomation: false
+    shouldPauseAutomation: false,
+    reasonDetails: []
   };
 };

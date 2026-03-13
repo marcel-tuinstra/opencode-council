@@ -30,6 +30,7 @@ import {
   appendMcpWarnings,
   applyBudgetAction,
   appendMissingProviderNotice,
+  appendSupervisorDecisionNotes,
   extractDelegatedRoles,
   normalizeThreadOutput,
   stripControlLeakage
@@ -277,6 +278,7 @@ export const AgentConversations: Plugin = async () => {
           activeRoles = delegated.roles;
           activeTargets = buildTurnTargets(activeRoles, nextText);
           nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
+          nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "delegated-thread");
           debugLog("text.complete.delegation_upgraded", {
             sessionID: input.sessionID,
             leadRole: policy.roles[0],
@@ -287,6 +289,7 @@ export const AgentConversations: Plugin = async () => {
 
       if (policy.roles.length > 1) {
         nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
+        nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "multi-role-thread");
       }
 
       if (policy.mcpProviders.length > 1) {

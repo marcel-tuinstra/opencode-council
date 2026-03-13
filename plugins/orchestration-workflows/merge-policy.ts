@@ -1,4 +1,5 @@
 import type { RepoRiskTier } from "./lane-lifecycle";
+import { createSupervisorReasonDetail, type SupervisorReasonDetail } from "./reason-codes";
 import { getSupervisorPolicy } from "./supervisor-config";
 
 export type MergePolicyMode = "manual" | "auto-merge";
@@ -37,6 +38,7 @@ export type MergePolicyDecision = {
   blockedPaths: readonly string[];
   outOfPolicyPaths: readonly string[];
   reasons: readonly string[];
+  reasonDetails: readonly SupervisorReasonDetail[];
 };
 
 export const DEFAULT_MERGE_POLICY_MODE: "manual" = "manual";
@@ -131,7 +133,8 @@ export const evaluateMergePolicy = (
       matchedLabelHints,
       blockedPaths,
       outOfPolicyPaths,
-      reasons: ["Merge policy defaults to manual human approval."]
+      reasons: ["Merge policy defaults to manual human approval."],
+      reasonDetails: [createSupervisorReasonDetail("approval.manual-review-default")]
     };
   }
 
@@ -142,7 +145,8 @@ export const evaluateMergePolicy = (
       matchedLabelHints,
       blockedPaths,
       outOfPolicyPaths,
-      reasons: ["Service-critical changes require human approval unless the repository explicitly opts in."]
+      reasons: ["Service-critical changes require human approval unless the repository explicitly opts in."],
+      reasonDetails: [createSupervisorReasonDetail("approval.service-critical-review")]
     };
   }
 
@@ -153,7 +157,8 @@ export const evaluateMergePolicy = (
       matchedLabelHints,
       blockedPaths,
       outOfPolicyPaths,
-      reasons: ["Blocked paths require human approval even when auto-merge is enabled."]
+      reasons: ["Blocked paths require human approval even when auto-merge is enabled."],
+      reasonDetails: [createSupervisorReasonDetail("approval.blocked-path-review")]
     };
   }
 
@@ -164,7 +169,8 @@ export const evaluateMergePolicy = (
       matchedLabelHints,
       blockedPaths,
       outOfPolicyPaths,
-      reasons: ["Changed paths must stay within the configured eligible path prefixes for auto-merge."]
+      reasons: ["Changed paths must stay within the configured eligible path prefixes for auto-merge."],
+      reasonDetails: [createSupervisorReasonDetail("approval.eligible-path-review")]
     };
   }
 
@@ -176,7 +182,8 @@ export const evaluateMergePolicy = (
     outOfPolicyPaths,
     reasons: matchedLabelHints.length > 0
       ? ["Label hints matched, but path and criticality checks remained the primary merge gate."]
-      : ["Auto-merge is allowed because the repository opted in and all policy checks passed."]
+      : ["Auto-merge is allowed because the repository opted in and all policy checks passed."],
+    reasonDetails: [createSupervisorReasonDetail("approval.auto-merge-allowed")]
   };
 };
 

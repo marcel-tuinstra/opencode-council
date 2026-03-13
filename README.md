@@ -23,7 +23,7 @@ Vanilla multi-mention prompts often produce uneven participation, unclear owners
 - Relevance-weighted participation and heartbeat phases for 3+ roles (`Frame -> Challenge -> Synthesize`)
 - Mention-gated MCP behavior for installed providers
 - Runtime compaction and budget controls
-- Initial runtime-visible budget, handoff, and review-ready reminders where the plugin is wired locally
+- Initial runtime-visible budget, handoff, review-ready, and reason-coded supervisor reminders where the plugin is wired locally
 
 ## Foundation Shipped
 
@@ -90,6 +90,8 @@ Supervisor policy defaults now resolve from a typed `v1-safe` profile and can be
 - Missing config keeps the built-in safe defaults.
 - Invalid config logs diagnostics and falls back to safe defaults for invalid fields.
 - Current override surface covers role aliases, MCP provider patterns, lane/worktree/session limits, approval gates, and budget/compaction thresholds.
+
+Runtime checkpoints now use a shared typed reason-code catalog so operators and reviewers can see compact explanations for routing, weighted turn assignment, budget actions, compaction fallbacks, approval pauses, and blocked MCP steps.
 
 See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the contract and [`docs/guides/customization.md`](./docs/guides/customization.md) for the config shape.
 
