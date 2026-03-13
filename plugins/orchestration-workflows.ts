@@ -239,6 +239,9 @@ export {
   createSupervisorDispatchPlan
 } from "./orchestration-workflows/supervisor-dispatch-planning";
 export {
+  createSupervisorBootstrapPreview
+} from "./orchestration-workflows/supervisor-bootstrap";
+export {
   assertValidLaneCompletionContract,
   createLaneCompletionContract,
   evaluateLaneCompletionContract,
