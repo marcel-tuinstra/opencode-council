@@ -24,6 +24,7 @@ describe("supervisor-config", () => {
     expect(result.config.limits.sessions.maxPerWorktree).toBe(1);
     expect(result.config.approvalGates.mergeMode).toBe("manual");
     expect(result.config.budget.governance.warningThresholdPercents).toEqual([80, 100, 120]);
+    expect(result.config.compaction.backend.retainRecentLines).toBe(3);
   });
 
   it("applies valid repo overrides to the typed config surface", () => {
@@ -78,7 +79,8 @@ describe("supervisor-config", () => {
       compaction: {
         backend: {
           triggerTokens: 800,
-          targetTokens: 500
+          targetTokens: 500,
+          retainRecentLines: 4
         }
       }
     };
@@ -99,7 +101,7 @@ describe("supervisor-config", () => {
     expect(result.config.approvalGates.allowServiceCriticalAutoMerge).toBe(true);
     expect(result.config.budget.runtime.softRunTokens).toBe(7000);
     expect(result.config.budget.governance.warningThresholdPercents).toEqual([70, 90]);
-    expect(result.config.compaction.backend).toEqual({ triggerTokens: 800, targetTokens: 500 });
+    expect(result.config.compaction.backend).toEqual({ triggerTokens: 800, targetTokens: 500, retainRecentLines: 4 });
   });
 
   it("falls back safely and reports diagnostics for invalid config", () => {

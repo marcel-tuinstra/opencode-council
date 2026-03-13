@@ -35,6 +35,15 @@ const trimLine = (line: string): string => {
   return `${normalized.slice(0, 177)}...`;
 };
 
+const getRecentLines = (text: string, count: number): string[] => {
+  if (count <= 0) {
+    return [];
+  }
+
+  const lines = text.split("\n").map((line) => trimLine(line)).filter(Boolean);
+  return unique(lines.slice(-count));
+};
+
 const extractSlots = (text: string) => {
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
   const slots: Record<CompactionSlot, string[]> = {
@@ -68,13 +77,15 @@ const unique = (values: string[]) => {
   return output;
 };
 
-const buildCompactedText = (text: string, intent: Intent, targetTokens: number): string => {
+const buildCompactedText = (text: string, intent: Intent, targetTokens: number, retainRecentLines: number): string => {
   const slots = extractSlots(text);
+  const recentLines = getRecentLines(text, retainRecentLines);
   const sections = [
     slots.goals.length > 0 ? `Goals: ${unique(slots.goals).slice(0, 3).join(" | ")}` : "",
     slots.constraints.length > 0 ? `Constraints: ${unique(slots.constraints).slice(0, 3).join(" | ")}` : "",
     slots.blockers.length > 0 ? `Blockers: ${unique(slots.blockers).slice(0, 3).join(" | ")}` : "",
-    slots.openActions.length > 0 ? `Open Actions: ${unique(slots.openActions).slice(0, 4).join(" | ")}` : ""
+    slots.openActions.length > 0 ? `Open Actions: ${unique(slots.openActions).slice(0, 4).join(" | ")}` : "",
+    recentLines.length > 0 ? `Continuity: ${recentLines.join(" | ")}` : ""
   ].filter(Boolean);
 
   const fallbackLines = text.split("\n").map((line) => trimLine(line)).filter(Boolean).slice(0, 8);
@@ -88,6 +99,15 @@ const buildCompactedText = (text: string, intent: Intent, targetTokens: number):
   }
 
   return compacted;
+};
+
+const hasRecentLineLoss = (source: string, compacted: string, retainRecentLines: number): boolean => {
+  const recentLines = getRecentLines(source, retainRecentLines);
+  if (recentLines.length === 0) {
+    return false;
+  }
+
+  return recentLines.some((line) => !compacted.includes(line));
 };
 
 const hasCriticalSlotLoss = (source: string, compacted: string): boolean => {
@@ -114,7 +134,7 @@ export const compactWorkflowContext = (text: string, intent: Intent): Compaction
     };
   }
 
-  const compacted = buildCompactedText(text, intent, profile.targetTokens);
+  const compacted = buildCompactedText(text, intent, profile.targetTokens, profile.retainRecentLines);
   const compactedTokens = estimateTokens(compacted);
   const reduction = sourceTokens - compactedTokens;
   const reductionRatio = sourceTokens > 0 ? reduction / sourceTokens : 0;
@@ -149,7 +169,23 @@ export const compactWorkflowContext = (text: string, intent: Intent): Compaction
     };
   }
 
-  const summary = `Compaction applied (${intent}): ${sourceTokens} -> ${compactedTokens} tokens; preserved goals/constraints/blockers/open actions.`;
+  if (hasRecentLineLoss(text, compacted, profile.retainRecentLines)) {
+    debugLog("compaction.fallback", {
+      intent,
+      sourceTokens,
+      compactedTokens,
+      retainRecentLines: profile.retainRecentLines,
+      reason: "recent_context_loss"
+    });
+    return {
+      text,
+      compacted: false,
+      summary: null,
+      fallbackReason: formatSupervisorReason(createSupervisorReasonDetail("fallback.compaction-continuity"), "[Compaction]")
+    };
+  }
+
+  const summary = `Context condensed for continuity (${intent}, ${sourceTokens} -> ${compactedTokens} tokens).`;
   debugLog("compaction.applied", {
     intent,
     sourceTokens,
