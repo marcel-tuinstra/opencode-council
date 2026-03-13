@@ -5,8 +5,10 @@ import {
   type SupervisorApprovalSignal,
   type SupervisorApprovalNextAction
 } from "./approval-gates";
+import type { LaneCompletionContract } from "./lane-contract";
 import type {
   SupervisorApprovalRecord,
+  SupervisorArtifactRecord,
   SupervisorLaneRecord,
   SupervisorRunState,
   SupervisorSessionRecord,
@@ -20,6 +22,7 @@ import {
   type LaneLifecycleState,
   type RepoRiskTier
 } from "./lane-lifecycle";
+import { assertReviewReadyTransition, type ReviewReadyEvidencePacket, type ReviewReadyEvidencePacketInput } from "./review-ready-packet";
 import type { LanePlan } from "./lane-plan";
 import type {
   ProvisionSupervisorLaneWorktreeResult,
@@ -45,8 +48,8 @@ export type CreateSupervisorLaneDefinitionsOptions = {
 
 export type SupervisorDispatchLaneInput = {
   definition: SupervisorLaneDefinition;
-  waitingOn?: string[];
-  reviewReady?: boolean;
+  waitingOn?: readonly string[];
+  reviewReadyPacket?: ReviewReadyEvidencePacketInput | ReviewReadyEvidencePacket;
   complete?: boolean;
   approvalGate?: {
     request: SupervisorApprovalGateRequest;
@@ -219,6 +222,34 @@ const ensureLaneDefinitions = (
 
 const countActiveLanes = (state: SupervisorRunState): number => state.lanes.filter((lane) => countsTowardActiveLaneCap(lane.state)).length;
 
+const mapLaneContractArtifactKind = (kind: LaneCompletionContract["artifacts"][number]["kind"]): SupervisorArtifactRecord["kind"] => {
+  switch (kind) {
+    case "branch":
+      return "branch";
+    case "pull-request":
+      return "pull-request";
+    case "review-packet":
+      return "review-packet";
+    case "session-log":
+      return "session-log";
+    default:
+      return "other";
+  }
+};
+
+const buildLaneOutputArtifacts = (
+  laneId: string,
+  occurredAt: string,
+  laneOutput: LaneCompletionContract
+): readonly SupervisorArtifactRecord[] => Object.freeze(laneOutput.artifacts.map((artifact, index) => Object.freeze({
+  artifactId: `${laneId}:${artifact.kind}:${String(index + 1).padStart(2, "0")}:${occurredAt}`,
+  laneId,
+  kind: mapLaneContractArtifactKind(artifact.kind),
+  status: "ready" as const,
+  uri: artifact.uri,
+  updatedAt: occurredAt
+ })));
+
 const selectSessionOwner = (
   laneInput: SupervisorDispatchLaneInput,
   state: SupervisorRunState,
@@ -369,31 +400,61 @@ export const createSupervisorDispatchLoop = (
         continue;
       }
 
-      if (laneInput.reviewReady) {
-        lane = commitLaneState(
-          store,
-          runId,
-          actor,
-          occurredAt,
-          lane,
-          "review_ready",
-          `dispatch:${lane.laneId}:review-ready:${occurredAt}`,
-          `Mark lane '${lane.laneId}' review ready.`
-        );
-        reasons.push("Lane produced a reviewable handoff.");
-        decisions.push({
-          laneId: lane.laneId,
-          status: "review_ready",
-          targetState: "review_ready",
-          action: "none",
-          nextAction: "continue",
-          assignedOwner,
-          reasons: freezeList(reasons),
-          lane,
-          worktree,
-          session
-        });
-        continue;
+      if (laneInput.reviewReadyPacket) {
+        try {
+          const reviewPacket = assertReviewReadyTransition(lane.state, "review_ready", laneInput.reviewReadyPacket);
+          if (!reviewPacket?.laneOutput) {
+            throw new Error("Lane transition to review_ready requires a validated lane output contract.");
+          }
+
+          const artifactUpserts = buildLaneOutputArtifacts(lane.laneId, occurredAt, reviewPacket.laneOutput);
+          store.commitMutation(runId, {
+            mutationId: `dispatch:${lane.laneId}:review-ready:${occurredAt}`,
+            actor,
+            summary: `Mark lane '${lane.laneId}' review ready with validated handoff artifacts.`,
+            occurredAt,
+            laneUpserts: [Object.freeze({
+              ...lane,
+              state: "review_ready",
+              updatedAt: occurredAt
+            })],
+            artifactUpserts,
+            sideEffects: ["prepared-review-bundle", "validated-lane-handoff"]
+          });
+          state = store.getRunState(runId)!;
+          lane = findLane(state, laneInput.definition.laneId)!;
+          worktree = findWorktree(state, lane.worktreeId);
+          session = findSession(state, lane.sessionId);
+          reasons.push("Lane produced a validated review-ready handoff.");
+          decisions.push({
+            laneId: lane.laneId,
+            status: "review_ready",
+            targetState: "review_ready",
+            action: "none",
+            nextAction: "continue",
+            assignedOwner,
+            reasons: freezeList(reasons),
+            lane,
+            worktree,
+            session
+          });
+          continue;
+        } catch (error) {
+          reasons.push(error instanceof Error ? error.message : "Lane review-ready handoff validation failed.");
+          decisions.push({
+            laneId: lane.laneId,
+            status: "blocked",
+            targetState: lane.state,
+            action: "none",
+            nextAction: "pause",
+            assignedOwner,
+            reasons: freezeList(reasons),
+            lane,
+            worktree,
+            session
+          });
+          continue;
+        }
       }
 
       if (dependencyStatus.blocked) {

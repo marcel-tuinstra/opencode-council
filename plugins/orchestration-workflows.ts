@@ -11,6 +11,11 @@ export type {
   SupervisorRoutingIntentProfileInput
 } from "./orchestration-workflows/supervisor-config";
 export type {
+  CreateSupervisorDispatchPlanInput,
+  SupervisorDispatchPlanResult,
+  SupervisorDispatchPlanStatus
+} from "./orchestration-workflows/supervisor-dispatch-planning";
+export type {
   LaneCompletionContract,
   LaneCompletionContractInput,
   LaneCompletionStatus,
@@ -221,6 +226,9 @@ export type {
   SupervisorPolicyDecisionCategory,
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
+export {
+  createSupervisorDispatchPlan
+} from "./orchestration-workflows/supervisor-dispatch-planning";
 export {
   assertValidLaneCompletionContract,
   createLaneCompletionContract,
