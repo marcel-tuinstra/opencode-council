@@ -72,13 +72,16 @@ Example:
   "compaction": {
     "backend": {
       "triggerTokens": 700,
-      "targetTokens": 420
+      "targetTokens": 420,
+      "retainRecentLines": 3
     }
   }
 }
 ```
 
 If the file is missing, the plugin keeps the built-in profile. If a field is invalid, the loader records diagnostics and falls back safely for that field.
+
+`compaction.<intent>.retainRecentLines` keeps the newest non-empty lines in the condensed checkpoint so longer runs do not lose the freshest operator context.
 
 ## 1) Customize MCP provider checks
 

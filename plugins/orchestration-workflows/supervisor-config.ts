@@ -70,7 +70,11 @@ export type SupervisorPolicyInput = {
       hardStopThresholdPercent?: number;
     };
   };
-  compaction?: Partial<Record<Intent, { triggerTokens?: number; targetTokens?: number }>>;
+  compaction?: Partial<Record<Intent, {
+    triggerTokens?: number;
+    targetTokens?: number;
+    retainRecentLines?: number;
+  }>>;
 };
 
 export type ResolvedSupervisorPolicy = {
@@ -118,7 +122,11 @@ export type ResolvedSupervisorPolicy = {
       hardStopThresholdPercent: number;
     };
   };
-  compaction: Record<Intent, { triggerTokens: number; targetTokens: number }>;
+  compaction: Record<Intent, {
+    triggerTokens: number;
+    targetTokens: number;
+    retainRecentLines: number;
+  }>;
 };
 
 export type SupervisorPolicyLoadResult = {
@@ -206,12 +214,12 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
     }
   },
   compaction: {
-    backend: { triggerTokens: 700, targetTokens: 420 },
-    design: { triggerTokens: 760, targetTokens: 460 },
-    marketing: { triggerTokens: 640, targetTokens: 380 },
-    roadmap: { triggerTokens: 780, targetTokens: 460 },
-    research: { triggerTokens: 760, targetTokens: 440 },
-    mixed: { triggerTokens: 720, targetTokens: 430 }
+    backend: { triggerTokens: 700, targetTokens: 420, retainRecentLines: 3 },
+    design: { triggerTokens: 760, targetTokens: 460, retainRecentLines: 3 },
+    marketing: { triggerTokens: 640, targetTokens: 380, retainRecentLines: 2 },
+    roadmap: { triggerTokens: 780, targetTokens: 460, retainRecentLines: 3 },
+    research: { triggerTokens: 760, targetTokens: 440, retainRecentLines: 3 },
+    mixed: { triggerTokens: 720, targetTokens: 430, retainRecentLines: 3 }
   }
 };
 
@@ -682,6 +690,12 @@ export const resolveSupervisorPolicy = (
           config.compaction[intent].targetTokens,
           diagnostics,
           `compaction.${intent}.targetTokens`
+        );
+        config.compaction[intent].retainRecentLines = readPositiveInteger(
+          override.retainRecentLines,
+          config.compaction[intent].retainRecentLines,
+          diagnostics,
+          `compaction.${intent}.retainRecentLines`
         );
       }
     }

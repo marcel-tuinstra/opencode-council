@@ -14,6 +14,7 @@ export type SupervisorReasonCode =
   | "assignment.weighted-turns"
   | "fallback.compaction-guardrail"
   | "fallback.compaction-critical-slots"
+  | "fallback.compaction-continuity"
   | "budget.warning-threshold"
   | "budget.escalation-required"
   | "budget.hard-stop"
@@ -96,14 +97,21 @@ export const createSupervisorReasonDetail = (
         code,
         category: "fallback",
         short: "Compaction skipped.",
-        explanation: "Skipped compaction because the reduction guardrail was not met, so the full checkpoint stayed intact."
+        explanation: "Full context kept because compaction would not save enough space."
       };
     case "fallback.compaction-critical-slots":
       return {
         code,
         category: "fallback",
-        short: "Compaction fallback preserved signal.",
-        explanation: "Skipped compaction because it would have dropped critical goal, constraint, blocker, or open-action context."
+        short: "Compaction kept key signal.",
+        explanation: "Full context kept because compaction would hide goals, constraints, blockers, or next steps."
+      };
+    case "fallback.compaction-continuity":
+      return {
+        code,
+        category: "fallback",
+        short: "Compaction kept recent context.",
+        explanation: "Full context kept because compaction would hide the latest working context."
       };
     case "budget.warning-threshold":
       return {
