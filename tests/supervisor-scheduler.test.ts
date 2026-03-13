@@ -474,7 +474,14 @@ describe("supervisor-scheduler", () => {
         laneId: "lane-1",
         status: "review_ready",
         targetState: "review_ready",
-        action: "none"
+        action: "none",
+        reviewRouting: {
+          outcome: "accept",
+          policy: {
+            applied: true,
+            evaluator: "governance-policy:policy-default"
+          }
+        }
       }
     ]);
     expect(completePass.decisions).toMatchObject([
@@ -706,10 +713,22 @@ describe("supervisor-scheduler", () => {
         laneId: "lane-1",
         status: "blocked",
         action: "pause-session",
-        nextAction: "pause"
+        nextAction: "pause",
+        reviewRouting: {
+          outcome: "escalate",
+          policy: {
+            applied: true,
+            evaluator: "governance-policy:explicit-policy"
+          }
+        }
       }
     ]);
-    expect(reviewPass.decisions[0]?.reasons[0]).toContain("Review checkpoint owner");
+    expect(reviewPass.decisions[0]?.reasons).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("review-owner-mismatch-escalate"),
+        expect.stringContaining("Review checkpoint owner")
+      ])
+    );
     expect(state?.lanes[0]?.state).toBe("waiting");
     expect(state?.approvals).toMatchObject([
       {
@@ -838,16 +857,164 @@ describe("supervisor-scheduler", () => {
         laneId: "lane-1",
         status: "blocked",
         action: "none",
-        nextAction: "pause"
+        nextAction: "pause",
+        reviewRouting: {
+          outcome: "repair",
+          policy: {
+            applied: true,
+            evaluator: "governance-policy:explicit-policy"
+          }
+        }
       }
     ]);
-    expect(reviewPass.decisions[0]?.reasons[0]).toContain("review-packet artifact");
+    expect(reviewPass.decisions[0]?.reasons).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("review-artifacts-repair"),
+        expect.stringContaining("review-packet artifact")
+      ])
+    );
     expect(state?.lanes[0]?.state).toBe("active");
     expect(state?.artifacts).toMatchObject([
       {
         laneId: "lane-1",
         kind: "branch",
         uri: "branch:marceltuinstra/sc-438/lane-01"
+      }
+    ]);
+  });
+
+  it("routes blocked review handoffs into an explicit scheduler hold", () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const system = createFakeSystem();
+    const runtime = createFakeRuntime();
+    const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
+    const sessions = createSupervisorSessionLifecycle({ store, runtime });
+    const scheduler = createSupervisorDispatchLoop({ store, provisioner, sessions });
+    const lanes = [{
+      definition: {
+        laneId: "lane-1",
+        sequence: 1,
+        workUnitIds: ["sc-441-core"],
+        dependsOnLaneIds: [],
+        branch: "marceltuinstra/sc-441/lane-01"
+      }
+    }] as const;
+
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T19:01:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes,
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T19:02:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes,
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+
+    // Act
+    const reviewPass = scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T19:03:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: [{
+        ...lanes[0],
+        reviewReadyPacket: {
+          acceptanceCriteriaTrace: [{ requirement: "Blocked review routing stays explicit.", evidence: "tests/supervisor-scheduler.test.ts", status: "done" }],
+          scopedDiffSummary: ["Route blocked lane outputs into an explicit scheduler hold instead of a generic failure."],
+          verificationResults: [{ check: "npm test", result: "pass", notes: "Blocked routing path is covered." }],
+          riskRollbackNotes: ["None."],
+          handoff: {
+            laneId: "lane-1",
+            currentOwner: "DEV",
+            nextOwner: "REVIEWER",
+            transferScope: "review",
+            transferTrigger: "Implementation finished but blockers remain.",
+            deltaSummary: "Trigger blocked review routing.",
+            risks: ["Known blockers should pause the handoff before review starts."],
+            nextRequiredEvidence: ["Resolved blocking issue"],
+            evidenceAttached: ["tests/supervisor-scheduler.test.ts"]
+          },
+          laneOutput: createLaneCompletionContract({
+            runId: "run-alpha",
+            laneId: "lane-1",
+            status: "blocked",
+            handoff: {
+              laneId: "lane-1",
+              currentOwner: "DEV",
+              nextOwner: "REVIEWER",
+              transferScope: "review",
+              transferTrigger: "Implementation finished but blockers remain.",
+              deltaSummary: "Trigger blocked review routing.",
+              risks: ["Known blockers should pause the handoff before review starts."],
+              nextRequiredEvidence: ["Resolved blocking issue"],
+              evidenceAttached: ["tests/supervisor-scheduler.test.ts"]
+            },
+            artifacts: [
+              {
+                laneId: "lane-1",
+                kind: "branch",
+                uri: "branch:marceltuinstra/sc-441/lane-01",
+                label: "Lane branch"
+              },
+              {
+                laneId: "lane-1",
+                kind: "review-packet",
+                uri: "docs/review-packets/run-alpha-lane-1.md",
+                label: "Review packet"
+              }
+            ],
+            evidence: ["npm test"],
+            producedAt: "2026-03-13T19:03:00.000Z",
+            blockingIssues: ["Waiting for architecture sign-off."]
+          }),
+          ownership: {
+            reviewerOwner: "REVIEWER",
+            mergeOwner: "Marcel Tuinstra",
+            followUpOwner: "DEV"
+          }
+        }
+      }],
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+    const state = store.getRunState("run-alpha");
+
+    // Assert
+    expect(reviewPass.decisions).toMatchObject([
+      {
+        laneId: "lane-1",
+        status: "blocked",
+        action: "pause-session",
+        nextAction: "pause",
+        reviewRouting: {
+          outcome: "block",
+          reasons: ["Waiting for architecture sign-off."]
+        }
+      }
+    ]);
+    expect(state?.lanes[0]?.state).toBe("waiting");
+    expect(state?.sessions[0]?.status).toBe("paused");
+    expect(state?.artifacts).toMatchObject([
+      {
+        laneId: "lane-1",
+        kind: "branch",
+        uri: "branch:marceltuinstra/sc-441/lane-01"
+      },
+      {
+        laneId: "lane-1",
+        kind: "review-packet",
+        uri: "docs/review-packets/run-alpha-lane-1.md"
       }
     ]);
   });

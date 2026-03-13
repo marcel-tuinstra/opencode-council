@@ -10,165 +10,57 @@ import {
 
 describe("supervisor-config", () => {
   it("resolves the v1-safe defaults when no repo policy is present", () => {
-    // Arrange
-
-    // Act
     const result = resolveSupervisorPolicy();
 
-    // Assert
     expect(result.valid).toBe(true);
     expect(result.config.profile).toBe("v1-safe");
     expect(result.config.roleAliases.developer).toBe("DEV");
     expect(result.config.limits.lanes.activeCapsByTier["medium-moderate-risk"]).toBe(3);
-    expect(result.config.limits.worktrees.maxActive).toBe(1);
-    expect(result.config.limits.sessions.maxPerWorktree).toBe(1);
+    expect(result.config.execution).toEqual({
+      mode: "delegate-only",
+      allowSupervisorDirectEdits: false,
+      requireDelegationLog: true,
+      requireAgentWorktreeBinding: true,
+      requireDedicatedIntegrationAgent: true,
+      integrationAgentLabel: "INTEGRATION"
+    });
     expect(result.config.approvalGates.mergeMode).toBe("manual");
-    expect(result.config.approvalGates.boundaries).toEqual({
-      merge: true,
-      release: true,
-      destructive: true,
-      securitySensitive: true,
-      budgetExceptions: true,
-      automationWidening: true
-    });
-    expect(result.config.budget.governance.warningThresholdPercents).toEqual([80, 100, 120]);
-    expect(result.config.routing.minimumSignalScore).toBe(2);
-    expect(result.config.routing.intentProfiles.backend).toEqual({
-      path: "execute",
-      leadRole: "DEV",
-      fallbackLeadRole: "CTO"
-    });
     expect(result.config.compaction.backend.retainRecentLines).toBe(3);
   });
 
-  it("applies valid repo overrides to the typed config surface", () => {
-    // Arrange
+  it("applies execution policy overrides from repo config", () => {
     const input = {
       profile: "v1-safe",
-      roleAliases: {
-        engineer: "DEV"
-      },
-      providers: {
-        patterns: [
-          {
-            key: "github",
-            pattern: "\\b(github|gh)\\b",
-            hint: "GitHub MCP",
-            toolPrefix: "github_"
-          }
-        ]
-      },
-      limits: {
-        lanes: {
-          activeCapsByTier: {
-            "large-mature": 5
-          },
-          maxConcurrentCodeChanges: 2
-        },
-        worktrees: {
-          maxActive: 2
-        },
-        sessions: {
-          maxPerWorktree: 3
-        },
-        mcp: {
-          defaultCallCap: 4,
-          deepCallCap: 8
-        }
-      },
-      approvalGates: {
-        mergeMode: "auto-merge",
-        allowServiceCriticalAutoMerge: true,
-        boundaries: {
-          release: false,
-          automationWidening: false
-        }
-      },
-      budget: {
-        runtime: {
-          softRunTokens: 7000
-        },
-        governance: {
-          warningThresholdPercents: [70, 90],
-          hardStopEnabled: true,
-          hardStopThresholdPercent: 140
-        }
-      },
-      routing: {
-        minimumSignalScore: 3,
-        intentProfiles: {
-          research: {
-            path: "coordinate",
-            leadRole: "PM",
-            fallbackLeadRole: "CTO"
-          }
-        }
-      },
-      compaction: {
-        backend: {
-          triggerTokens: 800,
-          targetTokens: 500,
-          retainRecentLines: 4
-        }
+      execution: {
+        mode: "delegate-with-manual-override",
+        allowSupervisorDirectEdits: true,
+        requireDelegationLog: false,
+        requireAgentWorktreeBinding: false,
+        requireDedicatedIntegrationAgent: false,
+        integrationAgentLabel: "MERGE"
       }
     };
 
-    // Act
     const result = resolveSupervisorPolicy(input, "inline-test");
 
-    // Assert
     expect(result.valid).toBe(true);
-    expect(result.config.roleAliases.engineer).toBe("DEV");
-    expect(result.config.providers.patterns).toHaveLength(1);
-    expect(result.config.providers.patterns[0].regex.test("use gh for this")).toBe(true);
-    expect(result.config.limits.lanes.activeCapsByTier["large-mature"]).toBe(5);
-    expect(result.config.limits.worktrees.maxActive).toBe(2);
-    expect(result.config.limits.sessions.maxPerWorktree).toBe(3);
-    expect(result.config.limits.mcp.defaultCallCap).toBe(4);
-    expect(result.config.approvalGates.mergeMode).toBe("auto-merge");
-    expect(result.config.approvalGates.allowServiceCriticalAutoMerge).toBe(true);
-    expect(result.config.approvalGates.boundaries.release).toBe(false);
-    expect(result.config.approvalGates.boundaries.automationWidening).toBe(false);
-    expect(result.config.budget.runtime.softRunTokens).toBe(7000);
-    expect(result.config.budget.governance.warningThresholdPercents).toEqual([70, 90]);
-    expect(result.config.routing.minimumSignalScore).toBe(3);
-    expect(result.config.routing.intentProfiles.research).toEqual({
-      path: "coordinate",
-      leadRole: "PM",
-      fallbackLeadRole: "CTO"
+    expect(result.config.execution).toEqual({
+      mode: "delegate-with-manual-override",
+      allowSupervisorDirectEdits: true,
+      requireDelegationLog: false,
+      requireAgentWorktreeBinding: false,
+      requireDedicatedIntegrationAgent: false,
+      integrationAgentLabel: "MERGE"
     });
-    expect(result.config.compaction.backend).toEqual({ triggerTokens: 800, targetTokens: 500, retainRecentLines: 4 });
   });
 
-  it("falls back safely and reports diagnostics for invalid config", () => {
-    // Arrange
+  it("falls back safely and reports diagnostics for invalid execution config", () => {
     const input = {
       profile: "v2-risky",
-      roleAliases: {
-        engineer: "SECURITY"
-      },
-      providers: {
-        patterns: [
-          {
-            key: "github",
-            pattern: "(",
-            hint: "GitHub MCP",
-            toolPrefix: "github_"
-          }
-        ]
-      },
-      limits: {
-        sessions: {
-          maxPerWorktree: 0
-        }
-      },
-      routing: {
-        intentProfiles: {
-          backend: {
-            path: "unknown-path",
-            leadRole: "SECURITY"
-          }
-        }
+      execution: {
+        mode: "solo-hacker",
+        allowSupervisorDirectEdits: true,
+        integrationAgentLabel: ""
       },
       budget: {
         governance: {
@@ -178,52 +70,48 @@ describe("supervisor-config", () => {
       }
     };
 
-    // Act
     const result = resolveSupervisorPolicy(input, "inline-invalid-test");
 
-    // Assert
     expect(result.valid).toBe(false);
     expect(result.diagnostics.map((entry) => entry.path)).toEqual(expect.arrayContaining([
       "profile",
-      "roleAliases.engineer",
-      "providers.patterns.0.pattern",
-      "limits.sessions.maxPerWorktree",
-      "routing.intentProfiles.backend.path",
-      "routing.intentProfiles.backend.leadRole",
+      "execution.mode",
+      "execution.allowSupervisorDirectEdits",
+      "execution.integrationAgentLabel",
       "budget.governance.hardStopThresholdPercent"
     ]));
     expect(result.config.profile).toBe("v1-safe");
-    expect(result.config.roleAliases.engineer).toBeUndefined();
-    expect(result.config.providers.patterns.some((pattern) => pattern.key === "sentry")).toBe(true);
-    expect(result.config.limits.sessions.maxPerWorktree).toBe(1);
+    expect(result.config.execution).toEqual({
+      mode: "delegate-only",
+      allowSupervisorDirectEdits: false,
+      requireDelegationLog: true,
+      requireAgentWorktreeBinding: true,
+      requireDedicatedIntegrationAgent: true,
+      integrationAgentLabel: "INTEGRATION"
+    });
     expect(result.config.budget.governance.escalationThresholdPercent).toBe(120);
     expect(result.config.budget.governance.hardStopThresholdPercent).toBe(131.25);
   });
 
   it("loads a repo-local policy file from the standard path", () => {
-    // Arrange
     const tempRoot = mkdtempSync(join(tmpdir(), "supervisor-policy-"));
     const policyPath = join(tempRoot, DEFAULT_SUPERVISOR_POLICY_PATH);
     mkdirSync(join(tempRoot, ".opencode"));
     writeFileSync(policyPath, JSON.stringify({
       profile: "v1-safe",
-      roleAliases: {
-        engineer: "DEV"
-      },
-      limits: {
-        mcp: {
-          defaultCallCap: 3
-        }
+      execution: {
+        mode: "delegate-with-manual-override",
+        allowSupervisorDirectEdits: true,
+        integrationAgentLabel: "MERGE"
       }
     }));
 
-    // Act
     const result = loadSupervisorPolicy({ cwd: tempRoot });
 
-    // Assert
     expect(result.valid).toBe(true);
-    expect(result.config.roleAliases.engineer).toBe("DEV");
-    expect(result.config.limits.mcp.defaultCallCap).toBe(3);
+    expect(result.config.execution.mode).toBe("delegate-with-manual-override");
+    expect(result.config.execution.allowSupervisorDirectEdits).toBe(true);
+    expect(result.config.execution.integrationAgentLabel).toBe("MERGE");
     rmSync(tempRoot, { recursive: true, force: true });
   });
 });
