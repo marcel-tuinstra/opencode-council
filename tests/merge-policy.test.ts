@@ -109,6 +109,53 @@ describe("merge-policy", () => {
     expect(outOfPolicyDecision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.eligible-path-review"]);
   });
 
+  it("requires a human exception when protected paths are eligible for auto-merge but still governed", () => {
+    // Arrange
+    const policy = resolveMergePolicy("large-mature", {
+      mode: "auto-merge",
+      eligiblePathPrefixes: ["plugins"],
+      labelHints: ["automerge"]
+    });
+
+    // Act
+    const decision = evaluateMergePolicy(policy, {
+      serviceCriticality: "standard",
+      changedPaths: ["plugins/orchestration-workflows/merge-policy.ts"],
+      labels: ["automerge"]
+    });
+
+    // Assert
+    expect(decision.status).toBe("requires-human");
+    expect(decision.protectedPathOutcome).toBe("requires-human");
+    expect(decision.protectedPaths).toEqual(["plugins/orchestration-workflows/merge-policy.ts"]);
+    expect(decision.protectedPathAuditExpectations).toEqual([
+      "Attach the changed paths, the approving human, and the reason for the exception before continuing."
+    ]);
+    expect(decision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.protected-path-review"]);
+  });
+
+  it("denies autonomous merge handling for protected paths with no exception lane", () => {
+    // Arrange
+    const policy = resolveMergePolicy("large-mature", {
+      mode: "auto-merge",
+      eligiblePathPrefixes: [""],
+      labelHints: ["automerge"]
+    });
+
+    // Act
+    const decision = evaluateMergePolicy(policy, {
+      serviceCriticality: "standard",
+      changedPaths: ["secrets/production.env"],
+      labels: ["automerge"]
+    });
+
+    // Assert
+    expect(decision.status).toBe("denied");
+    expect(decision.protectedPathOutcome).toBe("deny");
+    expect(decision.deniedPaths).toEqual(["secrets/production.env"]);
+    expect(decision.reasonDetails.map((detail) => detail.code)).toEqual(["approval.protected-path-denied"]);
+  });
+
   it("allows auto-merge only after criticality and path checks pass", () => {
     // Arrange
     const policy = resolveMergePolicy("large-mature", {
@@ -128,6 +175,7 @@ describe("merge-policy", () => {
 
     // Assert
     expect(decision.status).toBe("eligible-for-auto-merge");
+    expect(decision.protectedPathOutcome).toBe("allow");
     expect(decision.matchedLabelHints).toEqual(["automerge"]);
     expect(decision.reasons).toEqual([
       "Label hints matched, but path and criticality checks remained the primary merge gate."
