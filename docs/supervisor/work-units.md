@@ -124,6 +124,16 @@ Multi-role collaboration can stay in one lane as long as turn ownership remains 
 
 The typed turn ownership helper and handoff contract live in `plugins/orchestration-workflows/turn-ownership.ts`.
 
+### Lane completion contract
+
+Beta now adds a typed lane completion contract for the review-ready boundary.
+
+- A lane can attach a machine-checkable handoff manifest that bundles the handoff contract, produced artifacts, evidence references, and completion status.
+- The v1 contract is intentionally narrow: it validates the lane id, requires branch and review-packet artifacts, and fails closed if blocked outputs omit blocking issues.
+- Review-ready and review-coordination helpers can consume this manifest without changing Alpha runtime persistence or dispatch semantics.
+
+The typed lane completion helper lives in `plugins/orchestration-workflows/lane-contract.ts`.
+
 ### Before / after behavior
 
 Before:

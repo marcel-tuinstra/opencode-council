@@ -1,5 +1,7 @@
 import type { LaneLifecycleState } from "./lane-lifecycle";
 import { assertLaneStateTransition } from "./lane-lifecycle";
+import type { LaneCompletionContract, LaneCompletionContractInput } from "./lane-contract";
+import { assertValidLaneCompletionContract } from "./lane-contract";
 import type { LaneTurnHandoffContract, LaneTurnHandoffInput } from "./turn-ownership";
 import { createLaneTurnHandoffContract } from "./turn-ownership";
 
@@ -37,6 +39,7 @@ export type ReviewReadyEvidencePacketInput = {
   verificationResults: readonly ReviewReadyVerificationEntry[];
   riskRollbackNotes: readonly string[];
   handoff: LaneTurnHandoffInput;
+  laneOutput?: LaneCompletionContractInput | LaneCompletionContract;
   ownership: ReviewReadyHandoffOwnersInput;
 };
 
@@ -46,6 +49,7 @@ export type ReviewReadyEvidencePacket = {
   verificationResults: readonly ReviewReadyVerificationEntry[];
   riskRollbackNotes: readonly string[];
   handoff: LaneTurnHandoffContract;
+  laneOutput?: LaneCompletionContract;
   ownership: ReviewReadyHandoffOwners;
 };
 
@@ -107,14 +111,24 @@ const normalizeOwnership = (input: ReviewReadyHandoffOwnersInput): ReviewReadyHa
 
 export const createReviewReadyEvidencePacket = (
   input: ReviewReadyEvidencePacketInput
-): ReviewReadyEvidencePacket => ({
-  acceptanceCriteriaTrace: normalizeAcceptanceTrace(input.acceptanceCriteriaTrace),
-  scopedDiffSummary: normalizeNonEmptyList(input.scopedDiffSummary, "scoped diff summary item"),
-  verificationResults: normalizeVerificationResults(input.verificationResults),
-  riskRollbackNotes: normalizeNonEmptyList(input.riskRollbackNotes, "risk or rollback note"),
-  handoff: createLaneTurnHandoffContract(input.handoff),
-  ownership: normalizeOwnership(input.ownership)
-});
+): ReviewReadyEvidencePacket => {
+  const handoff = createLaneTurnHandoffContract(input.handoff);
+  const laneOutput = input.laneOutput ? assertValidLaneCompletionContract(input.laneOutput) : undefined;
+
+  if (laneOutput && JSON.stringify(laneOutput.handoff) !== JSON.stringify(handoff)) {
+    throw new Error("Review-ready evidence packet requires laneOutput.handoff to match the explicit handoff contract.");
+  }
+
+  return {
+    acceptanceCriteriaTrace: normalizeAcceptanceTrace(input.acceptanceCriteriaTrace),
+    scopedDiffSummary: normalizeNonEmptyList(input.scopedDiffSummary, "scoped diff summary item"),
+    verificationResults: normalizeVerificationResults(input.verificationResults),
+    riskRollbackNotes: normalizeNonEmptyList(input.riskRollbackNotes, "risk or rollback note"),
+    handoff,
+    laneOutput,
+    ownership: normalizeOwnership(input.ownership)
+  };
+};
 
 export const assertReviewReadyTransition = (
   from: LaneLifecycleState,

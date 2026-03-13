@@ -11,6 +11,16 @@ export type {
   SupervisorRoutingIntentProfileInput
 } from "./orchestration-workflows/supervisor-config";
 export type {
+  LaneCompletionContract,
+  LaneCompletionContractInput,
+  LaneCompletionStatus,
+  LaneContractVersion,
+  LaneContractViolation,
+  LaneOutputArtifact,
+  LaneOutputArtifactInput,
+  LaneOutputArtifactKind
+} from "./orchestration-workflows/lane-contract";
+export type {
   DecomposeSupervisorGoalIntoLanesInput,
   SupervisorLaneDecompositionResult,
   SupervisorLaneDecompositionStatus
@@ -211,6 +221,11 @@ export type {
   SupervisorPolicyDecisionCategory,
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
+export {
+  assertValidLaneCompletionContract,
+  createLaneCompletionContract,
+  validateLaneCompletionContract
+} from "./orchestration-workflows/lane-contract";
 export {
   decomposeSupervisorGoalIntoLanes
 } from "./orchestration-workflows/lane-decomposition";

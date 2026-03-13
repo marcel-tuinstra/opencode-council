@@ -32,6 +32,8 @@ Minimum packet sections before a lane can move to `review_ready`:
 
 The typed enforcement helper for this minimum packet lives in `plugins/orchestration-workflows/review-ready-packet.ts` and reuses the turn-ownership contract for the handoff section.
 
+Beta also adds an optional typed lane-output handoff manifest. When present, it should carry the same handoff contract plus machine-checkable artifacts such as the lane branch ref and review packet URI so downstream review helpers can validate the boundary instead of inferring it.
+
 ```md
 # Evidence Packet
 
