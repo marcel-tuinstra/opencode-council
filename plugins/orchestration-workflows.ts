@@ -18,6 +18,8 @@ export type {
 export type {
   LaneCompletionContract,
   LaneCompletionContractInput,
+  LaneCompletionHandoffEvaluation,
+  LaneCompletionHandoffOutcome,
   LaneCompletionStatus,
   LaneContractVersion,
   LaneContractViolation,
@@ -232,6 +234,7 @@ export {
 export {
   assertValidLaneCompletionContract,
   createLaneCompletionContract,
+  evaluateLaneCompletionContract,
   validateLaneCompletionContract
 } from "./orchestration-workflows/lane-contract";
 export {

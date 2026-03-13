@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertValidLaneCompletionContract,
   createLaneCompletionContract,
+  evaluateLaneCompletionContract,
   validateLaneCompletionContract
 } from "../plugins/orchestration-workflows/lane-contract";
 
@@ -87,5 +88,21 @@ describe("lane-contract", () => {
       ...buildContract(),
       status: "blocked"
     })).toThrow("Blocked lane completion contracts require at least one blocking issue.");
+  });
+
+  it("classifies unexpected blocking issues on ready contracts as escalation", () => {
+    // Arrange
+    const contract = createLaneCompletionContract({
+      ...buildContract(),
+      blockingIssues: ["Human decision still required."]
+    });
+
+    // Act
+    const evaluation = evaluateLaneCompletionContract(contract);
+
+    // Assert
+    expect(evaluation.valid).toBe(false);
+    expect(evaluation.outcome).toBe("escalate");
+    expect(evaluation.violations.map((violation) => violation.code)).toEqual(["unexpected-blocking-issues"]);
   });
 });

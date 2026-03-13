@@ -94,6 +94,7 @@ describe("review-ready-packet", () => {
     ]);
     expect(packet.handoff.nextOwner).toBe("REVIEWER");
     expect(packet.laneOutput?.artifacts).toHaveLength(2);
+    expect(packet.handoffValidation.outcome).toBe("accepted");
     expect(packet.ownership).toEqual({
       reviewerOwner: "REVIEWER",
       mergeOwner: "Marcel Tuinstra",
@@ -134,6 +135,48 @@ describe("review-ready-packet", () => {
         }
       }
     })).toThrow("Review-ready evidence packet requires laneOutput.handoff to match the explicit handoff contract.");
+  });
+
+  it("marks review-ready packets for escalation when the reviewer owner mismatches the handoff owner", () => {
+    // Arrange
+
+    // Act
+    const packet = createReviewReadyEvidencePacket({
+      ...buildPacket(),
+      ownership: {
+        ...buildPacket().ownership,
+        reviewerOwner: "PM"
+      }
+    });
+
+    // Assert
+    expect(packet.handoffValidation.outcome).toBe("escalate");
+    expect(packet.handoffValidation.violations[0]?.code).toBe("review-owner-mismatch");
+  });
+
+  it("keeps invalid lane output attached so repair flows can inspect the submitted evidence", () => {
+    // Arrange
+
+    // Act
+    const packet = createReviewReadyEvidencePacket({
+      ...buildPacket(),
+      laneOutput: {
+        ...buildPacket().laneOutput!,
+        artifacts: [
+          {
+            laneId: "lane-7",
+            kind: "branch",
+            uri: "refs/heads/marceltuinstra/sc-440-lane-contract",
+            label: "Lane branch"
+          }
+        ]
+      }
+    });
+
+    // Assert
+    expect(packet.laneOutput?.artifacts).toHaveLength(1);
+    expect(packet.handoffValidation.outcome).toBe("repair");
+    expect(packet.handoffValidation.violations.map((violation) => violation.code)).toEqual(["missing-review-packet-artifact"]);
   });
 
   it("allows non-review-ready transitions without a packet", () => {
