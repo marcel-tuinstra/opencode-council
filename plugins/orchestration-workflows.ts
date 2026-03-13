@@ -155,6 +155,20 @@ export type {
   ReviewReadyVerificationStatus
 } from "./orchestration-workflows/review-ready-packet";
 export type {
+  ReviewCoordinationArtifactLink,
+  ReviewCoordinationArtifactLinkInput,
+  ReviewCoordinationArtifactLinkKind,
+  ReviewCoordinationBundle,
+  ReviewCoordinationBundleInput,
+  ReviewCoordinationExternalSystem,
+  ReviewCoordinationOriginatingRun,
+  ReviewCoordinationOriginatingRunInput,
+  ReviewCoordinationPullRequestPrep,
+  ReviewCoordinationPullRequestPrepInput,
+  ReviewCoordinationTrackerReference,
+  ReviewCoordinationTrackerReferenceInput
+} from "./orchestration-workflows/review-coordination";
+export type {
   SupervisorBlockerSnapshot,
   SupervisorBlockerSnapshotInput,
   SupervisorBlockerStatus,
@@ -225,6 +239,10 @@ export {
   assertReviewReadyTransition,
   createReviewReadyEvidencePacket
 } from "./orchestration-workflows/review-ready-packet";
+export {
+  createReviewCoordinationBundle,
+  renderReviewCoordinationPullRequestBody
+} from "./orchestration-workflows/review-coordination";
 export {
   createSupervisorObservabilityDashboard,
   resolveHeartbeatHealth
