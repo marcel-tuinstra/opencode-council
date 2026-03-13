@@ -9,6 +9,7 @@
 ## Foundation shipped
 
 - Policy defaults and repository classification
+- Durable supervisor control-plane state store
 - Review-ready packet template and enforcement helper
 - Turn ownership and handoff contract helper
 - Observability snapshot helper

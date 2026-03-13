@@ -36,6 +36,30 @@ export type {
   AdHocRunHistoryRecord
 } from "./orchestration-workflows/ad-hoc-run-history";
 export type {
+  FileBackedSupervisorStateStoreOptions,
+  SupervisorApprovalRecord,
+  SupervisorArtifactRecord,
+  SupervisorAuditEntityKind,
+  SupervisorAuditEntityReference,
+  SupervisorAuditEntry,
+  SupervisorPersistedApprovalStatus,
+  SupervisorPersistedArtifactKind,
+  SupervisorPersistedArtifactStatus,
+  SupervisorPersistedRunStatus,
+  SupervisorPersistedSessionStatus,
+  SupervisorPersistedWorktreeStatus,
+  SupervisorRunPatch,
+  SupervisorRunRecord,
+  SupervisorRunRecordInput,
+  SupervisorRunState,
+  SupervisorRunStateMutation,
+  SupervisorRunStorageLocation,
+  SupervisorSessionRecord,
+  SupervisorStateStore,
+  SupervisorWorktreeRecord,
+  SupervisorLaneRecord
+} from "./orchestration-workflows/durable-state-store";
+export type {
   LaneCapPolicyConfig,
   LaneLifecyclePolicy,
   LaneLifecycleState,
@@ -139,4 +163,9 @@ export {
   createAdHocRunHistoryRecord,
   linkAdHocRunArtifact
 } from "./orchestration-workflows/ad-hoc-run-history";
+export {
+  createFileBackedSupervisorStateStore,
+  DEFAULT_SUPERVISOR_STATE_ROOT,
+  SUPERVISOR_STATE_STORE_SCHEMA_VERSION
+} from "./orchestration-workflows/durable-state-store";
 export { normalizeWorkUnit } from "./orchestration-workflows/work-unit";
