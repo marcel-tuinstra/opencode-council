@@ -594,6 +594,264 @@ describe("supervisor-scheduler", () => {
     expect(store.getRunState("run-alpha")?.lanes[0]?.state).toBe("active");
   });
 
+  it("escalates review-ready checkpoints when ownership requires human resolution", () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const system = createFakeSystem();
+    const runtime = createFakeRuntime();
+    const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
+    const sessions = createSupervisorSessionLifecycle({ store, runtime });
+    const scheduler = createSupervisorDispatchLoop({ store, provisioner, sessions });
+    const lanes = [{
+      definition: {
+        laneId: "lane-1",
+        sequence: 1,
+        workUnitIds: ["sc-438-core"],
+        dependsOnLaneIds: [],
+        branch: "marceltuinstra/sc-438/lane-01"
+      }
+    }] as const;
+
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T17:01:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes,
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T17:02:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes,
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+
+    // Act
+    const reviewPass = scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T17:03:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: [{
+        ...lanes[0],
+        reviewReadyPacket: {
+          acceptanceCriteriaTrace: [{ requirement: "Escalated review handoff", evidence: "tests/supervisor-scheduler.test.ts", status: "done" }],
+          scopedDiffSummary: ["Escalate review-ready because the reviewer owner mismatches the handoff owner."],
+          verificationResults: [{ check: "npm test", result: "pass", notes: "Intentional escalation packet." }],
+          riskRollbackNotes: ["None."],
+          handoff: {
+            laneId: "lane-1",
+            currentOwner: "DEV",
+            nextOwner: "REVIEWER",
+            transferScope: "review",
+            transferTrigger: "Attempted review-ready transition.",
+            deltaSummary: "Trigger checkpoint escalation.",
+            risks: ["Human review owner mismatch should escalate."],
+            nextRequiredEvidence: ["Approval resolution"],
+            evidenceAttached: ["tests/supervisor-scheduler.test.ts"]
+          },
+          laneOutput: createLaneCompletionContract({
+            runId: "run-alpha",
+            laneId: "lane-1",
+            status: "ready",
+            handoff: {
+              laneId: "lane-1",
+              currentOwner: "DEV",
+              nextOwner: "REVIEWER",
+              transferScope: "review",
+              transferTrigger: "Attempted review-ready transition.",
+              deltaSummary: "Trigger checkpoint escalation.",
+              risks: ["Human review owner mismatch should escalate."],
+              nextRequiredEvidence: ["Approval resolution"],
+              evidenceAttached: ["tests/supervisor-scheduler.test.ts"]
+            },
+            artifacts: [
+              {
+                laneId: "lane-1",
+                kind: "branch",
+                uri: "branch:marceltuinstra/sc-438/lane-01",
+                label: "Lane branch"
+              },
+              {
+                laneId: "lane-1",
+                kind: "review-packet",
+                uri: "docs/review-packets/run-alpha-lane-1.md",
+                label: "Review packet"
+              }
+            ],
+            evidence: ["npm test"],
+            producedAt: "2026-03-13T17:03:00.000Z"
+          }),
+          ownership: {
+            reviewerOwner: "PM",
+            mergeOwner: "Marcel Tuinstra",
+            followUpOwner: "DEV"
+          }
+        }
+      }],
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+    const state = store.getRunState("run-alpha");
+
+    // Assert
+    expect(reviewPass.decisions).toMatchObject([
+      {
+        laneId: "lane-1",
+        status: "blocked",
+        action: "pause-session",
+        nextAction: "pause"
+      }
+    ]);
+    expect(reviewPass.decisions[0]?.reasons[0]).toContain("Review checkpoint owner");
+    expect(state?.lanes[0]?.state).toBe("waiting");
+    expect(state?.approvals).toMatchObject([
+      {
+        laneId: "lane-1",
+        boundary: "automation-widening",
+        status: "pending"
+      }
+    ]);
+    expect(state?.artifacts).toMatchObject([
+      {
+        laneId: "lane-1",
+        kind: "branch",
+        uri: "branch:marceltuinstra/sc-438/lane-01"
+      },
+      {
+        laneId: "lane-1",
+        kind: "review-packet",
+        uri: "docs/review-packets/run-alpha-lane-1.md"
+      }
+    ]);
+  });
+
+  it("captures handoff evidence and blocks for repair when the handoff contract is incomplete", () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const system = createFakeSystem();
+    const runtime = createFakeRuntime();
+    const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
+    const sessions = createSupervisorSessionLifecycle({ store, runtime });
+    const scheduler = createSupervisorDispatchLoop({ store, provisioner, sessions });
+    const lanes = [{
+      definition: {
+        laneId: "lane-1",
+        sequence: 1,
+        workUnitIds: ["sc-438-core"],
+        dependsOnLaneIds: [],
+        branch: "marceltuinstra/sc-438/lane-01"
+      }
+    }] as const;
+
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T18:01:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes,
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+    scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T18:02:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes,
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+
+    // Act
+    const reviewPass = scheduler.run({
+      runId: "run-alpha",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T18:03:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: [{
+        ...lanes[0],
+        reviewReadyPacket: {
+          acceptanceCriteriaTrace: [{ requirement: "Repair incomplete handoff", evidence: "tests/supervisor-scheduler.test.ts", status: "done" }],
+          scopedDiffSummary: ["Block review-ready because the handoff contract is missing the review packet artifact."],
+          verificationResults: [{ check: "npm test", result: "pass", notes: "Intentional repair packet." }],
+          riskRollbackNotes: ["None."],
+          handoff: {
+            laneId: "lane-1",
+            currentOwner: "DEV",
+            nextOwner: "REVIEWER",
+            transferScope: "review",
+            transferTrigger: "Attempted review-ready transition.",
+            deltaSummary: "Trigger repair routing.",
+            risks: ["Missing review packet artifact should stay in repair."],
+            nextRequiredEvidence: ["Review packet artifact"],
+            evidenceAttached: ["tests/supervisor-scheduler.test.ts"]
+          },
+          laneOutput: {
+            runId: "run-alpha",
+            laneId: "lane-1",
+            status: "ready",
+            handoff: {
+              laneId: "lane-1",
+              currentOwner: "DEV",
+              nextOwner: "REVIEWER",
+              transferScope: "review",
+              transferTrigger: "Attempted review-ready transition.",
+              deltaSummary: "Trigger repair routing.",
+              risks: ["Missing review packet artifact should stay in repair."],
+              nextRequiredEvidence: ["Review packet artifact"],
+              evidenceAttached: ["tests/supervisor-scheduler.test.ts"]
+            },
+            artifacts: [
+              {
+                laneId: "lane-1",
+                kind: "branch",
+                uri: "branch:marceltuinstra/sc-438/lane-01",
+                label: "Lane branch"
+              }
+            ],
+            evidence: ["npm test"],
+            producedAt: "2026-03-13T18:03:00.000Z"
+          },
+          ownership: {
+            reviewerOwner: "REVIEWER",
+            mergeOwner: "Marcel Tuinstra",
+            followUpOwner: "DEV"
+          }
+        }
+      }],
+      sessionOwners: ["developer-a"],
+      baseRef: "beta"
+    });
+    const state = store.getRunState("run-alpha");
+
+    // Assert
+    expect(reviewPass.decisions).toMatchObject([
+      {
+        laneId: "lane-1",
+        status: "blocked",
+        action: "none",
+        nextAction: "pause"
+      }
+    ]);
+    expect(reviewPass.decisions[0]?.reasons[0]).toContain("review-packet artifact");
+    expect(state?.lanes[0]?.state).toBe("active");
+    expect(state?.artifacts).toMatchObject([
+      {
+        laneId: "lane-1",
+        kind: "branch",
+        uri: "branch:marceltuinstra/sc-438/lane-01"
+      }
+    ]);
+  });
+
   it("pauses at approval gates and resumes only after an explicit approval event", () => {
     // Arrange
     const rootDir = createTempRoot();

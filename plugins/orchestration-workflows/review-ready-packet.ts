@@ -1,7 +1,12 @@
 import type { LaneLifecycleState } from "./lane-lifecycle";
 import { assertLaneStateTransition } from "./lane-lifecycle";
-import type { LaneCompletionContract, LaneCompletionContractInput } from "./lane-contract";
-import { assertValidLaneCompletionContract } from "./lane-contract";
+import type {
+  LaneCompletionContract,
+  LaneCompletionContractInput,
+  LaneCompletionHandoffEvaluation,
+  LaneContractViolation
+} from "./lane-contract";
+import { createLaneCompletionContract, evaluateLaneCompletionContract } from "./lane-contract";
 import type { LaneTurnHandoffContract, LaneTurnHandoffInput } from "./turn-ownership";
 import { createLaneTurnHandoffContract } from "./turn-ownership";
 
@@ -50,8 +55,45 @@ export type ReviewReadyEvidencePacket = {
   riskRollbackNotes: readonly string[];
   handoff: LaneTurnHandoffContract;
   laneOutput?: LaneCompletionContract;
+  handoffValidation: LaneCompletionHandoffEvaluation;
   ownership: ReviewReadyHandoffOwners;
 };
+
+const freezeList = <T>(items: readonly T[]): readonly T[] => Object.freeze([...items]);
+
+const createAcceptedValidation = (): LaneCompletionHandoffEvaluation => ({
+  valid: true,
+  outcome: "accepted",
+  violations: freezeList([])
+});
+
+const createEscalationValidation = (violation: LaneContractViolation): LaneCompletionHandoffEvaluation => ({
+  valid: false,
+  outcome: "escalate",
+  violations: freezeList([violation])
+});
+
+const combineHandoffEvaluations = (
+  evaluations: readonly LaneCompletionHandoffEvaluation[]
+): LaneCompletionHandoffEvaluation => {
+  const violations = freezeList(evaluations.flatMap((evaluation) => evaluation.violations));
+
+  if (violations.length === 0) {
+    return createAcceptedValidation();
+  }
+
+  return {
+    valid: false,
+    outcome: evaluations.some((evaluation) => evaluation.outcome === "escalate") ? "escalate" : "repair",
+    violations
+  };
+};
+
+const isLaneCompletionContract = (
+  input: LaneCompletionContractInput | LaneCompletionContract
+): input is LaneCompletionContract => (
+  (input as LaneCompletionContract).contractVersion === "v1"
+);
 
 const assertNonEmptyValue = (value: string, field: string): string => {
   const normalized = value.trim();
@@ -113,11 +155,29 @@ export const createReviewReadyEvidencePacket = (
   input: ReviewReadyEvidencePacketInput
 ): ReviewReadyEvidencePacket => {
   const handoff = createLaneTurnHandoffContract(input.handoff);
-  const laneOutput = input.laneOutput ? assertValidLaneCompletionContract(input.laneOutput) : undefined;
+  const ownership = normalizeOwnership(input.ownership);
+  const laneOutput = input.laneOutput
+    ? (isLaneCompletionContract(input.laneOutput) ? input.laneOutput : createLaneCompletionContract(input.laneOutput))
+    : undefined;
+  const handoffEvaluations: LaneCompletionHandoffEvaluation[] = [];
 
-  if (laneOutput && JSON.stringify(laneOutput.handoff) !== JSON.stringify(handoff)) {
-    throw new Error("Review-ready evidence packet requires laneOutput.handoff to match the explicit handoff contract.");
+  if (laneOutput) {
+    handoffEvaluations.push(evaluateLaneCompletionContract(laneOutput));
+
+    if (JSON.stringify(laneOutput.handoff) !== JSON.stringify(handoff)) {
+      throw new Error("Review-ready evidence packet requires laneOutput.handoff to match the explicit handoff contract.");
+    }
   }
+
+  if (handoff.nextOwner !== ownership.reviewerOwner) {
+    handoffEvaluations.push(createEscalationValidation({
+      code: "review-owner-mismatch",
+      field: "ownership.reviewerOwner",
+      message: `Review checkpoint owner '${ownership.reviewerOwner}' must match handoff next owner '${handoff.nextOwner}'.`
+    }));
+  }
+
+  const handoffValidation = combineHandoffEvaluations(handoffEvaluations);
 
   return {
     acceptanceCriteriaTrace: normalizeAcceptanceTrace(input.acceptanceCriteriaTrace),
@@ -126,7 +186,8 @@ export const createReviewReadyEvidencePacket = (
     riskRollbackNotes: normalizeNonEmptyList(input.riskRollbackNotes, "risk or rollback note"),
     handoff,
     laneOutput,
-    ownership: normalizeOwnership(input.ownership)
+    handoffValidation,
+    ownership
   };
 };
 

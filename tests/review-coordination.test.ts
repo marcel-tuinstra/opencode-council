@@ -273,6 +273,7 @@ describe("review-coordination", () => {
     expect(bundle.pullRequest.reviewTeams).toEqual(["platform"]);
     expect(bundle.pullRequest.labels).toEqual(["automation", "phase:alpha"]);
     expect(bundle.laneOutput?.laneId).toBe("lane-review");
+    expect(bundle.handoffValidation.outcome).toBe("accepted");
     expect(bundle.reviewPacket.handoff.deltaSummary).toBe("Adds Alpha review coordination and PR prep helpers.");
     expect(Object.isFrozen(bundle.reviewArtifacts)).toBe(true);
   });
@@ -361,6 +362,7 @@ describe("review-coordination", () => {
     expect(body).toContain("External tracker remains the source of truth: shortcut sc-400");
     expect(body).toContain("Base / head: epic/supervisor-alpha <- marceltuinstra/sc-400-review-coordination-pr-prep");
     expect(body).toContain("Requested reviewers: none specified");
+    expect(body).toContain("Handoff validation: accepted");
   });
 
   it("rejects pull request prep when required review sections are missing", () => {

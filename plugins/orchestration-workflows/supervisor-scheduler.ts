@@ -407,7 +407,97 @@ export const createSupervisorDispatchLoop = (
             throw new Error("Lane transition to review_ready requires a validated lane output contract.");
           }
 
-          const artifactUpserts = buildLaneOutputArtifacts(lane.laneId, occurredAt, reviewPacket.laneOutput);
+          const handoffArtifacts = buildLaneOutputArtifacts(lane.laneId, occurredAt, reviewPacket.laneOutput);
+
+          if (reviewPacket.handoffValidation.outcome === "repair") {
+            store.commitMutation(runId, {
+              mutationId: `dispatch:${lane.laneId}:review-handoff-repair:${occurredAt}`,
+              actor,
+              summary: `Capture review handoff evidence for lane '${lane.laneId}' before repair.`,
+              occurredAt,
+              artifactUpserts: handoffArtifacts,
+              sideEffects: ["captured-handoff-evidence", "handoff-repair-required"]
+            });
+            reasons.push(...reviewPacket.handoffValidation.violations.map((violation) => violation.message));
+            decisions.push({
+              laneId: lane.laneId,
+              status: "blocked",
+              targetState: lane.state,
+              action: "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+
+          if (reviewPacket.handoffValidation.outcome === "escalate") {
+            const approvalDecision = evaluateSupervisorApprovalGate({
+              laneId: lane.laneId,
+              actor,
+              occurredAt,
+              request: {
+                boundary: "automation-widening",
+                requestedAction: `clear the review-ready checkpoint escalation for ${lane.laneId}`,
+                summary: `Resolve review-ready checkpoint escalation for ${lane.laneId}.`,
+                rationale: reviewPacket.handoffValidation.violations.map((violation) => violation.message).join(" "),
+                context: {
+                  targetRef: lane.branch,
+                  automationChangeSummary: "Supervisor needs a human decision before accepting this review-ready handoff."
+                }
+              }
+            });
+
+            store.commitMutation(runId, {
+              mutationId: `dispatch:${lane.laneId}:checkpoint-escalation:${occurredAt}`,
+              actor,
+              summary: `Persist checkpoint escalation approval for lane '${lane.laneId}'.`,
+              occurredAt,
+              artifactUpserts: handoffArtifacts,
+              approvalUpserts: approvalDecision.approval ? [approvalDecision.approval] : [],
+              sideEffects: ["captured-handoff-evidence", "checkpoint-escalated"]
+            });
+            if (session?.status === "active") {
+              session = sessions.pauseSession({
+                runId,
+                laneId: lane.laneId,
+                actor,
+                mutationId: `dispatch:${lane.laneId}:checkpoint-escalation-pause:${occurredAt}`,
+                occurredAt,
+                summary: `Pause lane '${lane.laneId}' while a human resolves the checkpoint escalation.`
+              }).session;
+            }
+            if (lane.state === "active") {
+              lane = commitLaneState(
+                store,
+                runId,
+                actor,
+                occurredAt,
+                lane,
+                "waiting",
+                `dispatch:${lane.laneId}:checkpoint-escalation-wait:${occurredAt}`,
+                `Hold lane '${lane.laneId}' for checkpoint escalation.`
+              );
+            }
+            reasons.push(...reviewPacket.handoffValidation.violations.map((violation) => violation.message));
+            decisions.push({
+              laneId: lane.laneId,
+              status: "blocked",
+              targetState: lane.state,
+              action: session?.status === "paused" ? "pause-session" : "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+
           store.commitMutation(runId, {
             mutationId: `dispatch:${lane.laneId}:review-ready:${occurredAt}`,
             actor,
@@ -418,7 +508,7 @@ export const createSupervisorDispatchLoop = (
               state: "review_ready",
               updatedAt: occurredAt
             })],
-            artifactUpserts,
+            artifactUpserts: handoffArtifacts,
             sideEffects: ["prepared-review-bundle", "validated-lane-handoff"]
           });
           state = store.getRunState(runId)!;

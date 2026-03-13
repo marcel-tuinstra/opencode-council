@@ -44,6 +44,14 @@ export type LaneContractViolation = {
   message: string;
 };
 
+export type LaneCompletionHandoffOutcome = "accepted" | "repair" | "escalate";
+
+export type LaneCompletionHandoffEvaluation = {
+  valid: boolean;
+  outcome: LaneCompletionHandoffOutcome;
+  violations: readonly LaneContractViolation[];
+};
+
 const freezeRecord = <T extends Record<string, unknown>>(value: T): Readonly<T> => Object.freeze({ ...value });
 const freezeList = <T>(items: readonly T[]): readonly T[] => Object.freeze([...items]);
 
@@ -110,10 +118,7 @@ export const createLaneCompletionContract = (input: LaneCompletionContractInput)
   });
 };
 
-export const validateLaneCompletionContract = (contract: LaneCompletionContract): {
-  valid: boolean;
-  violations: readonly LaneContractViolation[];
-} => {
+export const evaluateLaneCompletionContract = (contract: LaneCompletionContract): LaneCompletionHandoffEvaluation => {
   const violations: LaneContractViolation[] = [];
 
   if (contract.handoff.laneId !== contract.laneId) {
@@ -167,9 +172,27 @@ export const validateLaneCompletionContract = (contract: LaneCompletionContract)
     });
   }
 
+  const frozenViolations = freezeList(violations.map((violation) => freezeRecord(violation)));
+
   return {
-    valid: violations.length === 0,
-    violations: freezeList(violations.map((violation) => freezeRecord(violation)))
+    valid: frozenViolations.length === 0,
+    outcome: frozenViolations.length === 0
+      ? "accepted"
+      : frozenViolations.some((violation) => violation.code === "unexpected-blocking-issues")
+        ? "escalate"
+        : "repair",
+    violations: frozenViolations
+  };
+};
+
+export const validateLaneCompletionContract = (contract: LaneCompletionContract): {
+  valid: boolean;
+  violations: readonly LaneContractViolation[];
+} => {
+  const evaluation = evaluateLaneCompletionContract(contract);
+  return {
+    valid: evaluation.valid,
+    violations: evaluation.violations
   };
 };
 
@@ -179,9 +202,9 @@ const isLaneCompletionContract = (input: LaneCompletionContractInput | LaneCompl
 
 export const assertValidLaneCompletionContract = (input: LaneCompletionContractInput | LaneCompletionContract): LaneCompletionContract => {
   const contract = isLaneCompletionContract(input) ? input : createLaneCompletionContract(input);
-  const validation = validateLaneCompletionContract(contract);
-  if (!validation.valid) {
-    throw new Error(validation.violations.map((violation) => violation.message).join(" "));
+  const evaluation = evaluateLaneCompletionContract(contract);
+  if (!evaluation.valid) {
+    throw new Error(evaluation.violations.map((violation) => violation.message).join(" "));
   }
   return contract;
 };

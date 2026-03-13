@@ -115,6 +115,7 @@ export type ReviewCoordinationBundle = {
   artifacts: readonly SupervisorArtifactRecord[];
   reviewPacket: ReviewReadyEvidencePacket;
   laneOutput?: LaneCompletionContract;
+  handoffValidation: ReviewReadyEvidencePacket["handoffValidation"];
   sourceOfTruth: "external-tracker";
   externalTracker: ReviewCoordinationTrackerReference;
   originatingRun: ReviewCoordinationOriginatingRun;
@@ -273,6 +274,7 @@ export const createReviewCoordinationBundle = (
     artifacts,
     reviewPacket,
     laneOutput,
+    handoffValidation: reviewPacket.handoffValidation,
     sourceOfTruth: "external-tracker",
     externalTracker,
     originatingRun,
@@ -311,6 +313,7 @@ export const renderReviewCoordinationPullRequestBody = (bundle: ReviewCoordinati
     reviewers,
     reviewTeams,
     artifactSummary,
+    `- Handoff validation: ${bundle.handoffValidation.outcome}`,
     "",
     "## Validation",
     ...bundle.pullRequest.validation.map((item) => `- ${item}`)
