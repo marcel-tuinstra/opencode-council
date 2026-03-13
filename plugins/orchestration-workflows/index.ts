@@ -71,6 +71,10 @@ export const AgentConversations: Plugin = async () => {
         return;
       }
 
+      if (message.info.sessionID && !sessionPolicy.has(message.info.sessionID)) {
+        await initializeProviderPatterns(true);
+      }
+
       let roles: Role[] | null = null;
       let sourceText = "";
       let nonTextParts = 0;

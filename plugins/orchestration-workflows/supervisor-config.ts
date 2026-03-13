@@ -135,16 +135,16 @@ const SUPPORTED_REPO_RISK_TIERS: RepoRiskTier[] = [
 ];
 
 const DEFAULT_PROVIDER_PATTERNS: SupervisorProviderPatternInput[] = [
-  { key: "sentry", pattern: "\\b(sentry|sentry\\.io)\\b", hint: "Sentry MCP (issues, traces, releases)", toolPrefix: "sentry_" },
-  { key: "github", pattern: "\\b(github|github\\.com)\\b", hint: "GitHub MCP (PRs, commits, code context)", toolPrefix: "github_" },
-  { key: "shortcut", pattern: "\\b(shortcut)\\b", hint: "Shortcut MCP (stories, epics, milestones)", toolPrefix: "shortcut_" },
-  { key: "nuxt", pattern: "\\b(nuxt|nuxt\\s*ui|ui\\.nuxt\\.com)\\b", hint: "Nuxt UI MCP (components, docs, examples)", toolPrefix: "nuxt-ui_" },
-  { key: "jira", pattern: "\\b(jira|atlassian)\\b", hint: "Jira MCP (issues, boards, sprints)", toolPrefix: "jira_" },
-  { key: "confluence", pattern: "\\b(confluence|wiki)\\b", hint: "Confluence MCP (pages, spaces, search)", toolPrefix: "confluence_" },
-  { key: "linear", pattern: "\\b(linear)\\b", hint: "Linear MCP (issues, projects, cycles)", toolPrefix: "linear_" },
-  { key: "notion", pattern: "\\b(notion)\\b", hint: "Notion MCP (pages, databases)", toolPrefix: "notion_" },
-  { key: "slack", pattern: "\\b(slack)\\b", hint: "Slack MCP (messages, channels)", toolPrefix: "slack_" },
-  { key: "datadog", pattern: "\\b(datadog)\\b", hint: "Datadog MCP (metrics, monitors, logs)", toolPrefix: "datadog_" }
+  { key: "sentry", pattern: "\\b(sentry(?:\\.io)?|sentry\\s+mcp)\\b", hint: "Sentry MCP (issues, traces, releases)", toolPrefix: "sentry_" },
+  { key: "github", pattern: "\\b(github(?:\\.com)?|gh|gh\\s+cli|github\\s+mcp)\\b", hint: "GitHub MCP (PRs, commits, code context)", toolPrefix: "github_" },
+  { key: "shortcut", pattern: "\\b(shortcut(?:\\.com)?|clubhouse(?:\\.io)?|shortcut\\s+mcp)\\b", hint: "Shortcut MCP (stories, epics, milestones)", toolPrefix: "shortcut_" },
+  { key: "nuxt", pattern: "\\b(nuxt(?:\\s*ui)?|nuxt-ui|ui\\.nuxt\\.com|nuxt\\s+ui\\s+mcp)\\b", hint: "Nuxt UI MCP (components, docs, examples)", toolPrefix: "nuxt-ui_" },
+  { key: "jira", pattern: "\\b(jira|jira\\s+software|atlassian\\s+jira|jira\\s+mcp)\\b", hint: "Jira MCP (issues, boards, sprints)", toolPrefix: "jira_" },
+  { key: "confluence", pattern: "\\b(confluence|atlassian\\s+wiki|confluence\\s+mcp)\\b", hint: "Confluence MCP (pages, spaces, search)", toolPrefix: "confluence_" },
+  { key: "linear", pattern: "\\b(linear(?:\\.app)?|linear\\s+mcp)\\b", hint: "Linear MCP (issues, projects, cycles)", toolPrefix: "linear_" },
+  { key: "notion", pattern: "\\b(notion(?:\\.so)?|notion\\s+mcp)\\b", hint: "Notion MCP (pages, databases)", toolPrefix: "notion_" },
+  { key: "slack", pattern: "\\b(slack|slack\\s+mcp)\\b", hint: "Slack MCP (messages, channels)", toolPrefix: "slack_" },
+  { key: "datadog", pattern: "\\b(datadog|ddog|datadog\\s+mcp)\\b", hint: "Datadog MCP (metrics, monitors, logs)", toolPrefix: "datadog_" }
 ];
 
 const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
