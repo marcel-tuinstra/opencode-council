@@ -10,6 +10,7 @@
 
 - Policy defaults and repository classification
 - Durable supervisor control-plane state store
+- Lane worktree provisioner and reconciler
 - Review-ready packet template and enforcement helper
 - Turn ownership and handoff contract helper
 - Observability snapshot helper

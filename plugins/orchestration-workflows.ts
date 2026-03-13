@@ -67,6 +67,21 @@ export type {
   RepoRiskTier
 } from "./orchestration-workflows/lane-lifecycle";
 export type {
+  GitWorktreeEntry,
+  ProvisionSupervisorLaneWorktreeInput,
+  ProvisionSupervisorLaneWorktreeResult,
+  ReleaseSupervisorLaneWorktreeInput,
+  ReleaseSupervisorLaneWorktreeResult,
+  SupervisorLaneWorktreeCollision,
+  SupervisorLaneWorktreeDrift,
+  SupervisorLaneWorktreeHealth,
+  SupervisorLaneWorktreeOrphan,
+  SupervisorLaneWorktreeProvisioner,
+  SupervisorLaneWorktreeProvisionerOptions,
+  SupervisorLaneWorktreeReconciliationReport,
+  SupervisorLaneWorktreeSystem
+} from "./orchestration-workflows/lane-worktree-provisioner";
+export type {
   MergePolicy,
   MergePolicyCandidate,
   MergePolicyConfig,
@@ -132,6 +147,7 @@ export {
   LANE_LIFECYCLE_POLICY,
   resolveLanePolicy
 } from "./orchestration-workflows/lane-lifecycle";
+export { buildSupervisorManagedWorktreePath, createSupervisorLaneWorktreeProvisioner, DEFAULT_SUPERVISOR_WORKTREE_ROOT } from "./orchestration-workflows/lane-worktree-provisioner";
 export {
   assertMergePolicyAllowsAutoMerge,
   DEFAULT_MERGE_POLICY_MODE,
