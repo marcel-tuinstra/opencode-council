@@ -236,6 +236,22 @@ export type {
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
 export type {
+  AdvanceSupervisorRunInput,
+  AdvanceSupervisorRunResult,
+  BootstrapSupervisorRunInput,
+  BootstrapSupervisorRunResult,
+  BuildSupervisorRunSummaryInput,
+  CreateSupervisorExecutionWorkflowOptions,
+  PrepareSupervisorReviewBundlesInput,
+  ReconstructSupervisorRunResult,
+  SupervisorLaneStateTransition,
+  SupervisorRunSummary,
+  SupervisorWorkflowEvent,
+  SupervisorWorkflowNextAction,
+  SupervisorWorkflowStage,
+  SupervisorWorkflowStageStatus
+} from "./orchestration-workflows/supervisor-execution-workflow";
+export type {
   CreateSupervisorDataLifecycleReportInput,
   SupervisorAdHocRunLifecycleInput,
   SupervisorDataLifecyclePolicy,
@@ -329,6 +345,9 @@ export {
   createSupervisorObservabilityDashboard,
   resolveHeartbeatHealth
 } from "./orchestration-workflows/observability-dashboard";
+export {
+  createSupervisorExecutionWorkflow
+} from "./orchestration-workflows/supervisor-execution-workflow";
 export {
   createSupervisorDataLifecycleReport,
   DEFAULT_SUPERVISOR_DATA_LIFECYCLE_POLICY
