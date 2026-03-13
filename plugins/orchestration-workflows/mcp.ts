@@ -1,11 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  BUILTIN_PROVIDER_PATTERNS,
-  MCP_CAPS
-} from "./constants";
 import { debugLog } from "./debug";
+import { getSupervisorPolicy } from "./supervisor-config";
 import type { McpBlockResult, McpProviderConfig, SessionPolicy } from "./types";
 
 let installedProviders: string[] | null = null;
@@ -26,11 +23,12 @@ export const loadInstalledProviders = async (): Promise<string[]> => {
 };
 
 export const buildProviderPatterns = (availableProviders: string[]): McpProviderConfig[] => {
+  const builtinProviderPatterns = getSupervisorPolicy().providers.patterns;
   const patterns: McpProviderConfig[] = [];
   const seen = new Set<string>();
 
   for (const providerKey of availableProviders) {
-    const builtin = BUILTIN_PROVIDER_PATTERNS.find((provider) => provider.key === providerKey);
+    const builtin = builtinProviderPatterns.find((provider) => provider.key === providerKey);
     if (builtin) {
       patterns.push(builtin);
       seen.add(providerKey);
@@ -46,7 +44,7 @@ export const buildProviderPatterns = (availableProviders: string[]): McpProvider
     seen.add(providerKey);
   }
 
-  for (const builtin of BUILTIN_PROVIDER_PATTERNS) {
+  for (const builtin of builtinProviderPatterns) {
     if (!seen.has(builtin.key)) {
       patterns.push(builtin);
     }
@@ -155,7 +153,8 @@ export const checkMcpAccess = (
     }
   }
 
-  const cap = policy.allowDeepMcp ? MCP_CAPS.deep : MCP_CAPS.default;
+  const mcpLimits = getSupervisorPolicy().limits.mcp;
+  const cap = policy.allowDeepMcp ? mcpLimits.deepCallCap : mcpLimits.defaultCallCap;
   if (policy.mcpCallCount >= cap) {
     return {
       blocked: true,

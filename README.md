@@ -83,6 +83,16 @@ In multi-role mode, this usually follows a heartbeat rhythm:
 - Quick start: [`docs/getting-started/quickstart.md`](./docs/getting-started/quickstart.md)
 - Customization: [`docs/guides/customization.md`](./docs/guides/customization.md)
 
+## Supervisor Policy Config
+
+Supervisor policy defaults now resolve from a typed `v1-safe` profile and can be overridden with a repo-local `.opencode/supervisor-policy.json` file.
+
+- Missing config keeps the built-in safe defaults.
+- Invalid config logs diagnostics and falls back to safe defaults for invalid fields.
+- Current override surface covers role aliases, MCP provider patterns, lane/worktree/session limits, approval gates, and budget/compaction thresholds.
+
+See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the contract and [`docs/guides/customization.md`](./docs/guides/customization.md) for the config shape.
+
 ## Docs For Operators And Contributors
 
 - Docs index: [`docs/README.md`](./docs/README.md)

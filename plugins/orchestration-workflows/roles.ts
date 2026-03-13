@@ -1,8 +1,8 @@
 import {
   MARKER_REGEX,
-  MENTION_REGEX,
-  ROLE_ALIASES
+  MENTION_REGEX
 } from "./constants";
+import { getSupervisorPolicy } from "./supervisor-config";
 import { SUPPORTED_ROLES } from "./types";
 import type { Role } from "./types";
 
@@ -20,8 +20,9 @@ const stripCodeSegments = (text: string) => {
 
 export const normalizeRole = (raw: string): Role | null => {
   const lowered = raw.toLowerCase();
-  if (ROLE_ALIASES[lowered]) {
-    return ROLE_ALIASES[lowered];
+  const roleAliases = getSupervisorPolicy().roleAliases;
+  if (roleAliases[lowered]) {
+    return roleAliases[lowered];
   }
 
   const upper = raw.toUpperCase();

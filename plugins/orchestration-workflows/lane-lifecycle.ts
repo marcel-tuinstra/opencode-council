@@ -1,3 +1,5 @@
+import { DEFAULT_SUPERVISOR_LIMITS, getSupervisorPolicy } from "./supervisor-config";
+
 export type LaneLifecycleState = "planned" | "active" | "waiting" | "review_ready" | "complete";
 
 export type RepoRiskTier = "small-high-risk" | "medium-moderate-risk" | "large-mature";
@@ -22,9 +24,9 @@ export type LanePolicy = {
 };
 
 export const DEFAULT_ACTIVE_LANE_CAPS: Readonly<Record<RepoRiskTier, number>> = {
-  "small-high-risk": 2,
-  "medium-moderate-risk": 3,
-  "large-mature": 4
+  "small-high-risk": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["small-high-risk"],
+  "medium-moderate-risk": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["medium-moderate-risk"],
+  "large-mature": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["large-mature"]
 };
 
 export const LANE_LIFECYCLE_POLICY: LaneLifecyclePolicy = {
@@ -40,7 +42,7 @@ export const LANE_LIFECYCLE_POLICY: LaneLifecyclePolicy = {
   }
 };
 
-export const getDefaultActiveLaneCap = (repoRiskTier: RepoRiskTier): number => DEFAULT_ACTIVE_LANE_CAPS[repoRiskTier];
+export const getDefaultActiveLaneCap = (repoRiskTier: RepoRiskTier): number => getSupervisorPolicy().limits.lanes.activeCapsByTier[repoRiskTier];
 
 export const getAllowedLaneTransitions = (state: LaneLifecycleState): readonly LaneLifecycleState[] => (
   LANE_LIFECYCLE_POLICY.allowedTransitions[state]

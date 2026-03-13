@@ -1,5 +1,5 @@
-import { COMPACTION_PROFILES } from "./constants";
 import { debugLog } from "./debug";
+import { getSupervisorPolicy } from "./supervisor-config";
 import type { Intent } from "./types";
 
 type CompactionSlot = "goals" | "constraints" | "blockers" | "openActions";
@@ -101,7 +101,8 @@ const hasCriticalSlotLoss = (source: string, compacted: string): boolean => {
 };
 
 export const compactWorkflowContext = (text: string, intent: Intent): CompactionResult => {
-  const profile = COMPACTION_PROFILES[intent] ?? COMPACTION_PROFILES.mixed;
+  const compactionProfiles = getSupervisorPolicy().compaction;
+  const profile = compactionProfiles[intent] ?? compactionProfiles.mixed;
   const sourceTokens = estimateTokens(text);
   if (sourceTokens < profile.triggerTokens) {
     return {

@@ -1,3 +1,5 @@
+import { DEFAULT_SUPERVISOR_BUDGET, getSupervisorPolicy } from "./supervisor-config";
+
 export type BudgetGovernanceScope = "run" | "step";
 
 export type BudgetGovernanceRecommendation =
@@ -59,9 +61,9 @@ export type BudgetGovernanceDecision = {
   shouldPauseAutomation: boolean;
 };
 
-export const DEFAULT_WARNING_THRESHOLD_PERCENTS = Object.freeze([80, 100, 120]);
-export const DEFAULT_ESCALATION_THRESHOLD_PERCENT = 120;
-export const DEFAULT_HARD_STOP_THRESHOLD_PERCENT = 131.25;
+export const DEFAULT_WARNING_THRESHOLD_PERCENTS = Object.freeze([...DEFAULT_SUPERVISOR_BUDGET.governance.warningThresholdPercents]);
+export const DEFAULT_ESCALATION_THRESHOLD_PERCENT = DEFAULT_SUPERVISOR_BUDGET.governance.escalationThresholdPercent;
+export const DEFAULT_HARD_STOP_THRESHOLD_PERCENT = DEFAULT_SUPERVISOR_BUDGET.governance.hardStopThresholdPercent;
 
 const normalizeThresholdPercents = (thresholds?: readonly number[]): readonly number[] => {
   const normalized = (thresholds ?? DEFAULT_WARNING_THRESHOLD_PERCENTS)
@@ -120,9 +122,12 @@ const hasExplicitOverride = (config?: BudgetGovernanceConfig): boolean => {
 export const resolveBudgetGovernancePolicy = (
   config?: BudgetGovernanceConfig
 ): BudgetGovernancePolicy => {
-  const warningThresholdPercents = normalizeThresholdPercents(config?.warningThresholdPercents);
-  const escalationThresholdPercent = config?.escalationThresholdPercent ?? DEFAULT_ESCALATION_THRESHOLD_PERCENT;
-  const hardStopThresholdPercent = config?.hardStopThresholdPercent ?? DEFAULT_HARD_STOP_THRESHOLD_PERCENT;
+  const supervisorGovernance = getSupervisorPolicy().budget.governance;
+  const warningThresholdPercents = normalizeThresholdPercents(
+    config?.warningThresholdPercents ?? supervisorGovernance.warningThresholdPercents
+  );
+  const escalationThresholdPercent = config?.escalationThresholdPercent ?? supervisorGovernance.escalationThresholdPercent;
+  const hardStopThresholdPercent = config?.hardStopThresholdPercent ?? supervisorGovernance.hardStopThresholdPercent;
 
   if (warningThresholdPercents.length === 0) {
     throw new Error("Budget governance policy requires at least one warning threshold.");
@@ -139,7 +144,7 @@ export const resolveBudgetGovernancePolicy = (
 
   return {
     defaultHardStopEnabled: false,
-    hardStopEnabled: config?.hardStopEnabled ?? false,
+    hardStopEnabled: config?.hardStopEnabled ?? supervisorGovernance.hardStopEnabled,
     warningThresholdPercents,
     escalationThresholdPercent,
     hardStopThresholdPercent,

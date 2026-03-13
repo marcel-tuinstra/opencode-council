@@ -1,9 +1,4 @@
-import type { Intent, McpProviderConfig, Role } from "./types";
-
-export const MCP_CAPS = {
-  default: 2,
-  deep: 6
-} as const;
+import type { Intent, Role } from "./types";
 
 export const TURN_COUNTS = {
   default: { 2: 8, 3: 10, 4: 12, 5: 12, max: 14 },
@@ -11,79 +6,7 @@ export const TURN_COUNTS = {
   marketing: { 2: 10, 3: 10, max: 12 }
 } as const;
 
-export const COMPACTION_PROFILES: Record<Intent, { triggerTokens: number; targetTokens: number }> = {
-  backend: { triggerTokens: 700, targetTokens: 420 },
-  design: { triggerTokens: 760, targetTokens: 460 },
-  marketing: { triggerTokens: 640, targetTokens: 380 },
-  roadmap: { triggerTokens: 780, targetTokens: 460 },
-  research: { triggerTokens: 760, targetTokens: 440 },
-  mixed: { triggerTokens: 720, targetTokens: 430 }
-};
-
-export const BUILTIN_PROVIDER_PATTERNS: McpProviderConfig[] = [
-  {
-    key: "sentry",
-    regex: /\b(sentry|sentry\.io)\b/i,
-    hint: "Sentry MCP (issues, traces, releases)",
-    toolPrefix: "sentry_"
-  },
-  {
-    key: "github",
-    regex: /\b(github|github\.com)\b/i,
-    hint: "GitHub MCP (PRs, commits, code context)",
-    toolPrefix: "github_"
-  },
-  {
-    key: "shortcut",
-    regex: /\b(shortcut)\b/i,
-    hint: "Shortcut MCP (stories, epics, milestones)",
-    toolPrefix: "shortcut_"
-  },
-  {
-    key: "nuxt",
-    regex: /\b(nuxt|nuxt\s*ui|ui\.nuxt\.com)\b/i,
-    hint: "Nuxt UI MCP (components, docs, examples)",
-    toolPrefix: "nuxt-ui_"
-  },
-  {
-    key: "jira",
-    regex: /\b(jira|atlassian)\b/i,
-    hint: "Jira MCP (issues, boards, sprints)",
-    toolPrefix: "jira_"
-  },
-  {
-    key: "confluence",
-    regex: /\b(confluence|wiki)\b/i,
-    hint: "Confluence MCP (pages, spaces, search)",
-    toolPrefix: "confluence_"
-  },
-  {
-    key: "linear",
-    regex: /\b(linear)\b/i,
-    hint: "Linear MCP (issues, projects, cycles)",
-    toolPrefix: "linear_"
-  },
-  {
-    key: "notion",
-    regex: /\b(notion)\b/i,
-    hint: "Notion MCP (pages, databases)",
-    toolPrefix: "notion_"
-  },
-  {
-    key: "slack",
-    regex: /\b(slack)\b/i,
-    hint: "Slack MCP (messages, channels)",
-    toolPrefix: "slack_"
-  },
-  {
-    key: "datadog",
-    regex: /\b(datadog)\b/i,
-    hint: "Datadog MCP (metrics, monitors, logs)",
-    toolPrefix: "datadog_"
-  }
-];
-
-export const ROLE_ALIASES: Record<string, Role> = {
+export const DEFAULT_ROLE_ALIASES: Record<string, Role> = {
   cto: "CTO",
   dev: "DEV",
   developer: "DEV",

@@ -1,4 +1,4 @@
-import { MCP_CAPS } from "./constants";
+import { getSupervisorPolicy } from "./supervisor-config";
 import type { Role } from "./types";
 
 export const buildSystemInstruction = (
@@ -33,7 +33,7 @@ export const buildSystemInstruction = (
     .join(" ");
 
   const mcpNote = mcpProviders.length > 0
-    ? `MCP allowed for: ${mcpProviders.join(", ")}. Max ${MCP_CAPS.default} calls.`
+    ? `MCP allowed for: ${mcpProviders.join(", ")}. Max ${getSupervisorPolicy().limits.mcp.defaultCallCap} calls.`
     : "MCP disabled (no provider mentioned).";
 
   const phasePlan = heartbeat
@@ -93,7 +93,7 @@ const buildUserEnforcement = (
     "",
     `Format: [n] ROLE: message | Start with ${leadRole}: | Plan: ${turnPlan}`,
     heartbeatNote,
-    mcpProviders.length > 0 ? `MCP: ${mcpProviders.join(", ")} only, max ${MCP_CAPS.default} calls.` : "MCP: disabled.",
+    mcpProviders.length > 0 ? `MCP: ${mcpProviders.join(", ")} only, max ${getSupervisorPolicy().limits.mcp.defaultCallCap} calls.` : "MCP: disabled.",
     staleSensitive ? "Suggest /mcp if data may be stale." : "",
     "No markdown. Plain lines only."
   ].filter(Boolean).join("\n");
