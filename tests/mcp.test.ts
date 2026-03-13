@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { checkMcpAccess } from "../plugins/orchestration-workflows/mcp";
+import {
+  buildProviderPatterns,
+  checkMcpAccess,
+  detectMcpProvidersWithPatterns,
+  resolveProviderFromToolName
+} from "../plugins/orchestration-workflows/mcp";
 import type { SessionPolicy } from "../plugins/orchestration-workflows/types";
 
 const basePolicy = (): SessionPolicy => ({
@@ -25,6 +30,31 @@ const basePolicy = (): SessionPolicy => ({
 });
 
 describe("mcp access", () => {
+  it("detects common provider aliases without matching generic wiki text", () => {
+    // Arrange
+    const patterns = buildProviderPatterns([]);
+
+    // Act
+    const detected = detectMcpProvidersWithPatterns(
+      "Pull GH context, sync the Clubhouse story, and ignore the internal engineering wiki doc.",
+      patterns
+    );
+
+    // Assert
+    expect(detected).toEqual(["github", "shortcut"]);
+  });
+
+  it("resolves provider tool prefixes for normalized custom provider keys", () => {
+    // Arrange
+    const patterns = buildProviderPatterns(["acme.docs-v2"]);
+
+    // Act
+    const resolved = resolveProviderFromToolName("acme_docs_v2_search", patterns);
+
+    // Assert
+    expect(resolved).toBe("acme.docs-v2");
+  });
+
   it("allows non-mcp tools", () => {
     // Arrange
 
@@ -48,7 +78,7 @@ describe("mcp access", () => {
 
     // Assert
     expect(result.blocked).toBe(true);
-    expect(result.warning).toContain("not installed");
+    expect(result.warning).toContain("unavailable in this runtime session");
   });
 
   it("blocks when no provider is mentioned", () => {
@@ -64,7 +94,7 @@ describe("mcp access", () => {
 
     // Assert
     expect(result.blocked).toBe(true);
-    expect(result.warning).toContain("no provider explicitly mentioned");
+    expect(result.warning).toContain("mention 'sentry' explicitly");
   });
 
   it("blocks when provider is not mentioned", () => {
@@ -78,7 +108,7 @@ describe("mcp access", () => {
 
     // Assert
     expect(result.blocked).toBe(true);
-    expect(result.warning).toContain("not mentioned");
+    expect(result.warning).toContain("Allowed providers for this session");
   });
 
   it("enforces fairness across multiple providers", () => {
@@ -95,7 +125,7 @@ describe("mcp access", () => {
 
     // Assert
     expect(result.blocked).toBe(true);
-    expect(result.warning).toContain("temporarily blocked");
+    expect(result.warning).toContain("Retry 'github'");
   });
 
   it("enforces default cap and allows deep cap", () => {

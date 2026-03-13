@@ -8,6 +8,60 @@ import type { McpBlockResult, McpProviderConfig, SessionPolicy } from "./types";
 let installedProviders: string[] | null = null;
 let mcpProviderPatterns: McpProviderConfig[] = [];
 
+const escapeRegexLiteral = (value: string): string => {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+
+const normalizeProviderToken = (value: string): string => {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+};
+
+const buildFallbackProviderRegex = (providerKey: string): RegExp => {
+  const normalized = providerKey.trim().toLowerCase();
+  const variants = new Set<string>([escapeRegexLiteral(normalized)]);
+  const pieces = normalized.split(/[^a-z0-9]+/).filter(Boolean);
+
+  if (pieces.length > 1) {
+    variants.add(pieces.map((piece) => escapeRegexLiteral(piece)).join("[-_.\\s]*"));
+    variants.add(pieces.join("\\s+"));
+  }
+
+  return new RegExp(`\\b(${[...variants].join("|")})\\b`, "i");
+};
+
+const buildToolPrefixes = (providerKey: string, toolPrefix: string): string[] => {
+  const normalizedKey = providerKey.trim().toLowerCase();
+  const prefixes = new Set<string>([toolPrefix, `${normalizedKey}_`]);
+  const underscored = normalizedKey.replace(/[^a-z0-9]+/g, "_");
+
+  if (underscored.length > 0) {
+    prefixes.add(`${underscored}_`);
+  }
+
+  return [...prefixes].filter(Boolean).sort((left, right) => right.length - left.length);
+};
+
+const getActiveProviderPatterns = (): McpProviderConfig[] => {
+  return mcpProviderPatterns.length > 0 ? mcpProviderPatterns : buildProviderPatterns([]);
+};
+
+const normalizeProviderList = (providers: string[]): string[] => {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+
+  for (const provider of providers) {
+    const token = normalizeProviderToken(provider);
+    if (!token || seen.has(token)) {
+      continue;
+    }
+
+    normalized.push(token.replace(/\s+/g, "-"));
+    seen.add(token);
+  }
+
+  return normalized;
+};
+
 export const loadInstalledProviders = async (): Promise<string[]> => {
   try {
     const configPath = join(homedir(), ".config", "opencode", "config.json");
@@ -28,20 +82,21 @@ export const buildProviderPatterns = (availableProviders: string[]): McpProvider
   const seen = new Set<string>();
 
   for (const providerKey of availableProviders) {
-    const builtin = builtinProviderPatterns.find((provider) => provider.key === providerKey);
+    const normalizedProviderKey = providerKey.trim().toLowerCase();
+    const builtin = builtinProviderPatterns.find((provider) => provider.key === normalizedProviderKey);
     if (builtin) {
       patterns.push(builtin);
-      seen.add(providerKey);
+      seen.add(normalizedProviderKey);
       continue;
     }
 
     patterns.push({
-      key: providerKey,
-      regex: new RegExp(`\\b(${providerKey})\\b`, "i"),
+      key: normalizedProviderKey,
+      regex: buildFallbackProviderRegex(normalizedProviderKey),
       hint: `${providerKey} MCP`,
-      toolPrefix: `${providerKey}_`
+      toolPrefix: `${normalizedProviderKey}_`
     });
-    seen.add(providerKey);
+    seen.add(normalizedProviderKey);
   }
 
   for (const builtin of builtinProviderPatterns) {
@@ -53,8 +108,8 @@ export const buildProviderPatterns = (availableProviders: string[]): McpProvider
   return patterns;
 };
 
-export const initializeProviderPatterns = async (): Promise<void> => {
-  if (installedProviders !== null) {
+export const initializeProviderPatterns = async (forceRefresh = false): Promise<void> => {
+  if (installedProviders !== null && !forceRefresh) {
     return;
   }
 
@@ -68,14 +123,15 @@ export const initializeProviderPatterns = async (): Promise<void> => {
 };
 
 export const isProviderInstalled = (providerKey: string): boolean => {
-  return installedProviders?.includes(providerKey) ?? false;
+  const normalized = providerKey.trim().toLowerCase();
+  return installedProviders?.some((provider) => provider.trim().toLowerCase() === normalized) ?? false;
 };
 
-export const detectMcpProviders = (text: string): string[] => {
+export const detectMcpProvidersWithPatterns = (text: string, patterns: McpProviderConfig[]): string[] => {
   const providers: string[] = [];
   const seen = new Set<string>();
 
-  for (const provider of mcpProviderPatterns) {
+  for (const provider of patterns) {
     if (provider.regex.test(text) && !seen.has(provider.key)) {
       providers.push(provider.key);
       seen.add(provider.key);
@@ -85,23 +141,36 @@ export const detectMcpProviders = (text: string): string[] => {
   return providers;
 };
 
+export const detectMcpProviders = (text: string): string[] => {
+  return detectMcpProvidersWithPatterns(text, getActiveProviderPatterns());
+};
+
 export const buildMcpHints = (providers: string[]): string[] => {
-  return mcpProviderPatterns
+  return getActiveProviderPatterns()
     .filter((provider) => providers.includes(provider.key))
     .map((provider) => provider.hint);
 };
 
-export const providerFromToolName = (tool: string): string | null => {
-  for (const provider of mcpProviderPatterns) {
-    if (tool.startsWith(provider.toolPrefix)) {
-      return provider.key;
+export const resolveProviderFromToolName = (tool: string, patterns: McpProviderConfig[]): string | null => {
+  for (const provider of patterns) {
+    for (const prefix of buildToolPrefixes(provider.key, provider.toolPrefix)) {
+      if (tool.startsWith(prefix)) {
+        return provider.key;
+      }
     }
   }
+
   return null;
 };
 
+export const providerFromToolName = (tool: string): string | null => {
+  return resolveProviderFromToolName(tool, getActiveProviderPatterns());
+};
+
 export const getMissingProviders = (policy: SessionPolicy): string[] => {
-  return policy.mcpProviders.filter((provider) => !(policy.mcpTouched[provider] && policy.mcpTouched[provider] > 0));
+  return normalizeProviderList(policy.mcpProviders).filter(
+    (provider) => !(policy.mcpTouched[provider] && policy.mcpTouched[provider] > 0)
+  );
 };
 
 type AccessCheckDeps = {
@@ -117,6 +186,7 @@ export const checkMcpAccess = (
   const resolveProvider = deps.providerFromToolName ?? providerFromToolName;
   const providerInstalled = deps.isProviderInstalled ?? isProviderInstalled;
   const provider = resolveProvider(tool);
+  const allowedProviders = normalizeProviderList(policy.mcpProviders);
 
   if (!provider) {
     return { blocked: false };
@@ -125,30 +195,30 @@ export const checkMcpAccess = (
   if (!providerInstalled(provider)) {
     return {
       blocked: true,
-      warning: `MCP provider '${provider}' is not installed. Install it in ~/.config/opencode/config.json to use.`
+      warning: `MCP provider '${provider}' is unavailable in this runtime session. Add it to ~/.config/opencode/config.json, then restart or start a new session before retrying.`
     };
   }
 
-  if (policy.mcpProviders.length === 0) {
+  if (allowedProviders.length === 0) {
     return {
       blocked: true,
-      warning: `MCP blocked: no provider explicitly mentioned in prompt. Mention '${provider}' to enable.`
+      warning: `MCP blocked: mention '${provider}' explicitly in the prompt to enable its tools for this session.`
     };
   }
 
-  if (!policy.mcpProviders.includes(provider)) {
+  if (!allowedProviders.includes(provider)) {
     return {
       blocked: true,
-      warning: `MCP provider '${provider}' not mentioned in prompt. Only these are allowed: ${policy.mcpProviders.join(", ")}.`
+      warning: `MCP provider '${provider}' was not approved in the prompt. Allowed providers for this session: ${allowedProviders.join(", ")}.`
     };
   }
 
-  if (policy.mcpProviders.length > 1) {
+  if (allowedProviders.length > 1) {
     const missing = getMissingProviders(policy);
     if (missing.length > 0 && !missing.includes(provider)) {
       return {
         blocked: true,
-        warning: `MCP provider '${provider}' temporarily blocked. Check these first: ${missing.join(", ")}.`
+        warning: `MCP provider '${provider}' is temporarily blocked until these provider checks run first: ${missing.join(", ")}. Retry '${provider}' after that coverage lands.`
       };
     }
   }
