@@ -12,6 +12,8 @@ Quick test:
 
 ```text
 @cto @dev @pm Investigate why API latency regressed this week and propose a fix plan.
+
+@fe @ux Review the landing page interaction flow and tighten the responsive layout.
 ```
 
 No `opencode.json` edits required.

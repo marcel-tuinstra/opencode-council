@@ -14,7 +14,10 @@ Example:
 {
   "profile": "v1-safe",
   "roleAliases": {
-    "engineer": "DEV"
+    "engineer": "DEV",
+    "frontend": "FE",
+    "backend": "BE",
+    "ui": "UX"
   },
   "providers": {
     "patterns": [
@@ -144,6 +147,8 @@ When introducing a new role, update all of the following:
 - Target/count objects in `buildTurnTargets()` and `normalizeThreadOutput()`
 
 This keeps role parsing, weighting, and output normalization in sync.
+
+Keep `DEV` as the default full-stack implementation role, then add aliases for `FE`, `BE`, or `UX` when you want more specialized routing.
 
 ## 4) Create your own agent personas
 
