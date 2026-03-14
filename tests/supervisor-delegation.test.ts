@@ -157,4 +157,76 @@ describe("supervisor-delegation", () => {
     expect(result.valid).toBe(true);
     expect(result.violations).toEqual([]);
   });
+
+  it("rejects CEO and PM assignments that absorb implementation work without execution roles", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "CEO" as const,
+          agentLabel: "CEO",
+          worktreePath: "/tmp/wt-ceo",
+          responsibilities: ["Implement the launch workflow"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Build the release checklist flow"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'CEO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Assignment 'PM' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
+
+  it("does not treat review and planning responsibilities as implementation ownership for manager roles", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "CTO" as const,
+          agentLabel: "CTO",
+          worktreePath: "/tmp/wt-cto",
+          responsibilities: ["Validate architecture", "Review test plan"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Deliver roadmap", "Document requirements"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
 });

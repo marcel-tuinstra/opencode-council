@@ -2,7 +2,9 @@ import { getSupervisorPolicy, type SupervisorExecutionPolicy } from "./superviso
 import type { Role } from "./types";
 
 const EXECUTION_ROLES = Object.freeze(["DEV", "FE", "BE", "UX"] as const satisfies readonly Role[]);
-const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|fix|ship|deliver|write|develop|test|validate|patch|refactor)\b/i;
+const MANAGER_ROLES = Object.freeze(["CEO", "CTO", "PM", "PO", "RESEARCH", "MARKETING"] as const satisfies readonly Role[]);
+const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|fix|ship|write code|develop|patch|refactor|debug|wire up)\b/i;
+const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|validate architecture|validate scope|test plan|review test plan|deliver roadmap)\b/i;
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;
@@ -104,8 +106,18 @@ const normalizeIntegration = (input: SupervisorIntegrationAssignmentInput): Supe
 
 const isExecutionRole = (role: Role): boolean => (EXECUTION_ROLES as readonly Role[]).includes(role);
 
+const isManagerRole = (role: Role): boolean => (MANAGER_ROLES as readonly Role[]).includes(role);
+
 const hasImplementationResponsibility = (responsibilities: readonly string[]): boolean => responsibilities
-  .some((responsibility) => IMPLEMENTATION_RESPONSIBILITY_REGEX.test(responsibility));
+  .some((responsibility) => {
+    const normalized = responsibility.trim();
+
+    if (!IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized)) {
+      return false;
+    }
+
+    return !NON_IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized);
+  });
 
 const isDelegationPlan = (input: SupervisorDelegationPlanInput | SupervisorDelegationPlan): input is SupervisorDelegationPlan => {
   return typeof (input as SupervisorDelegationPlan).supervisorLabel === "string"
@@ -142,7 +154,7 @@ export const validateSupervisorDelegationPlan = (
   const implementationAssignments = plan.assignments.filter((assignment) => hasImplementationResponsibility(assignment.responsibilities));
 
   for (const assignment of implementationAssignments) {
-    if (!isExecutionRole(assignment.role)) {
+    if (isManagerRole(assignment.role)) {
       violations.push(
         `Assignment '${assignment.agentLabel}' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.`
       );
