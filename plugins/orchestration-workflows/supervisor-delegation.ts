@@ -1,6 +1,9 @@
 import { getSupervisorPolicy, type SupervisorExecutionPolicy } from "./supervisor-config";
 import type { Role } from "./types";
 
+const EXECUTION_ROLES = Object.freeze(["DEV", "FE", "BE", "UX"] as const satisfies readonly Role[]);
+const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|fix|ship|deliver|write|develop|test|validate|patch|refactor)\b/i;
+
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;
   laneId?: string;
@@ -99,6 +102,11 @@ const normalizeIntegration = (input: SupervisorIntegrationAssignmentInput): Supe
   responsibilities: normalizeResponsibilities(input.responsibilities, "integration responsibility")
 });
 
+const isExecutionRole = (role: Role): boolean => (EXECUTION_ROLES as readonly Role[]).includes(role);
+
+const hasImplementationResponsibility = (responsibilities: readonly string[]): boolean => responsibilities
+  .some((responsibility) => IMPLEMENTATION_RESPONSIBILITY_REGEX.test(responsibility));
+
 const isDelegationPlan = (input: SupervisorDelegationPlanInput | SupervisorDelegationPlan): input is SupervisorDelegationPlan => {
   return typeof (input as SupervisorDelegationPlan).supervisorLabel === "string"
     && typeof (input as SupervisorDelegationPlan).directEditsRequested === "boolean"
@@ -129,6 +137,20 @@ export const validateSupervisorDelegationPlan = (
 
   if (plan.policy.requireDelegationLog && plan.assignments.length === 0) {
     violations.push("Supervisor execution requires at least one delegated assignment in the audit log.");
+  }
+
+  const implementationAssignments = plan.assignments.filter((assignment) => hasImplementationResponsibility(assignment.responsibilities));
+
+  for (const assignment of implementationAssignments) {
+    if (!isExecutionRole(assignment.role)) {
+      violations.push(
+        `Assignment '${assignment.agentLabel}' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.`
+      );
+    }
+  }
+
+  if (implementationAssignments.length > 0 && !plan.assignments.some((assignment) => isExecutionRole(assignment.role))) {
+    violations.push("Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment.");
   }
 
   if (plan.policy.requireAgentWorktreeBinding) {

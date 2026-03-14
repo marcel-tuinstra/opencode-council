@@ -95,4 +95,66 @@ describe("supervisor-delegation", () => {
       "Integration agent must stay distinct from implementation agents when dedicated integration is required."
     ]));
   });
+
+  it("rejects a CTO assignment that absorbs implementation work without an execution role", () => {
+    // Arrange
+    const input = {
+      assignments: [{
+        storyId: "sc-v1-boundary",
+        role: "CTO" as const,
+        agentLabel: "CTO",
+        worktreePath: "/tmp/wt-cto",
+        responsibilities: ["Implement the core workflow", "Run the tests"]
+      }],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'CTO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
+
+  it("allows a CTO assignment when implementation work is delegated to execution roles", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "CTO" as const,
+          agentLabel: "CTO",
+          worktreePath: "/tmp/wt-cto",
+          responsibilities: ["Define architecture", "Review technical risks"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "DEV" as const,
+          agentLabel: "DEV-A",
+          worktreePath: "/tmp/wt-dev",
+          responsibilities: ["Implement the core workflow", "Run the tests"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
 });
