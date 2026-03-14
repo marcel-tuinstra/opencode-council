@@ -21,7 +21,7 @@ const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature)\b/i,
   /\btest (the )?(fix|change|implementation|workflow|feature)\b/i
 ]);
-const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|test plan|review test plan|build the test plan|deliver roadmap|deliver messaging plan|develop roadmap|develop positioning|write release notes|validate architecture|validate scope)\b/i;
+const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|research|acceptance|risk|test plan|review test plan|build the test plan|deliver roadmap|deliver messaging plan|develop roadmap|develop positioning|write release notes|validate architecture|validate scope|document requirements)\b/i;
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;
