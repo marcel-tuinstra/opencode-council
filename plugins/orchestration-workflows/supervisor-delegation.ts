@@ -6,7 +6,6 @@ const MANAGER_ROLES = Object.freeze(["CEO", "CTO", "PM", "PO", "RESEARCH", "MARK
 const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|ship|write|deliver|write code|develop|patch|refactor|debug|wire up)\b/i;
 const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\bimplement\b/i,
-  /\bfix\b/i,
   /\bpatch\b/i,
   /\brefactor\b/i,
   /\bdebug\b/i,
@@ -18,10 +17,12 @@ const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\bdeliver (the )?(feature|fix|implementation|workflow|patch)\b/i,
   /\brun tests?\b/i,
   /\btest (the )?(release candidate|rc|fix|change|implementation|workflow|feature)\b/i,
+  /\btest (the )?(migration|api client|client|integration)\b/i,
   /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature)\b/i,
+  /\bvalidate (the )?(api client|client|integration|migration)\b/i,
   /\btest (the )?(fix|change|implementation|workflow|feature)\b/i
 ]);
-const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|research|acceptance|risk|test plan|review test plan|build the test plan|deliver roadmap|deliver messaging plan|develop roadmap|develop positioning|write release notes|validate architecture|validate scope|document requirements)\b/i;
+const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|review the fix|architecture|architect|scope|research|acceptance|risk|test plan|review test plan|build the test plan|deliver roadmap|deliver messaging plan|develop roadmap|develop positioning|write release notes|validate architecture|validate scope|document requirements)\b/i;
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;

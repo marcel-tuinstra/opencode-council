@@ -492,4 +492,67 @@ describe("supervisor-delegation", () => {
       "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
     ]));
   });
+
+  it("does not flag review phrasing when no execution work is present", () => {
+    // Arrange
+    const input = {
+      assignments: [{
+        storyId: "sc-v1-boundary",
+        role: "CTO" as const,
+        agentLabel: "CTO",
+        worktreePath: "/tmp/wt-cto",
+        responsibilities: ["Review the fix"]
+      }],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
+
+  it("rejects testing and validation phrasing when it targets executable artifacts", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Test the migration"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "CEO" as const,
+          agentLabel: "CEO",
+          worktreePath: "/tmp/wt-ceo",
+          responsibilities: ["Validate the API client"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'PM' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Assignment 'CEO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
 });
