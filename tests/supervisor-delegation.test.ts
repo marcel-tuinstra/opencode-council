@@ -334,6 +334,44 @@ describe("supervisor-delegation", () => {
     ]));
   });
 
+  it("rejects manager-owned execution phrasing for fix and release flow work", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "CTO" as const,
+          agentLabel: "CTO",
+          worktreePath: "/tmp/wt-cto",
+          responsibilities: ["Fix the release flow"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Ship the feature"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'CTO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Assignment 'PM' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
+
   it("rejects manager-owned execution phrasing for testing and api implementation work", () => {
     // Arrange
     const input = {

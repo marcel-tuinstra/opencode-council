@@ -3,26 +3,28 @@ import type { Role } from "./types";
 
 const EXECUTION_ROLES = Object.freeze(["DEV", "FE", "BE", "UX"] as const satisfies readonly Role[]);
 const MANAGER_ROLES = Object.freeze(["CEO", "CTO", "PM", "PO", "RESEARCH", "MARKETING"] as const satisfies readonly Role[]);
-const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|ship|write|deliver|write code|develop|patch|refactor|debug|wire up)\b/i;
-const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
-  /\bimplement\b/i,
-  /\bpatch\b/i,
-  /\brefactor\b/i,
-  /\bdebug\b/i,
-  /\bwire up\b/i,
-  /\bwrite (the )?(migration|feature|fix|patch|implementation|workflow)\b/i,
-  /\bwrite (the )?(api client|client|integration)\b/i,
-  /\bbuild (the )?(feature|implementation|workflow|api client|client|integration)\b/i,
-  /\bdevelop (the )?(feature|implementation|workflow|api client|client|integration)\b/i,
-  /\bdeliver (the )?(feature|fix|implementation|workflow|patch)\b/i,
+const IMPLEMENTATION_VERB_REGEX = /\b(implement|build|code|fix|ship|write|deliver|develop|patch|refactor|debug|wire up|test|validate|run)\b/i;
+const IMPLEMENTATION_TARGET_REGEX = /\b(feature|fix|workflow|implementation|migration|api client|client|integration|patch|release flow|release candidate|tests?|flow|generator)\b/i;
+const EXPLICIT_IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\brun tests?\b/i,
-  /\btest (the )?(release candidate|rc|fix|change|implementation|workflow|feature)\b/i,
-  /\btest (the )?(migration|api client|client|integration)\b/i,
-  /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature)\b/i,
-  /\bvalidate (the )?(api client|client|integration|migration)\b/i,
-  /\btest (the )?(fix|change|implementation|workflow|feature)\b/i
+  /\bwrite code\b/i,
+  /\bwire up\b/i,
+  /\btest (the )?(migration|api client|client|integration|release candidate|rc|fix|change|implementation|workflow|feature)\b/i,
+  /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature|api client|client|integration|migration)\b/i
 ]);
-const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|review the fix|architecture|architect|scope|research|acceptance|risk|test plan|review test plan|build the test plan|deliver roadmap|deliver messaging plan|develop roadmap|develop positioning|write release notes|validate architecture|validate scope|document requirements)\b/i;
+const NON_IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
+  /\breview the fix\b/i,
+  /\bbuild the test plan\b/i,
+  /\breview test plan\b/i,
+  /\bdeliver roadmap\b/i,
+  /\bdeliver messaging plan\b/i,
+  /\bdevelop roadmap\b/i,
+  /\bdevelop positioning\b/i,
+  /\bwrite release notes\b/i,
+  /\bvalidate architecture\b/i,
+  /\bvalidate scope\b/i,
+  /\bdocument requirements\b/i
+]);
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;
@@ -130,19 +132,19 @@ const hasImplementationResponsibility = (responsibilities: readonly string[]): b
   .some((responsibility) => {
     const normalized = responsibility.trim();
 
-    if (IMPLEMENTATION_PHRASE_REGEXES.some((regex) => regex.test(normalized))) {
+    if (EXPLICIT_IMPLEMENTATION_PHRASE_REGEXES.some((regex) => regex.test(normalized))) {
       return true;
     }
 
-    if (NON_IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized)) {
+    if (NON_IMPLEMENTATION_PHRASE_REGEXES.some((regex) => regex.test(normalized))) {
       return false;
     }
 
-    if (!IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized)) {
+    if (!IMPLEMENTATION_VERB_REGEX.test(normalized)) {
       return false;
     }
 
-    return true;
+    return IMPLEMENTATION_TARGET_REGEX.test(normalized);
   });
 
 const isDelegationPlan = (input: SupervisorDelegationPlanInput | SupervisorDelegationPlan): input is SupervisorDelegationPlan => {
