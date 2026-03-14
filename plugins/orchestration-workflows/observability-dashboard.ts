@@ -1,3 +1,4 @@
+import type { SupervisorThresholdEvent } from "./guardrail-thresholds";
 import type { BudgetGovernanceDecision, BudgetGovernanceStatus } from "./budget-governance";
 import type { LaneLifecycleState } from "./lane-lifecycle";
 import type { SupervisorReasonDetail } from "./reason-codes";
@@ -59,6 +60,16 @@ export type SupervisorPolicyDecision = {
   reasonDetails: readonly SupervisorReasonDetail[];
 };
 
+export type SupervisorThresholdEventInput = {
+  occurredAt: string;
+  event: SupervisorThresholdEvent;
+};
+
+export type SupervisorObservedThresholdEvent = SupervisorThresholdEvent & {
+  laneId: string;
+  occurredAt: string;
+};
+
 export type SupervisorEscalationEvent = {
   laneId: string;
   sessionId?: string;
@@ -77,6 +88,7 @@ export type SupervisorLaneObservabilityInput = {
   budgetEvaluatedAt?: string;
   ownershipTransitions?: readonly LaneTurnHandoffContract[];
   policyDecisions?: readonly SupervisorPolicyDecisionInput[];
+  thresholdEvents?: readonly SupervisorThresholdEventInput[];
 };
 
 export type SupervisorLaneObservabilitySnapshot = {
@@ -87,6 +99,7 @@ export type SupervisorLaneObservabilitySnapshot = {
   budget?: BudgetGovernanceDecision;
   ownershipTransitions: readonly LaneTurnHandoffContract[];
   policyDecisions: readonly SupervisorPolicyDecision[];
+  thresholdEvents: readonly SupervisorObservedThresholdEvent[];
 };
 
 export type SupervisorObservabilityDashboardInput = {
@@ -112,6 +125,7 @@ export type SupervisorObservabilityDashboardSnapshot = {
   lanes: readonly SupervisorLaneObservabilitySnapshot[];
   escalationEvents: readonly SupervisorEscalationEvent[];
   recentPolicyDecisions: readonly SupervisorPolicyDecision[];
+  recentThresholdEvents: readonly SupervisorObservedThresholdEvent[];
   recentOwnershipTransitions: readonly LaneTurnHandoffContract[];
 };
 
@@ -206,6 +220,15 @@ const normalizePolicyDecision = (
   reasonDetails: Object.freeze([...(input.reasonDetails ?? [])])
 });
 
+const normalizeThresholdEvent = (
+  laneId: string,
+  input: SupervisorThresholdEventInput
+): SupervisorObservedThresholdEvent => ({
+  ...input.event,
+  laneId: assertNonEmptyValue(laneId, "threshold event lane id"),
+  occurredAt: assertTimestamp(input.occurredAt, "threshold event timestamp")
+});
+
 const buildEscalationEvent = (
   laneId: string,
   session: SupervisorHeartbeatSnapshot | undefined,
@@ -257,6 +280,7 @@ export const createSupervisorObservabilityDashboard = (
 
   const escalationEvents: SupervisorEscalationEvent[] = [];
   const policyDecisions: SupervisorPolicyDecision[] = [];
+  const thresholdEvents: SupervisorObservedThresholdEvent[] = [];
   const ownershipTransitions: LaneTurnHandoffContract[] = [];
 
   const lanes = input.lanes.map((lane) => {
@@ -264,6 +288,15 @@ export const createSupervisorObservabilityDashboard = (
     const session = resolveHeartbeatHealth(generatedAt, lane.session);
     const blocker = normalizeBlocker(lane.blocker);
     const normalizedPolicyDecisions = (lane.policyDecisions ?? []).map(normalizePolicyDecision);
+    const normalizedThresholdEvents = [
+      ...((lane.budget && lane.budgetEvaluatedAt)
+        ? lane.budget.thresholdEvents.map((event) => normalizeThresholdEvent(laneId, {
+          occurredAt: lane.budgetEvaluatedAt as string,
+          event
+        }))
+        : []),
+      ...(lane.thresholdEvents ?? []).map((event) => normalizeThresholdEvent(laneId, event))
+    ];
     const normalizedOwnershipTransitions = [...(lane.ownershipTransitions ?? [])];
 
     totals.lanes += 1;
@@ -310,6 +343,7 @@ export const createSupervisorObservabilityDashboard = (
     }
 
     policyDecisions.push(...normalizedPolicyDecisions);
+    thresholdEvents.push(...normalizedThresholdEvents);
     ownershipTransitions.push(...normalizedOwnershipTransitions);
 
     return {
@@ -319,7 +353,8 @@ export const createSupervisorObservabilityDashboard = (
       blocker,
       budget: lane.budget,
       ownershipTransitions: normalizedOwnershipTransitions,
-      policyDecisions: normalizedPolicyDecisions
+      policyDecisions: normalizedPolicyDecisions,
+      thresholdEvents: normalizedThresholdEvents
     } satisfies SupervisorLaneObservabilitySnapshot;
   });
 
@@ -329,6 +364,7 @@ export const createSupervisorObservabilityDashboard = (
     lanes,
     escalationEvents: escalationEvents.sort(compareByTimestampDescending).slice(0, recentEventLimit),
     recentPolicyDecisions: policyDecisions.sort(compareByTimestampDescending).slice(0, recentEventLimit),
+    recentThresholdEvents: thresholdEvents.sort(compareByTimestampDescending).slice(0, recentEventLimit),
     recentOwnershipTransitions: ownershipTransitions.reverse().slice(0, recentEventLimit)
   };
 };

@@ -1,8 +1,14 @@
 import type { SupervisorApprovalRecord } from "./durable-state-store";
+import {
+  createSupervisorThresholdEventId,
+  type SupervisorThresholdEvent
+} from "./guardrail-thresholds";
+import { evaluateProtectedPathPolicy } from "./protected-path-policy";
 import { createSupervisorReasonDetail, type SupervisorReasonDetail } from "./reason-codes";
 import { getSupervisorPolicy } from "./supervisor-config";
 
 export type SupervisorApprovalBoundary =
+  | "write"
   | "merge"
   | "release"
   | "destructive"
@@ -56,6 +62,21 @@ export type SupervisorApprovalGateDecision = {
   approval: SupervisorApprovalRecord | null;
   reasons: readonly string[];
   reasonDetails: readonly SupervisorReasonDetail[];
+  decisionEvidence: {
+    boundary: SupervisorApprovalBoundary;
+    policyRequiresApproval: boolean;
+    requestOverrideApplied: boolean;
+    effectiveRequiresApproval: boolean;
+    changedPaths: readonly string[];
+    protectedPathOutcome: "allow" | "requires-human" | "deny";
+    protectedPaths: readonly string[];
+    deniedPaths: readonly string[];
+    protectedPathAuditExpectations: readonly string[];
+    targetRef?: string;
+    budgetUsagePercent?: number;
+    budgetThresholdPercent?: number;
+  };
+  thresholdEvents: readonly SupervisorThresholdEvent[];
 };
 
 const freezeList = <T>(items: readonly T[]): readonly T[] => Object.freeze([...items]);
@@ -121,6 +142,8 @@ const getBoundaryApprovalRequirement = (boundary: SupervisorApprovalBoundary): b
   const boundaries = getSupervisorPolicy().approvalGates.boundaries;
 
   switch (boundary) {
+    case "write":
+      return false;
     case "merge":
       return boundaries.merge;
     case "release":
@@ -157,7 +180,77 @@ export const evaluateSupervisorApprovalGate = (
   const summary = assertNonEmpty(input.request.summary, "approval summary");
   const rationale = assertNonEmpty(input.request.rationale, "approval rationale");
   const approvalId = resolveSupervisorApprovalId(laneId, input.request);
-  const requiresApproval = input.request.requiresApproval ?? getBoundaryApprovalRequirement(input.request.boundary);
+  const policyRequiresApproval = getBoundaryApprovalRequirement(input.request.boundary);
+  const normalizedContext = normalizeContext(input.request.context);
+  const protectedPathDecision = input.request.boundary === "merge" || input.request.boundary === "write"
+    ? evaluateProtectedPathPolicy(normalizedContext.changedPaths ?? freezeList([]))
+    : {
+        outcome: "allow" as const,
+        requiresHumanPaths: freezeList([]),
+        deniedPaths: freezeList([]),
+        auditExpectations: freezeList([]),
+        reasonDetails: freezeList([])
+      };
+  const requiresApproval = (input.request.requiresApproval ?? policyRequiresApproval)
+    || protectedPathDecision.outcome === "requires-human"
+    || protectedPathDecision.outcome === "deny";
+  const decisionEvidence = Object.freeze({
+    boundary: input.request.boundary,
+    policyRequiresApproval,
+    requestOverrideApplied: input.request.requiresApproval !== undefined,
+    effectiveRequiresApproval: requiresApproval,
+    changedPaths: normalizedContext.changedPaths ?? freezeList([]),
+    protectedPathOutcome: protectedPathDecision.outcome,
+    protectedPaths: protectedPathDecision.requiresHumanPaths,
+    deniedPaths: protectedPathDecision.deniedPaths,
+    protectedPathAuditExpectations: protectedPathDecision.auditExpectations,
+    targetRef: normalizedContext.targetRef,
+    budgetUsagePercent: normalizedContext.budgetUsagePercent,
+    budgetThresholdPercent: normalizedContext.budgetThresholdPercent
+  });
+  const thresholdEvidence = Object.freeze({
+    boundary: input.request.boundary,
+    policyRequiresApproval,
+    requestOverrideApplied: input.request.requiresApproval !== undefined,
+    effectiveRequiresApproval: requiresApproval,
+    changedPaths: normalizedContext.changedPaths ?? freezeList([]),
+    protectedPathOutcome: protectedPathDecision.outcome,
+    protectedPaths: protectedPathDecision.requiresHumanPaths,
+    deniedPaths: protectedPathDecision.deniedPaths,
+    protectedPathAuditExpectations: protectedPathDecision.auditExpectations,
+    ...(normalizedContext.targetRef ? { targetRef: normalizedContext.targetRef } : {}),
+    ...(normalizedContext.budgetUsagePercent !== undefined ? { budgetUsagePercent: normalizedContext.budgetUsagePercent } : {}),
+    ...(normalizedContext.budgetThresholdPercent !== undefined
+      ? { budgetThresholdPercent: normalizedContext.budgetThresholdPercent }
+      : {})
+  });
+  const thresholdEvents = freezeList([
+    Object.freeze({
+      eventId: createSupervisorThresholdEventId(
+        "approval-gates",
+        laneId,
+        input.request.boundary,
+        requiresApproval,
+        input.request.requestedAction
+      ),
+      guardrail: "approval-gates",
+      thresholdKey: `${input.request.boundary}-boundary`,
+      status: requiresApproval ? "triggered" : "within-threshold",
+      thresholdValue: policyRequiresApproval,
+      observedValue: requiresApproval,
+      reasonCode: protectedPathDecision.outcome === "deny"
+        ? "approval.protected-path-denied"
+        : protectedPathDecision.outcome === "requires-human"
+          ? "approval.protected-path-review"
+          : requiresApproval
+            ? "approval.governance-boundary"
+            : undefined,
+      summary: requiresApproval
+        ? `Approval is required at the ${input.request.boundary} governance boundary for ${requestedAction}.`
+        : `Approval is not required at the ${input.request.boundary} governance boundary for ${requestedAction}.`,
+      evidence: thresholdEvidence
+    } satisfies SupervisorThresholdEvent)
+  ]);
 
   if (!requiresApproval) {
     return {
@@ -167,11 +260,13 @@ export const evaluateSupervisorApprovalGate = (
       nextAction: "continue",
       approval: null,
       reasons: freezeList(["Action stays inside the configured autonomous guardrails."]),
-      reasonDetails: freezeList([])
+      reasonDetails: freezeList([]),
+      decisionEvidence,
+      thresholdEvents
     };
   }
 
-  const context = normalizeContext(input.request.context);
+  const context = normalizedContext;
   const existingApproval = input.existingApproval;
 
   if (existingApproval && existingApproval.approvalId !== approvalId) {
@@ -205,14 +300,23 @@ export const evaluateSupervisorApprovalGate = (
       nextAction: status === "approved" ? "continue" : "pause",
       approval: Object.freeze({ ...baseApproval, status, updatedAt: existingApproval?.updatedAt ?? occurredAt }),
       reasons: freezeList([
-        `Human approval is required at the ${input.request.boundary} governance boundary before ${requestedAction}.`
+        protectedPathDecision.outcome === "deny"
+          ? "Protected-path policy denied these paths, so automation stays paused and requires human follow-up."
+          : protectedPathDecision.outcome === "requires-human"
+            ? "Protected-path policy requires a documented human exception before this action can continue."
+            : `Human approval is required at the ${input.request.boundary} governance boundary before ${requestedAction}.`
       ]),
       reasonDetails: freezeList([
+        ...(protectedPathDecision.outcome === "allow"
+          ? []
+          : protectedPathDecision.reasonDetails),
         createSupervisorReasonDetail("approval.governance-boundary", {
           path: input.request.boundary,
           actionReason: requestedAction
         })
-      ])
+      ]),
+      decisionEvidence,
+      thresholdEvents
     };
   }
 
@@ -240,7 +344,9 @@ export const evaluateSupervisorApprovalGate = (
           path: input.request.boundary,
           actionReason: requestedAction
         })
-      ])
+      ]),
+      decisionEvidence,
+      thresholdEvents
     };
   }
 
@@ -263,6 +369,8 @@ export const evaluateSupervisorApprovalGate = (
         path: input.request.boundary,
         actionReason: requestedAction
       })
-    ])
+    ]),
+    decisionEvidence,
+    thresholdEvents
   };
 };

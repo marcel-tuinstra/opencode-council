@@ -18,6 +18,9 @@ import { normalizeWorkUnit } from "../plugins/orchestration-workflows/work-unit"
 const threadTargets: Record<Role, number> = {
   CTO: 2,
   DEV: 1,
+  FE: 0,
+  BE: 0,
+  UX: 0,
   PO: 0,
   PM: 0,
   CEO: 0,

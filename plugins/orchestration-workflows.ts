@@ -11,6 +11,28 @@ export type {
   SupervisorRoutingIntentProfileInput
 } from "./orchestration-workflows/supervisor-config";
 export type {
+  CreateSupervisorDispatchPlanInput,
+  SupervisorDispatchPlanResult,
+  SupervisorDispatchPlanStatus
+} from "./orchestration-workflows/supervisor-dispatch-planning";
+export type {
+  LaneCompletionContract,
+  LaneCompletionContractInput,
+  LaneCompletionHandoffEvaluation,
+  LaneCompletionHandoffOutcome,
+  LaneCompletionStatus,
+  LaneContractVersion,
+  LaneContractViolation,
+  LaneOutputArtifact,
+  LaneOutputArtifactInput,
+  LaneOutputArtifactKind
+} from "./orchestration-workflows/lane-contract";
+export type {
+  DecomposeSupervisorGoalIntoLanesInput,
+  SupervisorLaneDecompositionResult,
+  SupervisorLaneDecompositionStatus
+} from "./orchestration-workflows/lane-decomposition";
+export type {
   PlanSupervisorGoalInput,
   PlanSupervisorGoalResult,
   SupervisorGoalBudgetClass,
@@ -46,6 +68,13 @@ export type {
   BudgetGovernanceStatus,
   BudgetGovernanceThreshold
 } from "./orchestration-workflows/budget-governance";
+export type {
+  SupervisorGuardrailArea,
+  SupervisorThresholdEvent,
+  SupervisorThresholdEvidence,
+  SupervisorThresholdEvidenceValue,
+  SupervisorThresholdObservedValue
+} from "./orchestration-workflows/guardrail-thresholds";
 export type {
   AdHocRunArtifactKind,
   AdHocRunArtifactLink,
@@ -206,6 +235,50 @@ export type {
   SupervisorPolicyDecisionCategory,
   SupervisorPolicyDecisionInput
 } from "./orchestration-workflows/observability-dashboard";
+export type {
+  AdvanceSupervisorRunInput,
+  AdvanceSupervisorRunResult,
+  BootstrapSupervisorRunInput,
+  BootstrapSupervisorRunResult,
+  BuildSupervisorRunSummaryInput,
+  CreateSupervisorExecutionWorkflowOptions,
+  PrepareSupervisorReviewBundlesInput,
+  ReconstructSupervisorRunResult,
+  SupervisorLaneStateTransition,
+  SupervisorRunSummary,
+  SupervisorWorkflowEvent,
+  SupervisorWorkflowNextAction,
+  SupervisorWorkflowStage,
+  SupervisorWorkflowStageStatus
+} from "./orchestration-workflows/supervisor-execution-workflow";
+export type {
+  CreateSupervisorDataLifecycleReportInput,
+  SupervisorAdHocRunLifecycleInput,
+  SupervisorDataLifecyclePolicy,
+  SupervisorDataLifecycleRecommendation,
+  SupervisorDataLifecycleReport,
+  SupervisorDataLifecycleStage,
+  SupervisorDurableRunLifecycleInput,
+  SupervisorLifecycleAssessment,
+  SupervisorLifecycleInventory,
+  SupervisorLifecyclePolicyWindow,
+  SupervisorLifecycleRecordType
+} from "./orchestration-workflows/data-lifecycle";
+export {
+  createSupervisorDispatchPlan
+} from "./orchestration-workflows/supervisor-dispatch-planning";
+export {
+  createSupervisorBootstrapPreview
+} from "./orchestration-workflows/supervisor-bootstrap";
+export {
+  assertValidLaneCompletionContract,
+  createLaneCompletionContract,
+  evaluateLaneCompletionContract,
+  validateLaneCompletionContract
+} from "./orchestration-workflows/lane-contract";
+export {
+  decomposeSupervisorGoalIntoLanes
+} from "./orchestration-workflows/lane-decomposition";
 export {
   planSupervisorGoal
 } from "./orchestration-workflows/supervisor-goal-plan";
@@ -272,6 +345,13 @@ export {
   createSupervisorObservabilityDashboard,
   resolveHeartbeatHealth
 } from "./orchestration-workflows/observability-dashboard";
+export {
+  createSupervisorExecutionWorkflow
+} from "./orchestration-workflows/supervisor-execution-workflow";
+export {
+  createSupervisorDataLifecycleReport,
+  DEFAULT_SUPERVISOR_DATA_LIFECYCLE_POLICY
+} from "./orchestration-workflows/data-lifecycle";
 export {
   createAdHocRunHistoryRecord,
   linkAdHocRunArtifact

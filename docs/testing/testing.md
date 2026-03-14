@@ -14,6 +14,7 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` runs these tests on No
 ## Role Parsing
 
 - `@cto @dev` should detect both roles and produce thread mode.
+- `@fe @ux` should detect frontend build plus UX review roles.
 - Mentions inside code (inline or fenced) should be ignored.
 - File references like `@INSTALL.md` should be ignored.
 - Marker payload (`<<ORCHESTRATION_WORKFLOWS:CTO,DEV>>`) should restore roles.
@@ -21,7 +22,9 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` runs these tests on No
 
 ## Intent and Turn Planning
 
-- Backend prompts should favor `CTO` and `DEV` airtime.
+- Full-stack implementation prompts should favor `DEV` when no specialist role is explicitly requested.
+- Backend prompts should favor `CTO` and `BE` airtime.
+- Frontend prompts should favor `FE` with meaningful `UX` participation.
 - Marketing prompts should favor `MARKETING` and `CEO` airtime.
 - Single-role prompts should remain direct prose.
 - Multi-role prompts should start and end with the lead role.
@@ -51,6 +54,14 @@ Use these prompts after restarting OpenCode:
 ```
 
 ```text
+@cto @be @pm Investigate API latency regressions from this week and produce a fix plan.
+```
+
+```text
+@fe @ux Review the onboarding UI, tighten spacing, and call out usability issues before implementation.
+```
+
+```text
 @dev This week we saw fresh production incidents; investigate with sentry and github and propose a mitigation.
 ```
 
@@ -61,3 +72,11 @@ Use these prompts after restarting OpenCode:
 ```text
 @research Compare approaches and list evidence with confidence and open questions.
 ```
+
+## Specialist boundary regression
+
+Run the dedicated specialist sanity script whenever role routing, aliases, or agent prompts change:
+
+- [`role-sanity-script.md`](./role-sanity-script.md)
+
+This script verifies refusal quality, reroute accuracy, ownership clarity, and supervisor purity across `DEV`, `FE`, `BE`, and `UX`.

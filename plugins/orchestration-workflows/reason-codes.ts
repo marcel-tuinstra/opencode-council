@@ -6,6 +6,7 @@ export type SupervisorReasonCategory =
   | "fallback"
   | "budget-escalation"
   | "approval-pause"
+  | "governance-policy"
   | "blocked-action";
 
 export type SupervisorReasonCode =
@@ -32,9 +33,15 @@ export type SupervisorReasonCode =
   | "approval.blocked-path-review"
   | "approval.eligible-path-review"
   | "approval.auto-merge-allowed"
+  | "approval.protected-path-review"
+  | "approval.protected-path-denied"
+  | "approval.protected-path-allowed"
   | "approval.governance-boundary"
   | "approval.resume-approved"
   | "approval.rejected-hold"
+  | "governance.explicit-policy"
+  | "governance.policy-default"
+  | "governance.policy-missing"
   | "blocked.missing-mcp-provider"
   | "blocked.mcp-access";
 
@@ -58,6 +65,7 @@ type SupervisorReasonContext = {
   laneId?: string;
   owner?: string;
   confidence?: string;
+  policyId?: string;
 };
 
 const formatRoleList = (roles: readonly Role[]): string => roles.join(", ");
@@ -267,6 +275,27 @@ export const createSupervisorReasonDetail = (
         short: "Auto-merge checks passed.",
         explanation: "Allowed auto-merge because criticality, path, and opt-in policy checks all passed."
       };
+    case "approval.protected-path-review":
+      return {
+        code,
+        category: "approval-pause",
+        short: "Protected paths need review.",
+        explanation: "Paused for human approval because one or more changed paths matched a protected-path rule that requires review and audit evidence."
+      };
+    case "approval.protected-path-denied":
+      return {
+        code,
+        category: "blocked-action",
+        short: "Protected paths denied.",
+        explanation: "Blocked the action because one or more changed paths matched a protected-path rule that does not allow autonomous writes or merges."
+      };
+    case "approval.protected-path-allowed":
+      return {
+        code,
+        category: "approval-pause",
+        short: "Protected-path checks passed.",
+        explanation: "Allowed the action because every changed path stayed inside the currently allowed protected-path policy scope."
+      };
     case "approval.governance-boundary": {
       const boundary = context.path ?? "governance";
       const action = context.actionReason ?? "the requested action";
@@ -295,6 +324,37 @@ export const createSupervisorReasonDetail = (
         category: "approval-pause",
         short: "Approval rejected.",
         explanation: `Kept execution paused because human review rejected ${action} at the ${boundary} governance boundary.`
+      };
+    }
+    case "governance.explicit-policy": {
+      const checkpoint = context.path ?? "checkpoint";
+      const outcome = context.actionReason ?? "accept";
+      const ruleSummary = context.policyId ? ` Matched rules: ${context.policyId}.` : "";
+      return {
+        code,
+        category: "governance-policy",
+        short: "Explicit governance policy matched.",
+        explanation: `Applied explicit governance policy at ${checkpoint} and routed the checkpoint to ${outcome}.${ruleSummary}`.trim()
+      };
+    }
+    case "governance.policy-default": {
+      const checkpoint = context.path ?? "checkpoint";
+      const outcome = context.actionReason ?? "accept";
+      return {
+        code,
+        category: "governance-policy",
+        short: "Checkpoint default applied.",
+        explanation: `No explicit governance rule matched at ${checkpoint}, so the configured default routed the checkpoint to ${outcome}.`
+      };
+    }
+    case "governance.policy-missing": {
+      const checkpoint = context.path ?? "checkpoint";
+      const outcome = context.actionReason ?? "accept";
+      return {
+        code,
+        category: "governance-policy",
+        short: "Governance policy missing.",
+        explanation: `No governance policy is configured for ${checkpoint}, so the evaluator failed open to ${outcome} and recorded a warning.`
       };
     }
     case "blocked.missing-mcp-provider": {

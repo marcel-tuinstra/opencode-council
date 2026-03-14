@@ -4,10 +4,15 @@ import {
   resolveBudgetGovernancePolicy
 } from "../plugins/orchestration-workflows/budget-governance";
 import {
+  evaluateSupervisorApprovalGate,
+} from "../plugins/orchestration-workflows/approval-gates";
+import {
   createSupervisorObservabilityDashboard,
   resolveHeartbeatHealth
 } from "../plugins/orchestration-workflows/observability-dashboard";
+import { routeSupervisorWorkUnit } from "../plugins/orchestration-workflows/supervisor-routing";
 import { createLaneTurnHandoffContract } from "../plugins/orchestration-workflows/turn-ownership";
+import { normalizeWorkUnit } from "../plugins/orchestration-workflows/work-unit";
 
 describe("observability-dashboard", () => {
   it("aggregates lane, heartbeat, blocker, budget, policy, and ownership signals into one snapshot", () => {
@@ -55,6 +60,31 @@ describe("observability-dashboard", () => {
       scope: "step",
       usedTokens: 3400,
       budgetTokens: 2800
+    });
+    const approvalDecision = evaluateSupervisorApprovalGate({
+      laneId: "lane-2",
+      actor: "supervisor",
+      occurredAt: "2026-03-12T11:59:35.000Z",
+      request: {
+        boundary: "budget-exception",
+        requestedAction: "continue the lane despite the overrun",
+        summary: "Budget crossed the escalation threshold.",
+        rationale: "The lane needs an explicit human checkpoint before it keeps spending.",
+        context: {
+          budgetUsagePercent: escalationDecision.usagePercent,
+          budgetThresholdPercent: escalationDecision.decisionEvidence.escalationThresholdPercent
+        }
+      }
+    });
+    const routingDecision = routeSupervisorWorkUnit({
+      workUnitId: "wu-low-confidence",
+      workUnit: normalizeWorkUnit({
+        objective: "General follow-up",
+        source: {
+          kind: "ad-hoc",
+          title: "General follow-up"
+        }
+      })
     });
 
     // Act
@@ -118,6 +148,16 @@ describe("observability-dashboard", () => {
               outcome: "dev-reentry-approved",
               occurredAt: "2026-03-12T11:58:40.000Z"
             }
+          ],
+          thresholdEvents: [
+            {
+              occurredAt: "2026-03-12T11:59:35.000Z",
+              event: approvalDecision.thresholdEvents[0]!
+            },
+            {
+              occurredAt: "2026-03-12T11:58:20.000Z",
+              event: routingDecision.thresholdEvents[0]!
+            }
           ]
         },
         {
@@ -180,6 +220,43 @@ describe("observability-dashboard", () => {
       "turn-ownership",
       "review-ready-packet",
       "lane-lifecycle"
+    ]);
+    expect(snapshot.recentThresholdEvents.map((event) => ({
+      laneId: event.laneId,
+      thresholdKey: event.thresholdKey,
+      reasonCode: event.reasonCode,
+      occurredAt: event.occurredAt
+    }))).toEqual([
+      {
+        laneId: "lane-2",
+        thresholdKey: "step-warning-percent",
+        reasonCode: "budget.warning-threshold",
+        occurredAt: "2026-03-12T11:59:55.000Z"
+      },
+      {
+        laneId: "lane-2",
+        thresholdKey: "step-warning-percent",
+        reasonCode: "budget.warning-threshold",
+        occurredAt: "2026-03-12T11:59:55.000Z"
+      },
+      {
+        laneId: "lane-2",
+        thresholdKey: "step-escalation-percent",
+        reasonCode: "budget.escalation-required",
+        occurredAt: "2026-03-12T11:59:55.000Z"
+      },
+      {
+        laneId: "lane-2",
+        thresholdKey: "budget-exception-boundary",
+        reasonCode: "approval.governance-boundary",
+        occurredAt: "2026-03-12T11:59:35.000Z"
+      },
+      {
+        laneId: "lane-2",
+        thresholdKey: "minimum-signal-score",
+        reasonCode: "fallback.low-confidence",
+        occurredAt: "2026-03-12T11:58:20.000Z"
+      }
     ]);
     expect(snapshot.recentOwnershipTransitions.map((handoff) => handoff.deltaSummary)).toEqual([
       "Lane 2 returned to development for blocker cleanup.",

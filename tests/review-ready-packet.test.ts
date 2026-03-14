@@ -37,6 +37,38 @@ const buildPacket = (): ReviewReadyEvidencePacketInput => ({
     nextRequiredEvidence: ["Review the packet helper output alongside the new tests."],
     evidenceAttached: ["tests/review-ready-packet.test.ts"]
   },
+  laneOutput: {
+    runId: "run-440",
+    laneId: "lane-7",
+    status: "ready" as const,
+    handoff: {
+      laneId: "lane-7",
+      currentOwner: "DEV",
+      nextOwner: "REVIEWER",
+      transferScope: "review" as const,
+      transferTrigger: "Implementation and targeted validation are complete.",
+      deltaSummary: "Added typed review-ready packet enforcement and tests.",
+      risks: ["Downstream lifecycle callers must supply the packet before moving a lane to review-ready."],
+      nextRequiredEvidence: ["Review the packet helper output alongside the new tests."],
+      evidenceAttached: ["tests/review-ready-packet.test.ts"]
+    },
+    artifacts: [
+      {
+        laneId: "lane-7",
+        kind: "branch" as const,
+        uri: "refs/heads/marceltuinstra/sc-440-lane-contract",
+        label: "Lane branch"
+      },
+      {
+        laneId: "lane-7",
+        kind: "review-packet" as const,
+        uri: "docs/review-packets/run-440-lane-7.md",
+        label: "Review packet"
+      }
+    ],
+    evidence: ["npm test"],
+    producedAt: "2026-03-13T13:00:00.000Z"
+  },
   ownership: {
     reviewerOwner: "REVIEWER",
     mergeOwner: "Marcel Tuinstra",
@@ -61,6 +93,8 @@ describe("review-ready-packet", () => {
       "Rollback by removing the helper export if downstream callers are not ready to adopt the guard yet."
     ]);
     expect(packet.handoff.nextOwner).toBe("REVIEWER");
+    expect(packet.laneOutput?.artifacts).toHaveLength(2);
+    expect(packet.handoffValidation.outcome).toBe("accepted");
     expect(packet.ownership).toEqual({
       reviewerOwner: "REVIEWER",
       mergeOwner: "Marcel Tuinstra",
@@ -85,6 +119,64 @@ describe("review-ready-packet", () => {
       ...buildPacket(),
       scopedDiffSummary: []
     })).toThrow("Review-ready evidence packet requires at least one scoped diff summary item.");
+  });
+
+  it("blocks review-ready packets when the lane output handoff drifts from the packet handoff", () => {
+    // Arrange
+
+    // Act / Assert
+    expect(() => createReviewReadyEvidencePacket({
+      ...buildPacket(),
+      laneOutput: {
+        ...buildPacket().laneOutput!,
+        handoff: {
+          ...buildPacket().laneOutput!.handoff,
+          nextOwner: "PM"
+        }
+      }
+    })).toThrow("Review-ready evidence packet requires laneOutput.handoff to match the explicit handoff contract.");
+  });
+
+  it("marks review-ready packets for escalation when the reviewer owner mismatches the handoff owner", () => {
+    // Arrange
+
+    // Act
+    const packet = createReviewReadyEvidencePacket({
+      ...buildPacket(),
+      ownership: {
+        ...buildPacket().ownership,
+        reviewerOwner: "PM"
+      }
+    });
+
+    // Assert
+    expect(packet.handoffValidation.outcome).toBe("escalate");
+    expect(packet.handoffValidation.violations[0]?.code).toBe("review-owner-mismatch");
+  });
+
+  it("keeps invalid lane output attached so repair flows can inspect the submitted evidence", () => {
+    // Arrange
+
+    // Act
+    const packet = createReviewReadyEvidencePacket({
+      ...buildPacket(),
+      laneOutput: {
+        ...buildPacket().laneOutput!,
+        artifacts: [
+          {
+            laneId: "lane-7",
+            kind: "branch",
+            uri: "refs/heads/marceltuinstra/sc-440-lane-contract",
+            label: "Lane branch"
+          }
+        ]
+      }
+    });
+
+    // Assert
+    expect(packet.laneOutput?.artifacts).toHaveLength(1);
+    expect(packet.handoffValidation.outcome).toBe("repair");
+    expect(packet.handoffValidation.violations.map((violation) => violation.code)).toEqual(["missing-review-packet-artifact"]);
   });
 
   it("allows non-review-ready transitions without a packet", () => {

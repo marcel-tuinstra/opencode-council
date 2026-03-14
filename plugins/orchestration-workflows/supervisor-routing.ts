@@ -1,4 +1,8 @@
 import type { SupervisorRunState } from "./durable-state-store";
+import {
+  createSupervisorThresholdEventId,
+  type SupervisorThresholdEvent
+} from "./guardrail-thresholds";
 import { detectIntent } from "./intent";
 import type { SupervisorReasonCode, SupervisorReasonDetail } from "./reason-codes";
 import { createSupervisorReasonDetail } from "./reason-codes";
@@ -40,6 +44,14 @@ export type RouteSupervisorWorkUnitResult = {
   missingPrerequisites: readonly string[];
   reasonDetails: readonly SupervisorReasonDetail[];
   reasons: readonly string[];
+  decisionEvidence: {
+    signalScore: number;
+    minimumSignalScore: number;
+    matchedSignals: readonly string[];
+    fallbackTriggered: boolean;
+    fallbackReason: "missing-prerequisites" | "low-confidence" | "none";
+  };
+  thresholdEvents: readonly SupervisorThresholdEvent[];
 };
 
 const freezeList = <T>(items: readonly T[]): readonly T[] => Object.freeze([...items]);
@@ -90,26 +102,34 @@ const scoreRoutingSignals = (
   workUnit: WorkUnit,
   intent: ReturnType<typeof detectIntent>,
   laneDefinition?: SupervisorLaneDefinition
-): number => {
+): { score: number; matchedSignals: readonly string[] } => {
   let score = 0;
+  const matchedSignals: string[] = [];
 
   if (intent !== "mixed") {
     score += 1;
+    matchedSignals.push("intent-profile");
   }
 
   if (workUnit.source.kind === "tracker") {
     score += 1;
+    matchedSignals.push("tracked-source");
   }
 
   if (workUnit.acceptanceCriteria.length > 0) {
     score += 1;
+    matchedSignals.push("acceptance-criteria");
   }
 
   if (laneDefinition) {
     score += 1;
+    matchedSignals.push("planned-lane");
   }
 
-  return score;
+  return {
+    score,
+    matchedSignals: freezeList(matchedSignals)
+  };
 };
 
 const stableIndexFromText = (text: string, size: number): number => {
@@ -204,8 +224,8 @@ export const routeSupervisorWorkUnit = (input: RouteSupervisorWorkUnitInput): Ro
   const intent = detectIntent(buildRoutingText(input.workUnit));
   const profile = policy.intentProfiles[intent];
   const missingPrerequisites = getMissingPrerequisites(input.workUnit, input.readyDependencyReferences);
-  const confidenceScore = scoreRoutingSignals(input.workUnit, intent, laneDefinition);
-  const confidence = resolveConfidence(confidenceScore, policy.minimumSignalScore);
+  const routingSignals = scoreRoutingSignals(input.workUnit, intent, laneDefinition);
+  const confidence = resolveConfidence(routingSignals.score, policy.minimumSignalScore);
   const fallbackActive = missingPrerequisites.length > 0 || confidence === "low";
   const executionPath: SupervisorExecutionPath = fallbackActive ? "safe-hold" : profile.path;
   const leadRole = fallbackActive ? profile.fallbackLeadRole : profile.leadRole;
@@ -213,6 +233,38 @@ export const routeSupervisorWorkUnit = (input: RouteSupervisorWorkUnitInput): Ro
   const assignment = selectAssignedOwner(input, laneId);
   const nextAction = resolveNextAction(input, laneId, missingPrerequisites, confidence);
   const reasonDetails: SupervisorReasonDetail[] = [];
+  const fallbackReason = missingPrerequisites.length > 0
+    ? "missing-prerequisites"
+    : confidence === "low"
+      ? "low-confidence"
+      : "none";
+  const decisionEvidence = Object.freeze({
+    signalScore: routingSignals.score,
+    minimumSignalScore: policy.minimumSignalScore,
+    matchedSignals: routingSignals.matchedSignals,
+    fallbackTriggered: fallbackActive,
+    fallbackReason
+  });
+  const thresholdEvents = freezeList([
+    Object.freeze({
+      eventId: createSupervisorThresholdEventId(
+        "routing",
+        input.workUnitId,
+        policy.minimumSignalScore,
+        routingSignals.score
+      ),
+      guardrail: "routing",
+      thresholdKey: "minimum-signal-score",
+      status: confidence === "low" ? "triggered" : "within-threshold",
+      thresholdValue: policy.minimumSignalScore,
+      observedValue: routingSignals.score,
+      reasonCode: confidence === "low" ? "fallback.low-confidence" : undefined,
+      summary: confidence === "low"
+        ? `Routing signal score ${routingSignals.score} stayed below the minimum score ${policy.minimumSignalScore}.`
+        : `Routing signal score ${routingSignals.score} met the minimum score ${policy.minimumSignalScore}.`,
+      evidence: decisionEvidence
+    } satisfies SupervisorThresholdEvent)
+  ]);
 
   if (fallbackActive) {
     if (missingPrerequisites.length > 0) {
@@ -255,6 +307,8 @@ export const routeSupervisorWorkUnit = (input: RouteSupervisorWorkUnitInput): Ro
     nextAction,
     missingPrerequisites,
     reasonDetails: freezeList(reasonDetails),
-    reasons: freezeList(reasonDetails.map((detail) => detail.explanation))
+    reasons: freezeList(reasonDetails.map((detail) => detail.explanation)),
+    decisionEvidence,
+    thresholdEvents
   };
 };

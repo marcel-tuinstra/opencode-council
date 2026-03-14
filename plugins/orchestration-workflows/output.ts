@@ -132,6 +132,9 @@ export const normalizeThreadOutput = (text: string, roles: Role[], targets: Reco
   const counts: Record<Role, number> = {
     CTO: 0,
     DEV: 0,
+    FE: 0,
+    BE: 0,
+    UX: 0,
     PO: 0,
     PM: 0,
     CEO: 0,

@@ -5,6 +5,39 @@ import type { Intent, Role } from "./types";
 
 type RepoRiskTier = "small-high-risk" | "medium-moderate-risk" | "large-mature";
 type MergeMode = "manual" | "auto-merge";
+export type SupervisorGovernancePolicyOutcome = "accept" | "repair" | "escalate" | "block";
+
+export type SupervisorGovernanceCheckpointRuleInput = {
+  ruleId: string;
+  description?: string;
+  match?: {
+    violationCodes?: string[];
+    violationFields?: string[];
+  };
+  outcome: SupervisorGovernancePolicyOutcome;
+};
+
+export type SupervisorGovernanceCheckpointRule = {
+  ruleId: string;
+  description?: string;
+  match: {
+    violationCodes: readonly string[];
+    violationFields: readonly string[];
+  };
+  outcome: SupervisorGovernancePolicyOutcome;
+};
+
+export type SupervisorGovernanceCheckpointPolicyInput = {
+  checkpoint: string;
+  defaultOutcome?: SupervisorGovernancePolicyOutcome;
+  rules?: SupervisorGovernanceCheckpointRuleInput[];
+};
+
+export type SupervisorGovernanceCheckpointPolicy = {
+  checkpoint: string;
+  defaultOutcome: SupervisorGovernancePolicyOutcome;
+  rules: readonly SupervisorGovernanceCheckpointRule[];
+};
 
 export type SupervisorProviderPatternInput = {
   key: string;
@@ -32,6 +65,54 @@ export type SupervisorRoutingIntentProfile = {
   path: SupervisorExecutionPath;
   leadRole: Role;
   fallbackLeadRole: Role;
+};
+
+export type SupervisorExecutionMode = "delegate-only" | "delegate-with-manual-override";
+
+export type SupervisorExecutionPolicyInput = {
+  mode?: SupervisorExecutionMode;
+  allowSupervisorDirectEdits?: boolean;
+  requireDelegationLog?: boolean;
+  requireAgentWorktreeBinding?: boolean;
+  requireDedicatedIntegrationAgent?: boolean;
+  integrationAgentLabel?: string;
+};
+
+export type SupervisorExecutionPolicy = {
+  mode: SupervisorExecutionMode;
+  allowSupervisorDirectEdits: boolean;
+  requireDelegationLog: boolean;
+  requireAgentWorktreeBinding: boolean;
+  requireDedicatedIntegrationAgent: boolean;
+  integrationAgentLabel: string;
+};
+
+export type SupervisorProtectedPathOutcome = "allow" | "requires-human" | "deny";
+
+export type SupervisorProtectedPathRuleInput = {
+  ruleId: string;
+  description?: string;
+  pathPrefixes?: readonly string[];
+  outcome: SupervisorProtectedPathOutcome;
+  auditExpectation?: string;
+};
+
+export type SupervisorProtectedPathRule = {
+  ruleId: string;
+  description?: string;
+  pathPrefixes: readonly string[];
+  outcome: SupervisorProtectedPathOutcome;
+  auditExpectation?: string;
+};
+
+export type SupervisorProtectedPathPolicyInput = {
+  defaultOutcome?: SupervisorProtectedPathOutcome;
+  rules?: SupervisorProtectedPathRuleInput[];
+};
+
+export type SupervisorProtectedPathPolicy = {
+  defaultOutcome: SupervisorProtectedPathOutcome;
+  rules: readonly SupervisorProtectedPathRule[];
 };
 
 export type SupervisorPolicyDiagnostics = {
@@ -95,6 +176,11 @@ export type SupervisorPolicyInput = {
   routing?: {
     minimumSignalScore?: number;
     intentProfiles?: Partial<Record<Intent, SupervisorRoutingIntentProfileInput>>;
+  };
+  execution?: SupervisorExecutionPolicyInput;
+  protectedPaths?: SupervisorProtectedPathPolicyInput;
+  governance?: {
+    checkpoints?: SupervisorGovernanceCheckpointPolicyInput[];
   };
   compaction?: Partial<Record<Intent, {
     triggerTokens?: number;
@@ -160,6 +246,11 @@ export type ResolvedSupervisorPolicy = {
     minimumSignalScore: number;
     intentProfiles: Record<Intent, SupervisorRoutingIntentProfile>;
   };
+  execution: SupervisorExecutionPolicy;
+  protectedPaths: SupervisorProtectedPathPolicy;
+  governance: {
+    checkpoints: readonly SupervisorGovernanceCheckpointPolicy[];
+  };
   compaction: Record<Intent, {
     triggerTokens: number;
     targetTokens: number;
@@ -199,6 +290,21 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
     cto: "CTO",
     dev: "DEV",
     developer: "DEV",
+    engineer: "DEV",
+    fullstack: "DEV",
+    "full-stack": "DEV",
+    "full-stack-dev": "DEV",
+    fe: "FE",
+    frontend: "FE",
+    "frontend-dev": "FE",
+    be: "BE",
+    backend: "BE",
+    "backend-dev": "BE",
+    ux: "UX",
+    ui: "UX",
+    "ui-ux": "UX",
+    uiux: "UX",
+    "ui-ux-reviewer": "UX",
     po: "PO",
     pm: "PM",
     ceo: "CEO",
@@ -262,15 +368,142 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
   routing: {
     minimumSignalScore: 2,
     intentProfiles: {
-      backend: { path: "execute", leadRole: "DEV", fallbackLeadRole: "CTO" },
-      design: { path: "coordinate", leadRole: "PM", fallbackLeadRole: "CTO" },
+      frontend: { path: "execute", leadRole: "FE", fallbackLeadRole: "UX" },
+      backend: { path: "execute", leadRole: "BE", fallbackLeadRole: "CTO" },
+      design: { path: "coordinate", leadRole: "UX", fallbackLeadRole: "PO" },
       marketing: { path: "coordinate", leadRole: "MARKETING", fallbackLeadRole: "PM" },
       roadmap: { path: "coordinate", leadRole: "PM", fallbackLeadRole: "CTO" },
       research: { path: "investigate", leadRole: "RESEARCH", fallbackLeadRole: "CTO" },
-      mixed: { path: "execute", leadRole: "CTO", fallbackLeadRole: "PM" }
+      mixed: { path: "execute", leadRole: "DEV", fallbackLeadRole: "CTO" }
     }
   },
+  execution: {
+    mode: "delegate-only",
+    allowSupervisorDirectEdits: false,
+    requireDelegationLog: true,
+    requireAgentWorktreeBinding: true,
+    requireDedicatedIntegrationAgent: true,
+    integrationAgentLabel: "INTEGRATION"
+  },
+  protectedPaths: {
+    defaultOutcome: "deny",
+    rules: [
+      {
+        ruleId: "deny-vcs-internals",
+        description: "Never allow autonomous writes or merges against repository internals.",
+        pathPrefixes: [".git"],
+        outcome: "deny",
+        auditExpectation: "Record the attempted path and stop automation without applying an exception."
+      },
+      {
+        ruleId: "deny-secret-material",
+        description: "Never allow autonomous writes or merges for secret-bearing files.",
+        pathPrefixes: [".env", ".env.", "secrets", "credentials", "credentials.", "id_rsa"],
+        outcome: "deny",
+        auditExpectation: "Record the attempted path and route the work to a human owner with secret-handling context."
+      },
+      {
+        ruleId: "review-governance-and-runtime-policy",
+        description: "Require human review for supervisor governance, approval, and runtime control surfaces.",
+        pathPrefixes: [".github", ".opencode", "plugins/orchestration-workflows", "package.json", "tsconfig.json", "tsconfig.typecheck.json"],
+        outcome: "requires-human",
+        auditExpectation: "Attach the changed paths, the approving human, and the reason for the exception before continuing."
+      },
+      {
+        ruleId: "allow-default-repository-scope",
+        description: "Allow non-protected paths unless a more specific protected-path rule overrides them.",
+        pathPrefixes: [""],
+        outcome: "allow"
+      }
+    ]
+  },
+  governance: {
+    checkpoints: [
+      {
+        checkpoint: "lane-handoff",
+        defaultOutcome: "accept",
+        rules: [
+          {
+            ruleId: "lane-id-mismatch-block",
+            description: "Never continue when the handoff lane id drifts away from the lane contract.",
+            match: {
+              violationCodes: ["lane-id-mismatch"]
+            },
+            outcome: "block"
+          },
+          {
+            ruleId: "artifact-lane-mismatch-repair",
+            description: "Repair artifact ownership drift before handoff continues.",
+            match: {
+              violationCodes: ["artifact-lane-mismatch"]
+            },
+            outcome: "repair"
+          },
+          {
+            ruleId: "review-owner-mismatch-escalate",
+            description: "Escalate when the next owner and checkpoint reviewer diverge.",
+            match: {
+              violationCodes: ["review-owner-mismatch"]
+            },
+            outcome: "escalate"
+          }
+        ]
+      },
+      {
+        checkpoint: "review-ready",
+        defaultOutcome: "accept",
+        rules: [
+          {
+            ruleId: "review-owner-mismatch-escalate",
+            description: "Escalate review routing whenever reviewer ownership needs a human decision.",
+            match: {
+              violationCodes: ["review-owner-mismatch"]
+            },
+            outcome: "escalate"
+          },
+          {
+            ruleId: "protected-path-review-escalate",
+            description: "Escalate review-ready checkpoints whenever protected-path policy requires a human exception.",
+            match: {
+              violationCodes: ["protected-path-requires-human"]
+            },
+            outcome: "escalate"
+          },
+          {
+            ruleId: "protected-path-deny-block",
+            description: "Block review-ready checkpoints whenever protected-path policy denies the requested paths.",
+            match: {
+              violationCodes: ["protected-path-denied"]
+            },
+            outcome: "block"
+          },
+          {
+            ruleId: "unexpected-blocking-issues-block",
+            description: "Block review-ready checkpoints that claim ready status while still listing blockers.",
+            match: {
+              violationCodes: ["unexpected-blocking-issues"]
+            },
+            outcome: "block"
+          },
+          {
+            ruleId: "review-artifacts-repair",
+            description: "Repair incomplete review evidence before the checkpoint can advance.",
+            match: {
+              violationCodes: [
+                "missing-branch-artifact",
+                "missing-review-packet-artifact",
+                "missing-blocking-issues",
+                "artifact-lane-mismatch"
+              ]
+            },
+            outcome: "repair"
+          }
+        ]
+      }
+    ]
+  },
   compaction: {
+    frontend: { triggerTokens: 720, targetTokens: 430, retainRecentLines: 3 },
     backend: { triggerTokens: 700, targetTokens: 420, retainRecentLines: 3 },
     design: { triggerTokens: 760, targetTokens: 460, retainRecentLines: 3 },
     marketing: { triggerTokens: 640, targetTokens: 380, retainRecentLines: 2 },
@@ -325,6 +558,7 @@ export const DEFAULT_SUPERVISOR_BUDGET = Object.freeze({
 export const DEFAULT_SUPERVISOR_ROUTING = Object.freeze({
   minimumSignalScore: DEFAULT_POLICY_INPUT.routing!.minimumSignalScore!,
   intentProfiles: Object.freeze({
+    frontend: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.frontend }),
     backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.backend }),
     design: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.design }),
     marketing: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.marketing }),
@@ -333,7 +567,47 @@ export const DEFAULT_SUPERVISOR_ROUTING = Object.freeze({
     mixed: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.mixed })
   })
 }) as Readonly<ResolvedSupervisorPolicy["routing"]>;
+export const DEFAULT_SUPERVISOR_EXECUTION = Object.freeze({
+  mode: DEFAULT_POLICY_INPUT.execution!.mode!,
+  allowSupervisorDirectEdits: DEFAULT_POLICY_INPUT.execution!.allowSupervisorDirectEdits!,
+  requireDelegationLog: DEFAULT_POLICY_INPUT.execution!.requireDelegationLog!,
+  requireAgentWorktreeBinding: DEFAULT_POLICY_INPUT.execution!.requireAgentWorktreeBinding!,
+  requireDedicatedIntegrationAgent: DEFAULT_POLICY_INPUT.execution!.requireDedicatedIntegrationAgent!,
+  integrationAgentLabel: DEFAULT_POLICY_INPUT.execution!.integrationAgentLabel!
+}) as Readonly<ResolvedSupervisorPolicy["execution"]>;
+export const DEFAULT_SUPERVISOR_PROTECTED_PATHS = Object.freeze({
+  defaultOutcome: DEFAULT_POLICY_INPUT.protectedPaths!.defaultOutcome!,
+  rules: Object.freeze(
+    (DEFAULT_POLICY_INPUT.protectedPaths?.rules ?? []).map((rule) => Object.freeze({
+      ruleId: rule.ruleId,
+      description: rule.description,
+      pathPrefixes: Object.freeze([...(rule.pathPrefixes ?? [])]),
+      outcome: rule.outcome,
+      auditExpectation: rule.auditExpectation
+    }))
+  )
+}) as Readonly<ResolvedSupervisorPolicy["protectedPaths"]>;
+export const DEFAULT_SUPERVISOR_GOVERNANCE = Object.freeze({
+  checkpoints: Object.freeze(
+    (DEFAULT_POLICY_INPUT.governance?.checkpoints ?? []).map((checkpoint) => Object.freeze({
+      checkpoint: checkpoint.checkpoint,
+      defaultOutcome: checkpoint.defaultOutcome ?? "accept",
+      rules: Object.freeze(
+        (checkpoint.rules ?? []).map((rule) => Object.freeze({
+          ruleId: rule.ruleId,
+          description: rule.description,
+          match: Object.freeze({
+            violationCodes: Object.freeze([...(rule.match?.violationCodes ?? [])]),
+            violationFields: Object.freeze([...(rule.match?.violationFields ?? [])])
+          }),
+          outcome: rule.outcome
+        }))
+      )
+    }))
+  )
+}) as Readonly<ResolvedSupervisorPolicy["governance"]>;
 export const DEFAULT_SUPERVISOR_COMPACTION = Object.freeze({
+  frontend: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.frontend }),
   backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.backend }),
   design: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.design }),
   marketing: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.marketing }),
@@ -404,6 +678,7 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
   routing: {
     minimumSignalScore: DEFAULT_SUPERVISOR_ROUTING.minimumSignalScore,
     intentProfiles: {
+      frontend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.frontend },
       backend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.backend },
       design: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.design },
       marketing: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.marketing },
@@ -412,7 +687,41 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
       mixed: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.mixed }
     }
   },
+  execution: {
+    mode: DEFAULT_SUPERVISOR_EXECUTION.mode,
+    allowSupervisorDirectEdits: DEFAULT_SUPERVISOR_EXECUTION.allowSupervisorDirectEdits,
+    requireDelegationLog: DEFAULT_SUPERVISOR_EXECUTION.requireDelegationLog,
+    requireAgentWorktreeBinding: DEFAULT_SUPERVISOR_EXECUTION.requireAgentWorktreeBinding,
+    requireDedicatedIntegrationAgent: DEFAULT_SUPERVISOR_EXECUTION.requireDedicatedIntegrationAgent,
+    integrationAgentLabel: DEFAULT_SUPERVISOR_EXECUTION.integrationAgentLabel
+  },
+  protectedPaths: {
+    defaultOutcome: DEFAULT_SUPERVISOR_PROTECTED_PATHS.defaultOutcome,
+    rules: DEFAULT_SUPERVISOR_PROTECTED_PATHS.rules.map((rule) => ({
+      ruleId: rule.ruleId,
+      description: rule.description,
+      pathPrefixes: [...rule.pathPrefixes],
+      outcome: rule.outcome,
+      auditExpectation: rule.auditExpectation
+    }))
+  },
+  governance: {
+    checkpoints: DEFAULT_SUPERVISOR_GOVERNANCE.checkpoints.map((checkpoint) => ({
+      checkpoint: checkpoint.checkpoint,
+      defaultOutcome: checkpoint.defaultOutcome,
+      rules: checkpoint.rules.map((rule) => ({
+        ruleId: rule.ruleId,
+        description: rule.description,
+        match: {
+          violationCodes: [...rule.match.violationCodes],
+          violationFields: [...rule.match.violationFields]
+        },
+        outcome: rule.outcome
+      }))
+    }))
+  },
   compaction: {
+    frontend: { ...DEFAULT_SUPERVISOR_COMPACTION.frontend },
     backend: { ...DEFAULT_SUPERVISOR_COMPACTION.backend },
     design: { ...DEFAULT_SUPERVISOR_COMPACTION.design },
     marketing: { ...DEFAULT_SUPERVISOR_COMPACTION.marketing },
@@ -427,11 +736,23 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 const isSupportedRole = (value: string): value is Role => {
-  return ["CTO", "DEV", "PO", "PM", "CEO", "MARKETING", "RESEARCH"].includes(value);
+  return ["CTO", "DEV", "FE", "BE", "UX", "PO", "PM", "CEO", "MARKETING", "RESEARCH"].includes(value);
 };
 
 const isSupportedExecutionPath = (value: string): value is SupervisorExecutionPath => {
   return ["execute", "coordinate", "investigate", "safe-hold"].includes(value);
+};
+
+const isSupportedSupervisorExecutionMode = (value: string): value is SupervisorExecutionMode => {
+  return ["delegate-only", "delegate-with-manual-override"].includes(value);
+};
+
+const isSupportedProtectedPathOutcome = (value: string): value is SupervisorProtectedPathOutcome => {
+  return ["allow", "requires-human", "deny"].includes(value);
+};
+
+const isSupportedGovernanceOutcome = (value: string): value is SupervisorGovernancePolicyOutcome => {
+  return ["accept", "repair", "escalate", "block"].includes(value);
 };
 
 const compileProviderPattern = (pattern: SupervisorProviderPatternInput): SupervisorProviderPattern => ({
@@ -448,6 +769,12 @@ const pushDiagnostic = (
 ) => {
   diagnostics.push({ path, message });
 };
+
+const normalizeStringList = (values: readonly string[]): string[] => Array.from(new Set(
+  values
+    .map((value) => value.trim())
+    .filter(Boolean)
+));
 
 const readPositiveNumber = (
   value: unknown,
@@ -833,6 +1160,220 @@ export const resolveSupervisorPolicy = (
               }
             }
           }
+        }
+      }
+    }
+  }
+
+  if (input.execution !== undefined) {
+    if (!isRecord(input.execution)) {
+      pushDiagnostic(diagnostics, "execution", "Expected execution to be an object.");
+    } else {
+      if (input.execution.mode !== undefined) {
+        if (typeof input.execution.mode === "string" && isSupportedSupervisorExecutionMode(input.execution.mode)) {
+          config.execution.mode = input.execution.mode;
+        } else {
+          pushDiagnostic(diagnostics, "execution.mode", `Unsupported execution mode '${String(input.execution.mode)}'.`);
+        }
+      }
+
+      const booleanEntries = [
+        ["allowSupervisorDirectEdits", "allowSupervisorDirectEdits"],
+        ["requireDelegationLog", "requireDelegationLog"],
+        ["requireAgentWorktreeBinding", "requireAgentWorktreeBinding"],
+        ["requireDedicatedIntegrationAgent", "requireDedicatedIntegrationAgent"]
+      ] as const;
+
+      for (const [inputKey, configKey] of booleanEntries) {
+        const value = input.execution[inputKey];
+        if (value === undefined) {
+          continue;
+        }
+
+        if (typeof value === "boolean") {
+          config.execution[configKey] = value;
+        } else {
+          pushDiagnostic(diagnostics, `execution.${inputKey}`, "Expected a boolean value.");
+        }
+      }
+
+      if (input.execution.integrationAgentLabel !== undefined) {
+        if (typeof input.execution.integrationAgentLabel === "string" && input.execution.integrationAgentLabel.trim()) {
+          config.execution.integrationAgentLabel = input.execution.integrationAgentLabel.trim();
+        } else {
+          pushDiagnostic(diagnostics, "execution.integrationAgentLabel", "Expected a non-empty integration agent label.");
+        }
+      }
+
+      if (config.execution.mode === "delegate-only" && config.execution.allowSupervisorDirectEdits) {
+        pushDiagnostic(
+          diagnostics,
+          "execution.allowSupervisorDirectEdits",
+          "Delegate-only mode cannot allow direct supervisor edits; reverting to false."
+        );
+        config.execution.allowSupervisorDirectEdits = false;
+      }
+    }
+  }
+
+  if (input.protectedPaths !== undefined) {
+    if (!isRecord(input.protectedPaths)) {
+      pushDiagnostic(diagnostics, "protectedPaths", "Expected protectedPaths to be an object.");
+    } else {
+      if (input.protectedPaths.defaultOutcome !== undefined) {
+        if (typeof input.protectedPaths.defaultOutcome === "string" && isSupportedProtectedPathOutcome(input.protectedPaths.defaultOutcome)) {
+          config.protectedPaths.defaultOutcome = input.protectedPaths.defaultOutcome;
+        } else {
+          pushDiagnostic(diagnostics, "protectedPaths.defaultOutcome", `Unsupported protected path outcome '${String(input.protectedPaths.defaultOutcome)}'.`);
+        }
+      }
+
+      if (input.protectedPaths.rules !== undefined) {
+        if (!Array.isArray(input.protectedPaths.rules)) {
+          pushDiagnostic(diagnostics, "protectedPaths.rules", "Expected protectedPaths.rules to be an array.");
+        } else {
+          const rules: SupervisorProtectedPathRule[] = [];
+
+          for (const [index, entry] of input.protectedPaths.rules.entries()) {
+            if (!isRecord(entry)) {
+              pushDiagnostic(diagnostics, `protectedPaths.rules.${index}`, "Expected each protected path rule to be an object.");
+              continue;
+            }
+
+            const ruleId = typeof entry.ruleId === "string" ? entry.ruleId.trim() : "";
+            if (!ruleId) {
+              pushDiagnostic(diagnostics, `protectedPaths.rules.${index}.ruleId`, "Expected a non-empty protected path ruleId.");
+              continue;
+            }
+
+            if (typeof entry.outcome !== "string" || !isSupportedProtectedPathOutcome(entry.outcome)) {
+              pushDiagnostic(diagnostics, `protectedPaths.rules.${index}.outcome`, `Unsupported protected path outcome '${String(entry.outcome)}'.`);
+              continue;
+            }
+
+            const pathPrefixes = Array.isArray(entry.pathPrefixes)
+              ? Array.from(new Set(entry.pathPrefixes.filter((value): value is string => typeof value === "string").map((value) => value.trim())))
+              : [];
+
+            if (pathPrefixes.length === 0) {
+              pushDiagnostic(diagnostics, `protectedPaths.rules.${index}.pathPrefixes`, "Protected path rules require at least one path prefix matcher.");
+              continue;
+            }
+
+            rules.push({
+              ruleId,
+              description: typeof entry.description === "string" && entry.description.trim()
+                ? entry.description.trim()
+                : undefined,
+              pathPrefixes,
+              outcome: entry.outcome,
+              auditExpectation: typeof entry.auditExpectation === "string" && entry.auditExpectation.trim()
+                ? entry.auditExpectation.trim()
+                : undefined
+            });
+          }
+
+          if (rules.length > 0) {
+            config.protectedPaths.rules = rules;
+          }
+        }
+      }
+    }
+  }
+
+  if (input.governance !== undefined) {
+    if (!isRecord(input.governance)) {
+      pushDiagnostic(diagnostics, "governance", "Expected governance to be an object.");
+    } else if (input.governance.checkpoints !== undefined) {
+      if (!Array.isArray(input.governance.checkpoints)) {
+        pushDiagnostic(diagnostics, "governance.checkpoints", "Expected governance.checkpoints to be an array.");
+      } else {
+        const checkpoints: SupervisorGovernanceCheckpointPolicy[] = [];
+
+        for (const [index, entry] of input.governance.checkpoints.entries()) {
+          if (!isRecord(entry)) {
+            pushDiagnostic(diagnostics, `governance.checkpoints.${index}`, "Expected each governance checkpoint to be an object.");
+            continue;
+          }
+
+          const checkpoint = typeof entry.checkpoint === "string" ? entry.checkpoint.trim() : "";
+          if (!checkpoint) {
+            pushDiagnostic(diagnostics, `governance.checkpoints.${index}.checkpoint`, "Expected a non-empty checkpoint name.");
+            continue;
+          }
+
+          let defaultOutcome = config.governance.checkpoints.find((candidate) => candidate.checkpoint === checkpoint)?.defaultOutcome ?? "accept";
+          if (entry.defaultOutcome !== undefined) {
+            if (typeof entry.defaultOutcome === "string" && isSupportedGovernanceOutcome(entry.defaultOutcome)) {
+              defaultOutcome = entry.defaultOutcome;
+            } else {
+              pushDiagnostic(diagnostics, `governance.checkpoints.${index}.defaultOutcome`, `Unsupported governance outcome '${String(entry.defaultOutcome)}'.`);
+            }
+          }
+
+          const rules: SupervisorGovernanceCheckpointRule[] = [];
+          if (entry.rules !== undefined) {
+            if (!Array.isArray(entry.rules)) {
+              pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules`, "Expected governance checkpoint rules to be an array.");
+            } else {
+              for (const [ruleIndex, ruleEntry] of entry.rules.entries()) {
+                if (!isRecord(ruleEntry)) {
+                  pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules.${ruleIndex}`, "Expected each governance rule to be an object.");
+                  continue;
+                }
+
+                const ruleId = typeof ruleEntry.ruleId === "string" ? ruleEntry.ruleId.trim() : "";
+                if (!ruleId) {
+                  pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules.${ruleIndex}.ruleId`, "Expected a non-empty governance ruleId.");
+                  continue;
+                }
+
+                if (typeof ruleEntry.outcome !== "string" || !isSupportedGovernanceOutcome(ruleEntry.outcome)) {
+                  pushDiagnostic(diagnostics, `governance.checkpoints.${index}.rules.${ruleIndex}.outcome`, `Unsupported governance outcome '${String(ruleEntry.outcome)}'.`);
+                  continue;
+                }
+
+                const match = isRecord(ruleEntry.match) ? ruleEntry.match : {};
+                const violationCodes = Array.isArray(match.violationCodes)
+                  ? normalizeStringList(match.violationCodes.filter((value): value is string => typeof value === "string"))
+                  : [];
+                const violationFields = Array.isArray(match.violationFields)
+                  ? normalizeStringList(match.violationFields.filter((value): value is string => typeof value === "string"))
+                  : [];
+
+                if (violationCodes.length === 0 && violationFields.length === 0) {
+                  pushDiagnostic(
+                    diagnostics,
+                    `governance.checkpoints.${index}.rules.${ruleIndex}.match`,
+                    "Governance rules require at least one violationCodes or violationFields matcher."
+                  );
+                  continue;
+                }
+
+                rules.push({
+                  ruleId,
+                  description: typeof ruleEntry.description === "string" && ruleEntry.description.trim()
+                    ? ruleEntry.description.trim()
+                    : undefined,
+                  match: {
+                    violationCodes,
+                    violationFields
+                  },
+                  outcome: ruleEntry.outcome
+                });
+              }
+            }
+          }
+
+          checkpoints.push({
+            checkpoint,
+            defaultOutcome,
+            rules
+          });
+        }
+
+        if (checkpoints.length > 0) {
+          config.governance.checkpoints = checkpoints;
         }
       }
     }

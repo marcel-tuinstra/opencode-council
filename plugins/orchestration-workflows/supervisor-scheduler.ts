@@ -5,8 +5,11 @@ import {
   type SupervisorApprovalSignal,
   type SupervisorApprovalNextAction
 } from "./approval-gates";
+import { evaluateGovernancePolicy } from "./governance-policy";
+import type { LaneCompletionContract, LaneContractViolation } from "./lane-contract";
 import type {
   SupervisorApprovalRecord,
+  SupervisorArtifactRecord,
   SupervisorLaneRecord,
   SupervisorRunState,
   SupervisorSessionRecord,
@@ -20,6 +23,7 @@ import {
   type LaneLifecycleState,
   type RepoRiskTier
 } from "./lane-lifecycle";
+import { assertReviewReadyTransition, type ReviewReadyEvidencePacket, type ReviewReadyEvidencePacketInput } from "./review-ready-packet";
 import type { LanePlan } from "./lane-plan";
 import type {
   ProvisionSupervisorLaneWorktreeResult,
@@ -29,6 +33,11 @@ import type {
   SupervisorSessionLifecycle,
   SupervisorSessionLifecycleResult
 } from "./session-runtime-adapter";
+import {
+  resolveReviewRoutingDecision,
+  type ReviewRoutingDecision,
+  type ReviewRoutingPolicyDecision
+} from "./review-coordination";
 
 export type SupervisorLaneDefinition = {
   laneId: string;
@@ -45,8 +54,8 @@ export type CreateSupervisorLaneDefinitionsOptions = {
 
 export type SupervisorDispatchLaneInput = {
   definition: SupervisorLaneDefinition;
-  waitingOn?: string[];
-  reviewReady?: boolean;
+  waitingOn?: readonly string[];
+  reviewReadyPacket?: ReviewReadyEvidencePacketInput | ReviewReadyEvidencePacket;
   complete?: boolean;
   approvalGate?: {
     request: SupervisorApprovalGateRequest;
@@ -78,9 +87,23 @@ export type SupervisorDispatchLaneDecision = {
   nextAction: SupervisorApprovalNextAction;
   assignedOwner?: string;
   reasons: readonly string[];
+  reviewRouting?: ReviewRoutingDecision;
   lane: SupervisorLaneRecord;
   worktree?: SupervisorWorktreeRecord;
   session?: SupervisorSessionRecord;
+};
+
+export type SupervisorReviewRoutingPolicyEvaluatorInput = {
+  lane: SupervisorLaneRecord;
+  laneOutput: LaneCompletionContract;
+  violations: readonly LaneContractViolation[];
+  reviewRouting: ReviewRoutingDecision;
+  actor: string;
+  occurredAt: string;
+};
+
+export type SupervisorReviewRoutingPolicyEvaluator = {
+  evaluate(input: SupervisorReviewRoutingPolicyEvaluatorInput): ReviewRoutingPolicyDecision | undefined;
 };
 
 export type RunSupervisorDispatchLoopInput = {
@@ -103,6 +126,7 @@ export type CreateSupervisorDispatchLoopOptions = {
   store: SupervisorStateStore;
   provisioner: SupervisorLaneWorktreeProvisioner;
   sessions: SupervisorSessionLifecycle;
+  reviewRoutingPolicyEvaluator?: SupervisorReviewRoutingPolicyEvaluator;
 };
 
 const freezeList = <T>(items: readonly T[]): readonly T[] => Object.freeze([...items]);
@@ -219,6 +243,34 @@ const ensureLaneDefinitions = (
 
 const countActiveLanes = (state: SupervisorRunState): number => state.lanes.filter((lane) => countsTowardActiveLaneCap(lane.state)).length;
 
+const mapLaneContractArtifactKind = (kind: LaneCompletionContract["artifacts"][number]["kind"]): SupervisorArtifactRecord["kind"] => {
+  switch (kind) {
+    case "branch":
+      return "branch";
+    case "pull-request":
+      return "pull-request";
+    case "review-packet":
+      return "review-packet";
+    case "session-log":
+      return "session-log";
+    default:
+      return "other";
+  }
+};
+
+const buildLaneOutputArtifacts = (
+  laneId: string,
+  occurredAt: string,
+  laneOutput: LaneCompletionContract
+): readonly SupervisorArtifactRecord[] => Object.freeze(laneOutput.artifacts.map((artifact, index) => Object.freeze({
+  artifactId: `${laneId}:${artifact.kind}:${String(index + 1).padStart(2, "0")}:${occurredAt}`,
+  laneId,
+  kind: mapLaneContractArtifactKind(artifact.kind),
+  status: "ready" as const,
+  uri: artifact.uri,
+  updatedAt: occurredAt
+ })));
+
 const selectSessionOwner = (
   laneInput: SupervisorDispatchLaneInput,
   state: SupervisorRunState,
@@ -236,6 +288,49 @@ const selectSessionOwner = (
   }
 
   return sessionOwners[(laneInput.definition.sequence - 1) % sessionOwners.length] as string;
+};
+
+const buildCheckpointEscalationApprovalRequest = (
+  lane: SupervisorLaneRecord,
+  actor: string,
+  occurredAt: string,
+  reviewRouting: ReviewRoutingDecision
+): ReturnType<typeof evaluateSupervisorApprovalGate> => evaluateSupervisorApprovalGate({
+  laneId: lane.laneId,
+  actor,
+  occurredAt,
+  request: {
+    boundary: "automation-widening",
+    requestedAction: `clear the review-ready checkpoint escalation for ${lane.laneId}`,
+    summary: `Resolve review-ready checkpoint escalation for ${lane.laneId}.`,
+    rationale: reviewRouting.reasons.join(" "),
+    context: {
+      targetRef: lane.branch,
+      automationChangeSummary: "Supervisor needs a human decision before accepting this review-ready handoff."
+    }
+  }
+});
+
+const evaluateReviewRoutingPolicy = (
+  evaluator: SupervisorReviewRoutingPolicyEvaluator | undefined,
+  input: SupervisorReviewRoutingPolicyEvaluatorInput
+): ReviewRoutingPolicyDecision => {
+  const override = evaluator?.evaluate(input);
+
+  if (override) {
+    return override;
+  }
+
+  const governanceDecision = evaluateGovernancePolicy({
+    checkpoint: "review-ready",
+    violations: input.violations
+  });
+
+  return {
+    outcome: governanceDecision.outcome,
+    reasons: governanceDecision.reasons,
+    evaluator: `governance-policy:${governanceDecision.source}`
+  };
 };
 
 const summarizeDependencyStates = (
@@ -293,6 +388,7 @@ export const createSupervisorDispatchLoop = (
   const store = options.store;
   const provisioner = options.provisioner;
   const sessions = options.sessions;
+  const reviewRoutingPolicyEvaluator = options.reviewRoutingPolicyEvaluator;
 
   const run = (input: RunSupervisorDispatchLoopInput): RunSupervisorDispatchLoopResult => {
     const runId = assertNonEmpty(input.runId, "run id");
@@ -369,31 +465,201 @@ export const createSupervisorDispatchLoop = (
         continue;
       }
 
-      if (laneInput.reviewReady) {
-        lane = commitLaneState(
-          store,
-          runId,
-          actor,
-          occurredAt,
-          lane,
-          "review_ready",
-          `dispatch:${lane.laneId}:review-ready:${occurredAt}`,
-          `Mark lane '${lane.laneId}' review ready.`
-        );
-        reasons.push("Lane produced a reviewable handoff.");
-        decisions.push({
-          laneId: lane.laneId,
-          status: "review_ready",
-          targetState: "review_ready",
-          action: "none",
-          nextAction: "continue",
-          assignedOwner,
-          reasons: freezeList(reasons),
-          lane,
-          worktree,
-          session
-        });
-        continue;
+      if (laneInput.reviewReadyPacket) {
+        try {
+          const reviewPacket = assertReviewReadyTransition(lane.state, "review_ready", laneInput.reviewReadyPacket);
+          if (!reviewPacket?.laneOutput) {
+            throw new Error("Lane transition to review_ready requires a validated lane output contract.");
+          }
+
+          const handoffArtifacts = buildLaneOutputArtifacts(lane.laneId, occurredAt, reviewPacket.laneOutput);
+          const baseReviewRouting = resolveReviewRoutingDecision({ reviewPacket, laneOutput: reviewPacket.laneOutput });
+          const reviewRouting = resolveReviewRoutingDecision({
+            reviewPacket,
+            laneOutput: reviewPacket.laneOutput,
+            policyDecision: evaluateReviewRoutingPolicy(reviewRoutingPolicyEvaluator, {
+              lane,
+              laneOutput: reviewPacket.laneOutput,
+              violations: reviewPacket.handoffValidation.violations,
+              reviewRouting: baseReviewRouting,
+              actor,
+              occurredAt
+            })
+          });
+
+          if (reviewRouting.outcome === "repair") {
+            store.commitMutation(runId, {
+              mutationId: `dispatch:${lane.laneId}:review-handoff-repair:${occurredAt}`,
+              actor,
+              summary: `Capture review handoff evidence for lane '${lane.laneId}' before repair.`,
+              occurredAt,
+              artifactUpserts: handoffArtifacts,
+              sideEffects: ["captured-handoff-evidence", "handoff-repair-required"]
+            });
+            reasons.push(...reviewRouting.reasons);
+            decisions.push({
+              laneId: lane.laneId,
+              status: "blocked",
+              targetState: lane.state,
+              action: "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              reviewRouting,
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+
+          if (reviewRouting.outcome === "escalate") {
+            const approvalDecision = buildCheckpointEscalationApprovalRequest(lane, actor, occurredAt, reviewRouting);
+
+            store.commitMutation(runId, {
+              mutationId: `dispatch:${lane.laneId}:checkpoint-escalation:${occurredAt}`,
+              actor,
+              summary: `Persist checkpoint escalation approval for lane '${lane.laneId}'.`,
+              occurredAt,
+              artifactUpserts: handoffArtifacts,
+              approvalUpserts: approvalDecision.approval ? [approvalDecision.approval] : [],
+              sideEffects: ["captured-handoff-evidence", "checkpoint-escalated"]
+            });
+            if (session?.status === "active") {
+              session = sessions.pauseSession({
+                runId,
+                laneId: lane.laneId,
+                actor,
+                mutationId: `dispatch:${lane.laneId}:checkpoint-escalation-pause:${occurredAt}`,
+                occurredAt,
+                summary: `Pause lane '${lane.laneId}' while a human resolves the checkpoint escalation.`
+              }).session;
+            }
+            if (lane.state === "active") {
+              lane = commitLaneState(
+                store,
+                runId,
+                actor,
+                occurredAt,
+                lane,
+                "waiting",
+                `dispatch:${lane.laneId}:checkpoint-escalation-wait:${occurredAt}`,
+                `Hold lane '${lane.laneId}' for checkpoint escalation.`
+              );
+            }
+            reasons.push(...reviewRouting.reasons);
+            decisions.push({
+              laneId: lane.laneId,
+              status: "blocked",
+              targetState: lane.state,
+              action: session?.status === "paused" ? "pause-session" : "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              reviewRouting,
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+
+          if (reviewRouting.outcome === "block") {
+            store.commitMutation(runId, {
+              mutationId: `dispatch:${lane.laneId}:review-handoff-blocked:${occurredAt}`,
+              actor,
+              summary: `Capture blocked review handoff evidence for lane '${lane.laneId}'.`,
+              occurredAt,
+              artifactUpserts: handoffArtifacts,
+              sideEffects: ["captured-handoff-evidence", "handoff-blocked"]
+            });
+            if (session?.status === "active") {
+              session = sessions.pauseSession({
+                runId,
+                laneId: lane.laneId,
+                actor,
+                mutationId: `dispatch:${lane.laneId}:review-handoff-blocked-pause:${occurredAt}`,
+                occurredAt,
+                summary: `Pause lane '${lane.laneId}' while declared handoff blockers remain open.`
+              }).session;
+            }
+            if (lane.state === "active") {
+              lane = commitLaneState(
+                store,
+                runId,
+                actor,
+                occurredAt,
+                lane,
+                "waiting",
+                `dispatch:${lane.laneId}:review-handoff-blocked-wait:${occurredAt}`,
+                `Hold lane '${lane.laneId}' while the review handoff stays blocked.`
+              );
+            }
+            reasons.push(...reviewRouting.reasons);
+            decisions.push({
+              laneId: lane.laneId,
+              status: "blocked",
+              targetState: lane.state,
+              action: session?.status === "paused" ? "pause-session" : "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              reviewRouting,
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+
+          store.commitMutation(runId, {
+            mutationId: `dispatch:${lane.laneId}:review-ready:${occurredAt}`,
+            actor,
+            summary: `Mark lane '${lane.laneId}' review ready with validated handoff artifacts.`,
+            occurredAt,
+            laneUpserts: [Object.freeze({
+              ...lane,
+              state: "review_ready",
+              updatedAt: occurredAt
+            })],
+            artifactUpserts: handoffArtifacts,
+            sideEffects: ["prepared-review-bundle", "validated-lane-handoff"]
+          });
+          state = store.getRunState(runId)!;
+          lane = findLane(state, laneInput.definition.laneId)!;
+          worktree = findWorktree(state, lane.worktreeId);
+          session = findSession(state, lane.sessionId);
+          reasons.push(...reviewRouting.reasons);
+          decisions.push({
+            laneId: lane.laneId,
+            status: "review_ready",
+            targetState: "review_ready",
+            action: "none",
+            nextAction: "continue",
+            assignedOwner,
+            reasons: freezeList(reasons),
+            reviewRouting,
+            lane,
+            worktree,
+            session
+          });
+          continue;
+        } catch (error) {
+          reasons.push(error instanceof Error ? error.message : "Lane review-ready handoff validation failed.");
+          decisions.push({
+            laneId: lane.laneId,
+            status: "blocked",
+            targetState: lane.state,
+            action: "none",
+            nextAction: "pause",
+            assignedOwner,
+            reasons: freezeList(reasons),
+            lane,
+            worktree,
+            session
+          });
+          continue;
+        }
       }
 
       if (dependencyStatus.blocked) {

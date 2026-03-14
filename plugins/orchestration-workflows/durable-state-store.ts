@@ -78,7 +78,7 @@ export type SupervisorApprovalRecord = {
   approvalId: string;
   laneId: string;
   status: SupervisorPersistedApprovalStatus;
-  boundary: "merge" | "release" | "destructive" | "security-sensitive" | "budget-exception" | "automation-widening";
+  boundary: "write" | "merge" | "release" | "destructive" | "security-sensitive" | "budget-exception" | "automation-widening";
   requestedAction: string;
   summary: string;
   rationale: string;

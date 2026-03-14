@@ -9,7 +9,7 @@ The implementation lives in `plugins/orchestration-workflows/supervisor-schedule
 For each lane, the dispatcher evaluates the same inputs in the same order:
 
 1. completion signal
-2. review-ready signal
+2. validated review-ready packet + lane output contract
 3. unfinished dependency lanes
 4. explicit waiting blockers
 5. active-lane cap availability
@@ -25,10 +25,10 @@ The loop stays inside the currently approved lifecycle boundaries:
 - `planned`: lane exists but cannot start yet because dependencies are incomplete or the active lane cap is saturated
 - `active`: lane is eligible to run and should have a managed worktree plus an attached runtime session
 - `waiting`: lane was active, but an external blocker now pauses forward motion
-- `review_ready`: lane produced a reviewable handoff and waits at the approval boundary
+- `review_ready`: lane produced a validated review-ready packet plus lane output contract and waits at the approval boundary
 - `complete`: lane finished after merge and its managed worktree can be released
 
-The scheduler does not add approval gating yet. It leaves that boundary visible by treating `review_ready` as the terminal automation handoff before merge and `complete` as the post-merge cleanup state.
+The scheduler does not add merge automation yet. It now treats `review_ready` as a typed boundary: a lane must present a valid review-ready packet and lane output contract before the loop will promote it.
 
 ## Dispatch actions
 
@@ -55,6 +55,7 @@ After:
 - A lane plan can be materialized into durable lanes with explicit dependency edges.
 - The dispatcher can advance a ready lane by activating it, provisioning a worktree, assigning a runtime owner deterministically, and launching or resuming the next runtime session.
 - Waiting, blocked, review-ready, and complete outcomes are decided in one explainable pass.
+- A lane cannot silently become `review_ready`; the dispatcher validates the review-ready packet and persists the lane handoff artifacts that justify the transition.
 
 ## Example
 

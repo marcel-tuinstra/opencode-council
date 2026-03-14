@@ -11,6 +11,7 @@ export const shouldUseHeartbeat = (roles: Role[]): boolean => {
 
 export const detectIntent = (text: string): Intent => {
   const scores: Record<Intent, number> = {
+    frontend: 0,
     backend: 0,
     design: 0,
     marketing: 0,
@@ -32,7 +33,7 @@ export const detectIntent = (text: string): Intent => {
 
   let best: Intent = "mixed";
   let bestScore = 0;
-  for (const intent of ["backend", "design", "marketing", "roadmap", "research"] as Intent[]) {
+  for (const intent of ["frontend", "backend", "design", "marketing", "roadmap", "research"] as Intent[]) {
     if (scores[intent] > bestScore) {
       best = intent;
       bestScore = scores[intent];
@@ -65,6 +66,9 @@ const emptyTargets = (): Record<Role, number> => {
   return {
     CTO: 0,
     DEV: 0,
+    FE: 0,
+    BE: 0,
+    UX: 0,
     PO: 0,
     PM: 0,
     CEO: 0,

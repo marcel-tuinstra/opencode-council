@@ -1,4 +1,8 @@
 import { DEFAULT_SUPERVISOR_BUDGET, getSupervisorPolicy } from "./supervisor-config";
+import {
+  createSupervisorThresholdEventId,
+  type SupervisorThresholdEvent
+} from "./guardrail-thresholds";
 import { createSupervisorReasonDetail, type SupervisorReasonDetail } from "./reason-codes";
 
 export type BudgetGovernanceScope = "run" | "step";
@@ -61,6 +65,17 @@ export type BudgetGovernanceDecision = {
   requiredActions: readonly BudgetGovernanceRequirement[];
   shouldPauseAutomation: boolean;
   reasonDetails: readonly SupervisorReasonDetail[];
+  decisionEvidence: {
+    overrideSource: BudgetGovernancePolicy["overrideSource"];
+    hardStopEnabled: boolean;
+    warningThresholdPercents: readonly number[];
+    escalationThresholdPercent: number;
+    hardStopThresholdPercent: number;
+    usedTokens: number;
+    budgetTokens: number;
+    usagePercent: number;
+  };
+  thresholdEvents: readonly SupervisorThresholdEvent[];
 };
 
 export const DEFAULT_WARNING_THRESHOLD_PERCENTS = Object.freeze([...DEFAULT_SUPERVISOR_BUDGET.governance.warningThresholdPercents]);
@@ -180,6 +195,37 @@ export const evaluateBudgetGovernance = (
       reason: buildThresholdReason("hard-stop", policy.hardStopThresholdPercent, input.scope)
     } satisfies BudgetGovernanceThreshold]
     : triggeredWarnings;
+  const decisionEvidence = Object.freeze({
+    overrideSource: policy.overrideSource,
+    hardStopEnabled: policy.hardStopEnabled,
+    warningThresholdPercents: [...policy.warningThresholdPercents],
+    escalationThresholdPercent: policy.escalationThresholdPercent,
+    hardStopThresholdPercent: policy.hardStopThresholdPercent,
+    usedTokens: input.usedTokens,
+    budgetTokens: input.budgetTokens,
+    usagePercent
+  });
+  const thresholdEvents = Object.freeze(triggeredThresholds.map((threshold) => ({
+    eventId: createSupervisorThresholdEventId(
+      "budget-governance",
+      input.scope,
+      threshold.kind,
+      threshold.usagePercent,
+      usagePercent
+    ),
+    guardrail: "budget-governance",
+    thresholdKey: `${input.scope}-${threshold.kind}-percent`,
+    status: "triggered",
+    thresholdValue: threshold.usagePercent,
+    observedValue: usagePercent,
+    reasonCode: threshold.kind === "hard-stop"
+      ? "budget.hard-stop"
+      : threshold.kind === "escalation"
+        ? "budget.escalation-required"
+        : "budget.warning-threshold",
+    summary: threshold.reason,
+    evidence: decisionEvidence
+  } satisfies SupervisorThresholdEvent)));
 
   if (policy.hardStopEnabled && usagePercent >= policy.hardStopThresholdPercent) {
     return {
@@ -192,7 +238,9 @@ export const evaluateBudgetGovernance = (
       recommendations: ["enable-hard-stop-for-runaway-risk"],
       requiredActions: [],
       shouldPauseAutomation: true,
-      reasonDetails: [createSupervisorReasonDetail("budget.hard-stop", { usagePercent })]
+      reasonDetails: [createSupervisorReasonDetail("budget.hard-stop", { usagePercent })],
+      decisionEvidence,
+      thresholdEvents
     };
   }
 
@@ -216,7 +264,9 @@ export const evaluateBudgetGovernance = (
         "schedule-checkpoint-review"
       ],
       shouldPauseAutomation: true,
-      reasonDetails: [createSupervisorReasonDetail("budget.escalation-required", { usagePercent })]
+      reasonDetails: [createSupervisorReasonDetail("budget.escalation-required", { usagePercent })],
+      decisionEvidence,
+      thresholdEvents
     };
   }
 
@@ -235,7 +285,9 @@ export const evaluateBudgetGovernance = (
       recommendations,
       requiredActions: [],
       shouldPauseAutomation: false,
-      reasonDetails: [createSupervisorReasonDetail("budget.warning-threshold", { usagePercent })]
+      reasonDetails: [createSupervisorReasonDetail("budget.warning-threshold", { usagePercent })],
+      decisionEvidence,
+      thresholdEvents
     };
   }
 
@@ -249,6 +301,8 @@ export const evaluateBudgetGovernance = (
     recommendations: ["continue-with-watch"],
     requiredActions: [],
     shouldPauseAutomation: false,
-    reasonDetails: []
+    reasonDetails: [],
+    decisionEvidence,
+    thresholdEvents: []
   };
 };

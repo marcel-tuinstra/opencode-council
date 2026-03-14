@@ -1,0 +1,159 @@
+import { getSupervisorPolicy, type SupervisorExecutionPolicy } from "./supervisor-config";
+import type { Role } from "./types";
+
+export type SupervisorDelegationAssignmentInput = {
+  storyId?: string;
+  laneId?: string;
+  role: Role;
+  agentLabel: string;
+  branch?: string;
+  worktreePath?: string;
+  responsibilities: readonly string[];
+};
+
+export type SupervisorDelegationAssignment = {
+  storyId?: string;
+  laneId?: string;
+  role: Role;
+  agentLabel: string;
+  branch?: string;
+  worktreePath?: string;
+  responsibilities: readonly string[];
+};
+
+export type SupervisorIntegrationAssignmentInput = {
+  agentLabel: string;
+  role?: Role;
+  worktreePath?: string;
+  responsibilities: readonly string[];
+};
+
+export type SupervisorIntegrationAssignment = {
+  agentLabel: string;
+  role?: Role;
+  worktreePath?: string;
+  responsibilities: readonly string[];
+};
+
+export type SupervisorDelegationPlanInput = {
+  supervisorLabel?: string;
+  directEditsRequested?: boolean;
+  assignments: readonly SupervisorDelegationAssignmentInput[];
+  integration?: SupervisorIntegrationAssignmentInput;
+  policy?: SupervisorExecutionPolicy;
+};
+
+export type SupervisorDelegationPlan = {
+  supervisorLabel: string;
+  directEditsRequested: boolean;
+  assignments: readonly SupervisorDelegationAssignment[];
+  integration?: SupervisorIntegrationAssignment;
+  policy: SupervisorExecutionPolicy;
+};
+
+export type SupervisorDelegationValidation = {
+  valid: boolean;
+  violations: readonly string[];
+  plan: SupervisorDelegationPlan;
+};
+
+const freezeList = <T>(items: readonly T[]): readonly T[] => Object.freeze([...items]);
+const freezeRecord = <T extends Record<string, unknown>>(value: T): Readonly<T> => Object.freeze({ ...value });
+
+const normalizeString = (value: string | undefined, field: string): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error(`Supervisor delegation requires a non-empty ${field} when provided.`);
+  }
+
+  return normalized;
+};
+
+const normalizeResponsibilities = (responsibilities: readonly string[], field: string): readonly string[] => {
+  const normalized = Array.from(new Set(responsibilities.map((item) => item.trim()).filter(Boolean)));
+  if (normalized.length === 0) {
+    throw new Error(`Supervisor delegation requires at least one ${field}.`);
+  }
+
+  return freezeList(normalized);
+};
+
+const normalizeAssignment = (input: SupervisorDelegationAssignmentInput): SupervisorDelegationAssignment => freezeRecord({
+  storyId: normalizeString(input.storyId, "assignment story id"),
+  laneId: normalizeString(input.laneId, "assignment lane id"),
+  role: input.role,
+  agentLabel: normalizeString(input.agentLabel, "assignment agent label")!,
+  branch: normalizeString(input.branch, "assignment branch"),
+  worktreePath: normalizeString(input.worktreePath, "assignment worktree path"),
+  responsibilities: normalizeResponsibilities(input.responsibilities, "assignment responsibility")
+});
+
+const normalizeIntegration = (input: SupervisorIntegrationAssignmentInput): SupervisorIntegrationAssignment => freezeRecord({
+  agentLabel: normalizeString(input.agentLabel, "integration agent label")!,
+  role: input.role,
+  worktreePath: normalizeString(input.worktreePath, "integration worktree path"),
+  responsibilities: normalizeResponsibilities(input.responsibilities, "integration responsibility")
+});
+
+const isDelegationPlan = (input: SupervisorDelegationPlanInput | SupervisorDelegationPlan): input is SupervisorDelegationPlan => {
+  return typeof (input as SupervisorDelegationPlan).supervisorLabel === "string"
+    && typeof (input as SupervisorDelegationPlan).directEditsRequested === "boolean"
+    && (input as SupervisorDelegationPlan).policy !== undefined;
+};
+
+export const createSupervisorDelegationPlan = (input: SupervisorDelegationPlanInput): SupervisorDelegationPlan => {
+  const policy = input.policy ?? getSupervisorPolicy().execution;
+
+  return freezeRecord({
+    supervisorLabel: normalizeString(input.supervisorLabel, "supervisor label") ?? "SUPERVISOR",
+    directEditsRequested: input.directEditsRequested ?? false,
+    assignments: freezeList(input.assignments.map(normalizeAssignment)),
+    integration: input.integration ? normalizeIntegration(input.integration) : undefined,
+    policy: freezeRecord({ ...policy })
+  });
+};
+
+export const validateSupervisorDelegationPlan = (
+  input: SupervisorDelegationPlanInput | SupervisorDelegationPlan
+): SupervisorDelegationValidation => {
+  const plan = isDelegationPlan(input) ? input : createSupervisorDelegationPlan(input);
+  const violations: string[] = [];
+
+  if (plan.policy.mode === "delegate-only" && (plan.policy.allowSupervisorDirectEdits || plan.directEditsRequested)) {
+    violations.push("Supervisor direct product-code edits are disabled in delegate-only mode.");
+  }
+
+  if (plan.policy.requireDelegationLog && plan.assignments.length === 0) {
+    violations.push("Supervisor execution requires at least one delegated assignment in the audit log.");
+  }
+
+  if (plan.policy.requireAgentWorktreeBinding) {
+    for (const assignment of plan.assignments) {
+      if (!assignment.worktreePath) {
+        violations.push(`Assignment '${assignment.agentLabel}' is missing a bound worktree path.`);
+      }
+    }
+
+    if (plan.integration && !plan.integration.worktreePath) {
+      violations.push(`Integration agent '${plan.integration.agentLabel}' is missing a bound worktree path.`);
+    }
+  }
+
+  if (plan.policy.requireDedicatedIntegrationAgent) {
+    if (!plan.integration) {
+      violations.push(`Supervisor execution requires a dedicated ${plan.policy.integrationAgentLabel} agent for integration.`);
+    } else if (plan.assignments.some((assignment) => assignment.agentLabel === plan.integration!.agentLabel)) {
+      violations.push("Integration agent must stay distinct from implementation agents when dedicated integration is required.");
+    }
+  }
+
+  return freezeRecord({
+    valid: violations.length === 0,
+    violations: freezeList(violations),
+    plan
+  });
+};

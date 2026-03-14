@@ -90,12 +90,32 @@ describe("supervisor-routing", () => {
       workUnitId: "sc-325",
       intent: "backend",
       executionPath: "execute",
-      leadRole: "DEV",
+      leadRole: "BE",
       confidence: "high",
       laneId: "lane-1",
       assignedOwner: "alice",
       nextAction: "none"
     });
+    expect(result.decisionEvidence).toEqual({
+      signalScore: 4,
+      minimumSignalScore: 2,
+      matchedSignals: ["intent-profile", "tracked-source", "acceptance-criteria", "planned-lane"],
+      fallbackTriggered: false,
+      fallbackReason: "none"
+    });
+    expect(result.thresholdEvents).toEqual([
+      {
+        eventId: "routing:sc-325:2:4",
+        guardrail: "routing",
+        thresholdKey: "minimum-signal-score",
+        status: "within-threshold",
+        thresholdValue: 2,
+        observedValue: 4,
+        reasonCode: undefined,
+        summary: "Routing signal score 4 met the minimum score 2.",
+        evidence: result.decisionEvidence
+      }
+    ]);
     expect(result.reasonDetails.map((detail) => detail.code)).toEqual([
       "route.intent-profile",
       "route.lane-match",
@@ -198,6 +218,7 @@ describe("supervisor-routing", () => {
     expect(result.executionPath).toBe("safe-hold");
     expect(result.nextAction).toBe("wait-for-prerequisites");
     expect(result.missingPrerequisites).toEqual(["sc-399"]);
+    expect(result.decisionEvidence.fallbackReason).toBe("missing-prerequisites");
     expect(result.reasonDetails.map((detail) => detail.code)).toEqual(["fallback.missing-prerequisites"]);
   });
 
@@ -221,8 +242,21 @@ describe("supervisor-routing", () => {
     expect(result.intent).toBe("mixed");
     expect(result.confidence).toBe("low");
     expect(result.executionPath).toBe("safe-hold");
-    expect(result.leadRole).toBe("PM");
+    expect(result.leadRole).toBe("CTO");
     expect(result.nextAction).toBe("manual-triage");
+    expect(result.thresholdEvents).toEqual([
+      {
+        eventId: "routing:wu-low-confidence:2:0",
+        guardrail: "routing",
+        thresholdKey: "minimum-signal-score",
+        status: "triggered",
+        thresholdValue: 2,
+        observedValue: 0,
+        reasonCode: "fallback.low-confidence",
+        summary: "Routing signal score 0 stayed below the minimum score 2.",
+        evidence: result.decisionEvidence
+      }
+    ]);
     expect(result.reasonDetails.map((detail) => detail.code)).toEqual(["fallback.low-confidence"]);
   });
 });
