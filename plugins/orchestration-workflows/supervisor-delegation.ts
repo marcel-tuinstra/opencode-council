@@ -3,8 +3,20 @@ import type { Role } from "./types";
 
 const EXECUTION_ROLES = Object.freeze(["DEV", "FE", "BE", "UX"] as const satisfies readonly Role[]);
 const MANAGER_ROLES = Object.freeze(["CEO", "CTO", "PM", "PO", "RESEARCH", "MARKETING"] as const satisfies readonly Role[]);
-const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|fix|ship|write code|develop|patch|refactor|debug|wire up)\b/i;
-const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|validate architecture|validate scope|test plan|review test plan|deliver roadmap)\b/i;
+const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|ship|write code|develop|patch|refactor|debug|wire up)\b/i;
+const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
+  /\bimplement\b/i,
+  /\bbuild\b/i,
+  /\bfix\b/i,
+  /\bpatch\b/i,
+  /\brefactor\b/i,
+  /\bdebug\b/i,
+  /\bwire up\b/i,
+  /\brun tests?\b/i,
+  /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature)\b/i,
+  /\btest (the )?(fix|change|implementation|workflow|feature)\b/i
+]);
+const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|test plan|review test plan|deliver roadmap|validate architecture|validate scope)\b/i;
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;
@@ -111,6 +123,10 @@ const isManagerRole = (role: Role): boolean => (MANAGER_ROLES as readonly Role[]
 const hasImplementationResponsibility = (responsibilities: readonly string[]): boolean => responsibilities
   .some((responsibility) => {
     const normalized = responsibility.trim();
+
+    if (IMPLEMENTATION_PHRASE_REGEXES.some((regex) => regex.test(normalized))) {
+      return true;
+    }
 
     if (!IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized)) {
       return false;

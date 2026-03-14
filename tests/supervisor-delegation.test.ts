@@ -229,4 +229,70 @@ describe("supervisor-delegation", () => {
     expect(result.valid).toBe(true);
     expect(result.violations).toEqual([]);
   });
+
+  it("still rejects mixed manager responsibilities that include real implementation work", () => {
+    // Arrange
+    const input = {
+      assignments: [{
+        storyId: "sc-v1-boundary",
+        role: "CTO" as const,
+        agentLabel: "CTO",
+        worktreePath: "/tmp/wt-cto",
+        responsibilities: ["Review the diff and implement the fix"]
+      }],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'CTO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
+
+  it("rejects manager-owned execution phrasing like run tests or validate the fix", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Run tests for the release flow"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "CEO" as const,
+          agentLabel: "CEO",
+          worktreePath: "/tmp/wt-ceo",
+          responsibilities: ["Validate the fix before launch"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'PM' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Assignment 'CEO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
 });
