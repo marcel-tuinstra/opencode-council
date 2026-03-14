@@ -1,6 +1,9 @@
 export const SUPPORTED_ROLES = [
   "CTO",
   "DEV",
+  "FE",
+  "BE",
+  "UX",
   "PO",
   "PM",
   "CEO",
@@ -9,7 +12,7 @@ export const SUPPORTED_ROLES = [
 ] as const;
 
 export type Role = (typeof SUPPORTED_ROLES)[number];
-export type Intent = "backend" | "design" | "marketing" | "roadmap" | "research" | "mixed";
+export type Intent = "frontend" | "backend" | "design" | "marketing" | "roadmap" | "research" | "mixed";
 
 export type McpProviderConfig = {
   key: string;

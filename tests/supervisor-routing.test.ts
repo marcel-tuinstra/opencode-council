@@ -90,7 +90,7 @@ describe("supervisor-routing", () => {
       workUnitId: "sc-325",
       intent: "backend",
       executionPath: "execute",
-      leadRole: "DEV",
+      leadRole: "BE",
       confidence: "high",
       laneId: "lane-1",
       assignedOwner: "alice",
@@ -242,7 +242,7 @@ describe("supervisor-routing", () => {
     expect(result.intent).toBe("mixed");
     expect(result.confidence).toBe("low");
     expect(result.executionPath).toBe("safe-hold");
-    expect(result.leadRole).toBe("PM");
+    expect(result.leadRole).toBe("CTO");
     expect(result.nextAction).toBe("manual-triage");
     expect(result.thresholdEvents).toEqual([
       {

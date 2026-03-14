@@ -2,6 +2,7 @@ import type { Intent, Role } from "./types";
 
 export const TURN_COUNTS = {
   default: { 2: 8, 3: 10, 4: 12, 5: 12, max: 14 },
+  frontend: { 2: 8, 3: 10, 4: 10, max: 12 },
   backend: { 2: 8, 3: 10, 4: 10, max: 12 },
   marketing: { 2: 10, 3: 10, max: 12 }
 } as const;
@@ -10,6 +11,21 @@ export const DEFAULT_ROLE_ALIASES: Record<string, Role> = {
   cto: "CTO",
   dev: "DEV",
   developer: "DEV",
+  engineer: "DEV",
+  fullstack: "DEV",
+  "full-stack": "DEV",
+  "full-stack-dev": "DEV",
+  fe: "FE",
+  frontend: "FE",
+  "frontend-dev": "FE",
+  be: "BE",
+  backend: "BE",
+  "backend-dev": "BE",
+  ux: "UX",
+  ui: "UX",
+  "ui-ux": "UX",
+  uiux: "UX",
+  "ui-ux-reviewer": "UX",
   po: "PO",
   pm: "PM",
   ceo: "CEO",
@@ -30,6 +46,10 @@ export const DEEP_MCP_REGEX =
   /\b(deeper|deep dive|thorough|comprehensive|full investigation|as needed|as much as needed|exhaustive)\b/i;
 
 export const INTENT_KEYWORDS: Record<Intent, RegExp[]> = {
+  frontend: [
+    /frontend|front-end|component|responsive|layout|css|tailwind|animation|interaction|client-side/i,
+    /react|vue|nuxt|next(?:\.js)|nextjs|tsx|jsx|state|hydration|storybook/i
+  ],
   backend: [
     /api|latency|database|db|cache|query|service|backend|throughput|p95|p99|infra|performance/i,
     /timeout|retry|index|n\+1|scaling|server|endpoint|queue/i
@@ -54,9 +74,24 @@ export const INTENT_KEYWORDS: Record<Intent, RegExp[]> = {
 };
 
 export const INTENT_ROLE_WEIGHTS: Record<Intent, Record<Role, number>> = {
+  frontend: {
+    CTO: 3,
+    DEV: 3,
+    FE: 5,
+    BE: 1,
+    UX: 4,
+    PM: 2,
+    PO: 3,
+    CEO: 1,
+    MARKETING: 1,
+    RESEARCH: 1
+  },
   backend: {
-    CTO: 5,
-    DEV: 5,
+    CTO: 4,
+    DEV: 3,
+    FE: 0,
+    BE: 5,
+    UX: 0,
     PM: 2,
     PO: 2,
     CEO: 1,
@@ -65,16 +100,22 @@ export const INTENT_ROLE_WEIGHTS: Record<Intent, Record<Role, number>> = {
   },
   design: {
     CTO: 2,
-    DEV: 2,
-    PM: 4,
+    DEV: 1,
+    FE: 2,
+    BE: 0,
+    UX: 5,
+    PM: 3,
     PO: 4,
     CEO: 1,
-    MARKETING: 3,
+    MARKETING: 2,
     RESEARCH: 3
   },
   marketing: {
     CTO: 1,
     DEV: 1,
+    FE: 1,
+    BE: 0,
+    UX: 1,
     PM: 2,
     PO: 2,
     CEO: 4,
@@ -84,6 +125,9 @@ export const INTENT_ROLE_WEIGHTS: Record<Intent, Record<Role, number>> = {
   roadmap: {
     CTO: 3,
     DEV: 2,
+    FE: 1,
+    BE: 1,
+    UX: 1,
     PM: 5,
     PO: 5,
     CEO: 4,
@@ -93,6 +137,9 @@ export const INTENT_ROLE_WEIGHTS: Record<Intent, Record<Role, number>> = {
   research: {
     CTO: 3,
     DEV: 3,
+    FE: 1,
+    BE: 1,
+    UX: 2,
     PM: 2,
     PO: 2,
     CEO: 1,
@@ -101,7 +148,10 @@ export const INTENT_ROLE_WEIGHTS: Record<Intent, Record<Role, number>> = {
   },
   mixed: {
     CTO: 2,
-    DEV: 2,
+    DEV: 3,
+    FE: 2,
+    BE: 2,
+    UX: 2,
     PM: 2,
     PO: 2,
     CEO: 2,

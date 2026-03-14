@@ -18,6 +18,17 @@ describe("intent", () => {
     expect(intent).toBe("backend");
   });
 
+  it("classifies frontend intent", () => {
+    // Arrange
+    const prompt = "Build a responsive React component with improved layout and interaction states";
+
+    // Act
+    const intent = detectIntent(prompt);
+
+    // Assert
+    expect(intent).toBe("frontend");
+  });
+
   it("falls back to mixed when no keywords match", () => {
     // Arrange
     const prompt = "Talk about team vibes and coordination";
@@ -39,16 +50,16 @@ describe("intent", () => {
     expect(sumTurns(targets)).toBe(0);
   });
 
-  it("allocates backend turns with stronger CTO/DEV share", () => {
+  it("allocates backend turns with stronger CTO/BE share", () => {
     // Arrange
 
     // Act
-    const targets = buildTurnTargets(["CTO", "DEV", "PM"], "API latency regression and backend performance");
+    const targets = buildTurnTargets(["CTO", "BE", "PM"], "API latency regression and backend performance");
 
     // Assert
     expect(sumTurns(targets)).toBe(10);
     expect(targets.CTO).toBeGreaterThanOrEqual(targets.PM);
-    expect(targets.DEV).toBeGreaterThanOrEqual(targets.PM);
+    expect(targets.BE).toBeGreaterThanOrEqual(targets.PM);
   });
 
   it("uses max turn fallback for larger role groups", () => {

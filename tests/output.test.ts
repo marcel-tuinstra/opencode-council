@@ -14,6 +14,9 @@ import type { Role } from "../plugins/orchestration-workflows/types";
 const targets: Record<Role, number> = {
   CTO: 2,
   DEV: 1,
+  FE: 0,
+  BE: 0,
+  UX: 0,
   PO: 0,
   PM: 0,
   CEO: 0,

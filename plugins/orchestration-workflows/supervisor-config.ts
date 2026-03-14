@@ -290,6 +290,21 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
     cto: "CTO",
     dev: "DEV",
     developer: "DEV",
+    engineer: "DEV",
+    fullstack: "DEV",
+    "full-stack": "DEV",
+    "full-stack-dev": "DEV",
+    fe: "FE",
+    frontend: "FE",
+    "frontend-dev": "FE",
+    be: "BE",
+    backend: "BE",
+    "backend-dev": "BE",
+    ux: "UX",
+    ui: "UX",
+    "ui-ux": "UX",
+    uiux: "UX",
+    "ui-ux-reviewer": "UX",
     po: "PO",
     pm: "PM",
     ceo: "CEO",
@@ -353,12 +368,13 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
   routing: {
     minimumSignalScore: 2,
     intentProfiles: {
-      backend: { path: "execute", leadRole: "DEV", fallbackLeadRole: "CTO" },
-      design: { path: "coordinate", leadRole: "PM", fallbackLeadRole: "CTO" },
+      frontend: { path: "execute", leadRole: "FE", fallbackLeadRole: "UX" },
+      backend: { path: "execute", leadRole: "BE", fallbackLeadRole: "CTO" },
+      design: { path: "coordinate", leadRole: "UX", fallbackLeadRole: "PO" },
       marketing: { path: "coordinate", leadRole: "MARKETING", fallbackLeadRole: "PM" },
       roadmap: { path: "coordinate", leadRole: "PM", fallbackLeadRole: "CTO" },
       research: { path: "investigate", leadRole: "RESEARCH", fallbackLeadRole: "CTO" },
-      mixed: { path: "execute", leadRole: "CTO", fallbackLeadRole: "PM" }
+      mixed: { path: "execute", leadRole: "DEV", fallbackLeadRole: "CTO" }
     }
   },
   execution: {
@@ -487,6 +503,7 @@ const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
     ]
   },
   compaction: {
+    frontend: { triggerTokens: 720, targetTokens: 430, retainRecentLines: 3 },
     backend: { triggerTokens: 700, targetTokens: 420, retainRecentLines: 3 },
     design: { triggerTokens: 760, targetTokens: 460, retainRecentLines: 3 },
     marketing: { triggerTokens: 640, targetTokens: 380, retainRecentLines: 2 },
@@ -541,6 +558,7 @@ export const DEFAULT_SUPERVISOR_BUDGET = Object.freeze({
 export const DEFAULT_SUPERVISOR_ROUTING = Object.freeze({
   minimumSignalScore: DEFAULT_POLICY_INPUT.routing!.minimumSignalScore!,
   intentProfiles: Object.freeze({
+    frontend: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.frontend }),
     backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.backend }),
     design: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.design }),
     marketing: Object.freeze({ ...DEFAULT_POLICY_INPUT.routing!.intentProfiles!.marketing }),
@@ -589,6 +607,7 @@ export const DEFAULT_SUPERVISOR_GOVERNANCE = Object.freeze({
   )
 }) as Readonly<ResolvedSupervisorPolicy["governance"]>;
 export const DEFAULT_SUPERVISOR_COMPACTION = Object.freeze({
+  frontend: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.frontend }),
   backend: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.backend }),
   design: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.design }),
   marketing: Object.freeze({ ...DEFAULT_POLICY_INPUT.compaction!.marketing }),
@@ -659,6 +678,7 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
   routing: {
     minimumSignalScore: DEFAULT_SUPERVISOR_ROUTING.minimumSignalScore,
     intentProfiles: {
+      frontend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.frontend },
       backend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.backend },
       design: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.design },
       marketing: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.marketing },
@@ -701,6 +721,7 @@ const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
     }))
   },
   compaction: {
+    frontend: { ...DEFAULT_SUPERVISOR_COMPACTION.frontend },
     backend: { ...DEFAULT_SUPERVISOR_COMPACTION.backend },
     design: { ...DEFAULT_SUPERVISOR_COMPACTION.design },
     marketing: { ...DEFAULT_SUPERVISOR_COMPACTION.marketing },
@@ -715,7 +736,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 const isSupportedRole = (value: string): value is Role => {
-  return ["CTO", "DEV", "PO", "PM", "CEO", "MARKETING", "RESEARCH"].includes(value);
+  return ["CTO", "DEV", "FE", "BE", "UX", "PO", "PM", "CEO", "MARKETING", "RESEARCH"].includes(value);
 };
 
 const isSupportedExecutionPath = (value: string): value is SupervisorExecutionPath => {
