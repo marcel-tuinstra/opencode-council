@@ -72,3 +72,11 @@ Use these prompts after restarting OpenCode:
 ```text
 @research Compare approaches and list evidence with confidence and open questions.
 ```
+
+## Specialist boundary regression
+
+Run the dedicated specialist sanity script whenever role routing, aliases, or agent prompts change:
+
+- [`role-sanity-script.md`](./role-sanity-script.md)
+
+This script verifies refusal quality, reroute accuracy, ownership clarity, and supervisor purity across `DEV`, `FE`, `BE`, and `UX`.

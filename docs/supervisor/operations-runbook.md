@@ -5,7 +5,8 @@ This repository does not yet ship a full Supervisor runtime. This runbook define
 ## Operating baseline
 
 - Default policy is `v1-safe`: ask-first escalation, manual merge, and conservative concurrency.
-- Start every implementation lane from fresh `beta`; do not chain work from another feature branch.
+- Start every implementation lane from fresh `main`; do not chain work from another feature branch.
+- Keep one primary repository worktree on `main`; create extra worktrees only as temporary feature or integration checkouts.
 - Keep exactly one active write owner per lane at a time, even when multiple roles participate.
 - Treat `review_ready` as the handoff point where the lane has a reviewable packet and an open PR or equivalent artifact.
 - Use observability snapshots to confirm lane state, heartbeat health, blocker state, policy decisions, ownership transitions, and budget status before changing course.
@@ -29,9 +30,10 @@ Checklist:
 - [ ] Work unit has objective, constraints, acceptance criteria, dependencies, risk tags, evidence links, and source metadata.
 - [ ] Lane dependencies and blocked vs parallelizable work are clear.
 - [ ] Active lane count fits the repository tier cap.
-- [ ] The implementation branch starts from fresh `beta`.
+- [ ] The implementation branch starts from fresh `main`.
 - [ ] Each implementation agent has a distinct worktree.
 - [ ] Integration ownership is assigned to a dedicated integration agent when multiple code-changing agents run in parallel.
+- [ ] Temporary feature worktrees are removed after merge, leaving the primary `main` worktree clean.
 
 ### 2. Active execution
 
@@ -52,13 +54,29 @@ Checklist:
 - [ ] No merge occurs without human approval.
 - [ ] Delegation log still matches the active agents, branches, and worktrees.
 
+### 2a. Worktree operating model
+
+Use this repository layout by default:
+
+```text
+primary worktree -> main
+temporary worktree -> one feature branch or one integration branch
+```
+
+Operational rules:
+
+- Do not keep long-lived feature worktrees after merge.
+- Do not stack unrelated feature work on the same temporary worktree.
+- If a feature needs integration testing, use a dedicated temporary integration worktree and remove it afterward.
+- If the root worktree drifts off `main`, clean it up before starting the next story.
+
 ### 3. Review-ready handoff
 
 Before moving a lane to `review_ready`:
 
 - Build the minimum review-ready packet from `EVIDENCE_PACKET_TEMPLATE.md`.
 - Include acceptance trace, scoped diff summary, verification results, risk or rollback notes, and explicit ownership.
-- Open the PR against `beta` and treat that artifact as part of the handoff evidence.
+- Open the PR against `main` and treat that artifact as part of the handoff evidence.
 - Keep the lane in `active` or `waiting` if the packet is incomplete.
 
 Checklist:

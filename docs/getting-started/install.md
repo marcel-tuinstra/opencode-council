@@ -1,9 +1,10 @@
 # Quick Install
 
 ```bash
-mkdir -p ~/.opencode/plugins ~/.config/opencode/agents
+mkdir -p ~/.opencode/plugins ~/.opencode/agents
 cp plugins/orchestration-workflows.ts ~/.opencode/plugins/orchestration-workflows.ts
-cp agents/*.md ~/.config/opencode/agents/
+cp -R plugins/orchestration-workflows ~/.opencode/plugins/orchestration-workflows
+cp agents/*.md ~/.opencode/agents/
 ```
 
 Restart OpenCode.
@@ -17,6 +18,16 @@ Quick test:
 ```
 
 No `opencode.json` edits required.
+
+## Agent load checklist
+
+Use this checklist if the plugin works but `@fe`, `@be`, or `@ux` do not appear in tag suggestions.
+
+- Confirm plugin files exist in `~/.opencode/plugins/`.
+- Confirm agent profile files exist in `~/.opencode/agents/`.
+- Restart OpenCode after syncing both plugin and agent files.
+- Try a smoke prompt like `@fe @ux Review the landing page interaction flow.`
+- If role parsing works but suggestions do not, re-copy the agent markdown files and restart again.
 
 Notes:
 
@@ -32,3 +43,5 @@ ORCHESTRATION_WORKFLOWS_DEBUG=1 opencode web
 ```
 
 This enables plugin debug logging to stderr. Look for lines prefixed with `[orchestration-workflows]`.
+
+If the debug output shows `FE`, `BE`, or `UX` in role parsing but the picker still hides them, the most likely problem is a missing or stale `~/.opencode/agents/*.md` sync.

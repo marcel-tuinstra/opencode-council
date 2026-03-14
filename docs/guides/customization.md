@@ -156,7 +156,7 @@ Agent files are plain markdown with optional frontmatter.
 
 Where agents live:
 
-- Global: `~/.config/opencode/agents/`
+- Local OpenCode home: `~/.opencode/agents/`
 - Project-local: `.opencode/agents/`
 
 Filename defines mention handle:
@@ -187,3 +187,28 @@ Prefer short diagnostics, explicit tradeoffs, and practical next steps.
 - Supervisor policy defaults now live in `POLICY_PROFILES.md`; keep repo-specific overrides aligned with that contract.
 - Budget environment variables in `plugins/orchestration-workflows/budget.ts` still override the repo policy file at runtime.
 - After changes, run a quick prompt with multi-mentions and provider names to verify behavior.
+- After merges, sync both plugin files and `~/.opencode/agents/` before concluding that new roles are missing.
+
+## 6) Full-stack default versus specialist roles
+
+Use `DEV` as the default implementation role when the request is mixed or when you want one generalist owner.
+
+Use specialist roles only when the work benefits from tighter boundaries:
+
+- `FE`: UI implementation and frontend delivery details
+- `BE`: API, persistence, validation, and backend failure semantics
+- `UX`: interaction intent, content hierarchy, and usability review
+
+Recommended examples:
+
+```text
+@dev Ship the smallest full-stack fix for this bug and list the verification steps.
+```
+
+```text
+@be Investigate why API latency regressed and propose the backend fix plan.
+```
+
+```text
+@fe @ux Review the onboarding flow and tighten the mobile interaction model.
+```
