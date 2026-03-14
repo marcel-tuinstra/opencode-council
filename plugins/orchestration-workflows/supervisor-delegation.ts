@@ -13,12 +13,14 @@ const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\bdebug\b/i,
   /\bwire up\b/i,
   /\bwrite (the )?(migration|feature|fix|patch|implementation|workflow)\b/i,
+  /\bwrite (the )?(api client|client|integration)\b/i,
   /\bdeliver (the )?(feature|fix|implementation|workflow|patch)\b/i,
   /\brun tests?\b/i,
+  /\btest (the )?(release candidate|rc|fix|change|implementation|workflow|feature)\b/i,
   /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature)\b/i,
   /\btest (the )?(fix|change|implementation|workflow|feature)\b/i
 ]);
-const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|test plan|review test plan|deliver roadmap|validate architecture|validate scope)\b/i;
+const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|test plan|review test plan|deliver roadmap|deliver messaging plan|write release notes|validate architecture|validate scope)\b/i;
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;

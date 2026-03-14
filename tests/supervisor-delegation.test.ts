@@ -333,4 +333,76 @@ describe("supervisor-delegation", () => {
       "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
     ]));
   });
+
+  it("rejects manager-owned execution phrasing for testing and api implementation work", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Test the release candidate"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "CTO" as const,
+          agentLabel: "CTO",
+          worktreePath: "/tmp/wt-cto",
+          responsibilities: ["Write the API client"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'PM' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Assignment 'CTO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
+
+  it("does not flag release-notes or messaging-plan work as implementation ownership", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Write release notes"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "MARKETING" as const,
+          agentLabel: "MARKETING",
+          worktreePath: "/tmp/wt-marketing",
+          responsibilities: ["Deliver messaging plan"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
 });
