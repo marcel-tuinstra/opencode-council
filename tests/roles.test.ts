@@ -12,24 +12,30 @@ describe("roles", () => {
 
     // Act
     const developer = normalizeRole("developer");
+    const frontend = normalizeRole("frontend");
+    const backend = normalizeRole("be");
+    const ux = normalizeRole("ui-ux-reviewer");
     const cto = normalizeRole("cto");
     const unknown = normalizeRole("unknown");
 
     // Assert
     expect(developer).toBe("DEV");
+    expect(frontend).toBe("FE");
+    expect(backend).toBe("BE");
+    expect(ux).toBe("UX");
     expect(cto).toBe("CTO");
     expect(unknown).toBeNull();
   });
 
   it("detects supported mentions", () => {
     // Arrange
-    const text = "@cto @dev @pm";
+    const text = "@cto @fe @be @ux @pm";
 
     // Act
     const roles = detectRolesFromMentions(text);
 
     // Assert
-    expect(roles).toEqual(["CTO", "DEV", "PM"]);
+    expect(roles).toEqual(["CTO", "FE", "BE", "UX", "PM"]);
   });
 
   it("ignores file references", () => {

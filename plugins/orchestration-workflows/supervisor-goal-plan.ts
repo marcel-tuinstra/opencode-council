@@ -260,7 +260,7 @@ export const planSupervisorGoal = (input: PlanSupervisorGoalInput): PlanSupervis
       reasons: dedupeStrings(reasons.concat("Goal is too ambiguous for safe autonomous planning.")),
       remediation: Object.freeze([
         "State one concrete deliverable (for example: code change, review packet, or validation outcome).",
-        "State at least one domain signal (backend, roadmap, design, marketing, or research).",
+        "State at least one domain signal (frontend, backend, roadmap, design, marketing, or research).",
         "State a safety boundary when relevant (merge, release, destructive, or security-sensitive)."
       ])
     };

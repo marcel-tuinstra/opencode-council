@@ -37,6 +37,7 @@ type BaselineStats = {
 };
 
 const WORKFLOW_MULTIPLIERS: Record<Intent, number> = {
+  frontend: 1.05,
   backend: 1.1,
   design: 0.95,
   marketing: 0.9,

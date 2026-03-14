@@ -15,6 +15,9 @@ describe("supervisor-config", () => {
     expect(result.valid).toBe(true);
     expect(result.config.profile).toBe("v1-safe");
     expect(result.config.roleAliases.developer).toBe("DEV");
+    expect(result.config.roleAliases.frontend).toBe("FE");
+    expect(result.config.roleAliases.backend).toBe("BE");
+    expect(result.config.roleAliases.ui).toBe("UX");
     expect(result.config.limits.lanes.activeCapsByTier["medium-moderate-risk"]).toBe(3);
     expect(result.config.execution).toEqual({
       mode: "delegate-only",
@@ -32,7 +35,23 @@ describe("supervisor-config", () => {
       "review-governance-and-runtime-policy",
       "allow-default-repository-scope"
     ]);
+    expect(result.config.routing.intentProfiles.frontend).toEqual({
+      path: "execute",
+      leadRole: "FE",
+      fallbackLeadRole: "UX"
+    });
+    expect(result.config.routing.intentProfiles.backend).toEqual({
+      path: "execute",
+      leadRole: "BE",
+      fallbackLeadRole: "CTO"
+    });
+    expect(result.config.routing.intentProfiles.design).toEqual({
+      path: "coordinate",
+      leadRole: "UX",
+      fallbackLeadRole: "PO"
+    });
     expect(result.config.compaction.backend.retainRecentLines).toBe(3);
+    expect(result.config.compaction.frontend.retainRecentLines).toBe(3);
   });
 
   it("applies execution policy overrides from repo config", () => {
