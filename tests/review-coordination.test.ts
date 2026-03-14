@@ -459,7 +459,7 @@ describe("review-coordination", () => {
       },
       pullRequest: {
         title: "Preserve blocked review routing metadata",
-        baseRef: "beta",
+        baseRef: "main",
         headRef: "marceltuinstra/sc-441-review-routing",
         summary: ["Carries blocked routing metadata into the review coordination bundle."],
         before: "Blocked handoff context was implicit outside the review packet.",
@@ -547,7 +547,7 @@ describe("review-coordination", () => {
       },
       pullRequest: {
         title: "Preserve scheduler review routing in bundle prep",
-        baseRef: "beta",
+        baseRef: "main",
         headRef: "marceltuinstra/sc-441-governance-policy-engine-review-routing",
         summary: ["Carries the scheduler review routing decision into the bundle."],
         before: "Bundle prep recomputed review routing without the scheduler's final governance decision.",

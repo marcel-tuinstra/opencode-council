@@ -1,6 +1,6 @@
-# Supervisor Beta Golden Traces
+# Supervisor Golden Traces
 
-This document is the reviewable release-readiness reference for Shortcut story `sc-439` (`Supervisor Scenario Evals + Golden Traces`). It keeps Beta validation at the test layer on top of the existing supervisor execution workflow rather than introducing a new runtime entry point.
+This document is the reviewable release-readiness reference for Shortcut story `sc-439` (`Supervisor Scenario Evals + Golden Traces`). It keeps release-readiness validation at the test layer on top of the existing supervisor execution workflow rather than introducing a new runtime entry point.
 
 ## Validation target
 
@@ -23,9 +23,9 @@ This document is the reviewable release-readiness reference for Shortcut story `
 
 - The fixture file names the five required reliability scenarios and their expected golden traces.
 - Each scenario asserts plan shape, governance routing, and final run or lane state from the shipped execution workflow helpers.
-- The release-readiness proof test compacts the scenario outcomes into one matrix so Beta reviewers can confirm all five traces stayed stable.
+- The release-readiness proof test compacts the scenario outcomes into one matrix so reviewers can confirm all five traces stayed stable.
 
-## Why this is enough for Beta readiness
+## Why this is enough for release readiness
 
 - It proves the must-pass scenarios on the current workflow surface without widening runtime scope.
 - It keeps trace assertions deterministic by pinning timestamps and avoiding temp-path assertions.

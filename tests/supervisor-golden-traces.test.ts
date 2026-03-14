@@ -194,7 +194,7 @@ const createReviewReadyPacketInput = (input: {
       status: "done"
     }
   ],
-  scopedDiffSummary: [`Captures the ${input.scenarioName} golden trace through the existing beta workflow.`],
+  scopedDiffSummary: [`Captures the ${input.scenarioName} golden trace through the existing supervisor workflow.`],
   verificationResults: [
     {
       check: "npm test -- tests/supervisor-golden-traces.test.ts",
@@ -325,7 +325,7 @@ const bootstrapScenario = (
     actor: "supervisor",
     occurredAt: "2026-03-13T20:00:00.000Z",
     objective: `Execute the ${scenario.name} golden trace.`,
-    goal: `Validate the ${scenario.name} beta workflow scenario.`,
+    goal: `Validate the ${scenario.name} supervisor workflow scenario.`,
     workUnits,
     readyDependencyReferences: [],
     mutationId: `bootstrap:${scenario.id}`
@@ -347,7 +347,7 @@ const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenar
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const second = harness.workflow.advanceRun({
     runId,
@@ -356,7 +356,7 @@ const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenar
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const packet = createReviewReadyPacketInput({
     runId,
@@ -376,7 +376,7 @@ const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenar
     repoRiskTier: "medium-moderate-risk",
     lanes: [{ ...laneInputs[0]!, reviewReadyPacket: packet }],
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const state = harness.store.getRunState(runId)!;
 
@@ -400,7 +400,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a", "developer-b"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const second = harness.workflow.advanceRun({
     runId,
@@ -409,7 +409,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a", "developer-b"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const laneOnePacket = createReviewReadyPacketInput({
     runId,
@@ -428,7 +428,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
       laneInputs[1]!
     ],
     sessionOwners: ["developer-a", "developer-b"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const fourth = harness.workflow.advanceRun({
     runId,
@@ -440,7 +440,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
       laneInputs[1]!
     ],
     sessionOwners: ["developer-a", "developer-b"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const fifth = harness.workflow.advanceRun({
     runId,
@@ -452,7 +452,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
       laneInputs[1]!
     ],
     sessionOwners: ["developer-a", "developer-b"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const packet = createReviewReadyPacketInput({
     runId,
@@ -475,7 +475,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
       { ...laneInputs[1]!, reviewReadyPacket: packet }
     ],
     sessionOwners: ["developer-a", "developer-b"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const state = harness.store.getRunState(runId)!;
 
@@ -500,7 +500,7 @@ const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixt
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const second = harness.workflow.advanceRun({
     runId,
@@ -509,7 +509,7 @@ const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixt
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const packet = createReviewReadyPacketInput({
     runId,
@@ -530,7 +530,7 @@ const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixt
     repoRiskTier: "medium-moderate-risk",
     lanes: [{ ...laneInputs[0]!, reviewReadyPacket: packet }],
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const state = harness.store.getRunState(runId)!;
 
@@ -554,7 +554,7 @@ const runProtectedPathGovernanceBlock = (harness: ScenarioHarness, scenario: Gol
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const second = harness.workflow.advanceRun({
     runId,
@@ -563,7 +563,7 @@ const runProtectedPathGovernanceBlock = (harness: ScenarioHarness, scenario: Gol
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const protectedPathDecision = evaluateProtectedPathPolicy(
     scenario.changedPaths ?? [],
@@ -601,7 +601,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const second = harness.workflow.advanceRun({
     runId,
@@ -610,7 +610,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   harness.sessions.detectStalledSession({
     runId,
@@ -628,7 +628,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     repoRiskTier: "medium-moderate-risk",
     lanes: laneInputs,
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const approvalRequest = {
     boundary: "merge" as const,
@@ -643,7 +643,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     repoRiskTier: "medium-moderate-risk",
     lanes: [{ ...laneInputs[0]!, approvalGate: { request: approvalRequest } }],
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const governance = mapGovernanceDecision(evaluateGovernancePolicy({
     checkpoint: "review-ready",
@@ -669,7 +669,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
       }
     }],
     sessionOwners: ["developer-a"],
-    baseRef: "origin/beta"
+    baseRef: "origin/main"
   });
   const state = harness.store.getRunState(runId)!;
 
@@ -722,7 +722,7 @@ describe("supervisor-golden-traces", () => {
     });
   }
 
-  it("produces a compact beta release-readiness proof from the scenario outcomes", () => {
+  it("produces a compact release-readiness proof from the scenario outcomes", () => {
     // Arrange + Act
     const proof = supervisorGoldenTracesFixture.scenarios.map((scenario) => {
       const trace = runScenario(scenario);

@@ -92,7 +92,7 @@ const slugify = (value: string): string => value
 const buildBranchPrefix = (target: SupervisorBootstrapTarget): string => {
   const organization = slugify(target.organization) || "org";
   const repository = slugify(target.repository) || "repo";
-  return `beta/${organization}/${repository}`;
+  return `work/${organization}/${repository}`;
 };
 
 const buildPolicyCheck = (): SupervisorBootstrapCheck => {
@@ -112,7 +112,7 @@ const buildPolicyCheck = (): SupervisorBootstrapCheck => {
     return {
       key: "policy-defaults",
       status: "ready",
-      summary: "Beta policy stays fail-closed with manual merge review and single active worktree/session defaults.",
+      summary: "Safe policy stays fail-closed with manual merge review and single active worktree/session defaults.",
       remediation: freezeList([])
     };
   }
@@ -120,11 +120,11 @@ const buildPolicyCheck = (): SupervisorBootstrapCheck => {
   return {
     key: "policy-defaults",
     status: "blocked",
-    summary: "Beta bootstrap requires manual merge review, full approval boundaries, and single active worktree/session defaults.",
+    summary: "Bootstrap requires manual merge review, full approval boundaries, and single active worktree/session defaults.",
     remediation: freezeList([
       "Restore manual merge review before onboarding this repository.",
       "Re-enable all approval boundaries for merge, release, destructive, security, budget, and automation widening decisions.",
-      "Reduce active worktrees and sessions to 1 so Beta stays fail-closed."
+      "Reduce active worktrees and sessions to 1 so the default workflow stays fail-closed."
     ])
   };
 };
@@ -153,7 +153,7 @@ const buildChecks = (
         ? "Repository access is not confirmed for this bootstrap target."
         : "Repository access is confirmed or left to manual verification.",
       remediation: prerequisites?.repoConnected === false
-        ? freezeList(["Confirm the Beta operator can read the repository and create review branches manually."])
+        ? freezeList(["Confirm the operator can read the repository and create review branches manually."])
         : freezeList([])
     },
     {
@@ -227,7 +227,7 @@ const buildRecoveryGuidance = (input: {
     input.recoveryOwner?.trim()
       ? `Escalate blocked or stalled bootstrap steps to ${input.recoveryOwner.trim()} before changing policy or lane definitions.`
       : "Assign a recovery owner before using this preview for onboarding decisions.",
-    "Keep merge, release, destructive, and security-sensitive actions manual during Beta onboarding.",
+    "Keep merge, release, destructive, and security-sensitive actions manual during onboarding.",
     "If routing falls back to safe-hold, resolve the missing prerequisite or ambiguity first and then regenerate the preview."
   ];
 
@@ -257,8 +257,8 @@ const buildSteps = (input: {
       key: "check-prerequisites",
       status: prerequisitesBlocked ? "blocked" : "ready",
       summary: prerequisitesBlocked
-        ? "Bootstrap prerequisites need manual fixes before Beta onboarding is execution-ready."
-        : "Bootstrap prerequisites pass the fail-closed Beta checks."
+        ? "Bootstrap prerequisites need manual fixes before onboarding is execution-ready."
+        : "Bootstrap prerequisites pass the fail-closed default checks."
     },
     {
       key: "plan-goal",

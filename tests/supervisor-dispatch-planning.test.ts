@@ -55,7 +55,7 @@ describe("supervisor-dispatch-planning", () => {
     const result = createSupervisorDispatchPlan({
       goalPlan,
       workUnits,
-      scheduler: { branchPrefix: "beta/sc-437" },
+      scheduler: { branchPrefix: "work/sc-437" },
       readyDependencyReferences: []
     });
 
@@ -68,7 +68,7 @@ describe("supervisor-dispatch-planning", () => {
           sequence: 1,
           workUnitIds: ["implementation"],
           dependsOnLaneIds: [],
-          branch: "beta/sc-437/lane-01"
+          branch: "work/sc-437/lane-01"
         },
         waitingOn: []
       },
@@ -78,7 +78,7 @@ describe("supervisor-dispatch-planning", () => {
           sequence: 2,
           workUnitIds: ["validation"],
           dependsOnLaneIds: ["lane-1"],
-          branch: "beta/sc-437/lane-02"
+          branch: "work/sc-437/lane-02"
         },
         waitingOn: ["implementation"]
       }

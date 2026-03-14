@@ -10,7 +10,7 @@ describe("supervisor-bootstrap", () => {
       {
         id: "implementation",
         workUnit: normalizeWorkUnit({
-          objective: "Implement the beta supervisor bootstrap helper",
+          objective: "Implement the supervisor bootstrap helper",
           acceptanceCriteria: ["Helper returns a deterministic preview"],
           source: {
             kind: "ad-hoc",
@@ -52,10 +52,10 @@ describe("supervisor-bootstrap", () => {
     const result = createSupervisorBootstrapPreview({
       target: {
         organization: "Acme Platform",
-        repository: "Supervisor Beta",
-        baseBranch: "beta"
+        repository: "Supervisor",
+        baseBranch: "main"
       },
-      goal: "CTO, implement beta bootstrap planning, verify it with tests, and prepare review guidance.",
+      goal: "CTO, implement supervisor bootstrap planning, verify it with tests, and prepare review guidance.",
       workUnits,
       prerequisites: {
         repoConnected: true,
@@ -68,7 +68,7 @@ describe("supervisor-bootstrap", () => {
 
     // Assert
     expect(result.status).toBe("supported");
-    expect(result.target.branchPrefix).toBe("beta/acme-platform/supervisor-beta");
+    expect(result.target.branchPrefix).toBe("work/acme-platform/supervisor");
     expect(result.steps.map((step) => step.key)).toEqual([
       "check-prerequisites",
       "plan-goal",
@@ -93,7 +93,7 @@ describe("supervisor-bootstrap", () => {
       {
         id: "implementation",
         workUnit: normalizeWorkUnit({
-          objective: "Implement the beta supervisor bootstrap helper",
+          objective: "Implement the supervisor bootstrap helper",
           source: {
             kind: "ad-hoc",
             title: "Implementation"
@@ -114,8 +114,8 @@ describe("supervisor-bootstrap", () => {
     const result = createSupervisorBootstrapPreview({
       target: {
         organization: "",
-        repository: "Supervisor Beta",
-        baseBranch: "beta"
+        repository: "Supervisor",
+        baseBranch: "main"
       },
       goal: "Help?",
       workUnits,

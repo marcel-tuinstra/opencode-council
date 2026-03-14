@@ -143,7 +143,7 @@ describe("supervisor-execution-workflow", () => {
       {
         id: "workflow-core",
         workUnit: normalizeWorkUnit({
-          objective: "Ship the beta supervisor execution workflow core.",
+          objective: "Ship the supervisor execution workflow core.",
           acceptanceCriteria: [
             "One delegated run finishes with visible workflow checkpoints",
             "Recovery and approval checkpoints remain resumable"
@@ -169,7 +169,7 @@ describe("supervisor-execution-workflow", () => {
       actor: "supervisor",
       occurredAt: "2026-03-13T20:00:00.000Z",
       objective: "Execute one thin delegated supervisor run with durable checkpoints.",
-      goal: "Implement the beta supervisor execution workflow, keep checkpoints explicit, and prepare review evidence.",
+      goal: "Implement the supervisor execution workflow, keep checkpoints explicit, and prepare review evidence.",
       workUnits,
       readyDependencyReferences: [],
       delegation: {
@@ -198,7 +198,7 @@ describe("supervisor-execution-workflow", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes: bootstrap.dispatchPlan.laneInputs,
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     const launchDispatch = workflow.advanceRun({
       runId: "run-sc-328",
@@ -207,7 +207,7 @@ describe("supervisor-execution-workflow", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes: bootstrap.dispatchPlan.laneInputs,
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     sessions.detectStalledSession({
       runId: "run-sc-328",
@@ -225,7 +225,7 @@ describe("supervisor-execution-workflow", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes: bootstrap.dispatchPlan.laneInputs,
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     const approvalBlocked = workflow.advanceRun({
       runId: "run-sc-328",
@@ -237,14 +237,14 @@ describe("supervisor-execution-workflow", () => {
         approvalGate: {
           request: {
             boundary: "merge",
-            requestedAction: "merge lane-1 into origin/beta",
+            requestedAction: "merge lane-1 into origin/main",
             summary: "Pause at the merge checkpoint.",
-            rationale: "Beta core keeps merge progression fail-closed."
+            rationale: "Mainline workflow keeps merge progression fail-closed."
           }
         }
       })),
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     const approvalResumed = workflow.advanceRun({
       runId: "run-sc-328",
@@ -256,9 +256,9 @@ describe("supervisor-execution-workflow", () => {
         approvalGate: {
           request: {
             boundary: "merge",
-            requestedAction: "merge lane-1 into origin/beta",
+            requestedAction: "merge lane-1 into origin/main",
             summary: "Pause at the merge checkpoint.",
-            rationale: "Beta core keeps merge progression fail-closed."
+            rationale: "Mainline workflow keeps merge progression fail-closed."
           },
           signal: {
             status: "approved",
@@ -269,7 +269,7 @@ describe("supervisor-execution-workflow", () => {
         }
       })),
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     const reviewBoundaryBlocked = workflow.advanceRun({
       runId: "run-sc-328",
@@ -302,7 +302,7 @@ describe("supervisor-execution-workflow", () => {
         }
       })),
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     const reviewReady = workflow.advanceRun({
       runId: "run-sc-328",
@@ -327,14 +327,14 @@ describe("supervisor-execution-workflow", () => {
               notes: "Exercises bootstrap, recovery, approval, review, and reconstruction."
             }
           ],
-          riskRollbackNotes: ["Rollback by removing the orchestration wrapper if beta wants to fall back to individual helpers."],
+          riskRollbackNotes: ["Rollback by removing the orchestration wrapper if main needs to fall back to individual helpers."],
           handoff: {
             laneId: "lane-1",
             currentOwner: "DEV",
             nextOwner: "REVIEWER",
             transferScope: "review",
             transferTrigger: "Governance checkpoint cleared and review packet is complete.",
-            deltaSummary: "Adds the beta execution wrapper.",
+            deltaSummary: "Adds the execution workflow wrapper.",
             risks: ["A missing workflow event would make restart reconstruction harder."],
             nextRequiredEvidence: ["review bundle", "validation output"],
             evidenceAttached: ["tests/supervisor-execution-workflow.test.ts"]
@@ -349,7 +349,7 @@ describe("supervisor-execution-workflow", () => {
               nextOwner: "REVIEWER",
               transferScope: "review",
               transferTrigger: "Governance checkpoint cleared and review packet is complete.",
-              deltaSummary: "Adds the beta execution wrapper.",
+              deltaSummary: "Adds the execution workflow wrapper.",
               risks: ["A missing workflow event would make restart reconstruction harder."],
               nextRequiredEvidence: ["review bundle", "validation output"],
               evidenceAttached: ["tests/supervisor-execution-workflow.test.ts"]
@@ -358,7 +358,7 @@ describe("supervisor-execution-workflow", () => {
               {
                 laneId: "lane-1",
                 kind: "branch",
-                uri: "branch:marceltuinstra/sc-328-beta-core",
+                uri: "branch:marceltuinstra/sc-328-main-core",
                 label: "Lane branch"
               },
               {
@@ -379,7 +379,7 @@ describe("supervisor-execution-workflow", () => {
         }
       })),
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     const reviewBundles = workflow.prepareReviewBundles({
       runId: "run-sc-328",
@@ -405,14 +405,14 @@ describe("supervisor-execution-workflow", () => {
                 notes: "Exercises bootstrap, recovery, approval, review, and reconstruction."
               }
             ],
-            riskRollbackNotes: ["Rollback by removing the orchestration wrapper if beta wants to fall back to individual helpers."],
+            riskRollbackNotes: ["Rollback by removing the orchestration wrapper if main needs to fall back to individual helpers."],
             handoff: {
               laneId: "lane-1",
               currentOwner: "DEV",
               nextOwner: "REVIEWER",
               transferScope: "review",
               transferTrigger: "Governance checkpoint cleared and review packet is complete.",
-              deltaSummary: "Adds the beta execution wrapper.",
+              deltaSummary: "Adds the execution workflow wrapper.",
               risks: ["A missing workflow event would make restart reconstruction harder."],
               nextRequiredEvidence: ["review bundle", "validation output"],
              evidenceAttached: ["tests/supervisor-execution-workflow.test.ts"]
@@ -427,7 +427,7 @@ describe("supervisor-execution-workflow", () => {
                 nextOwner: "REVIEWER",
                 transferScope: "review",
                 transferTrigger: "Governance checkpoint cleared and review packet is complete.",
-                deltaSummary: "Adds the beta execution wrapper.",
+                deltaSummary: "Adds the execution workflow wrapper.",
                 risks: ["A missing workflow event would make restart reconstruction harder."],
                 nextRequiredEvidence: ["review bundle", "validation output"],
                 evidenceAttached: ["tests/supervisor-execution-workflow.test.ts"]
@@ -436,7 +436,7 @@ describe("supervisor-execution-workflow", () => {
                 {
                   laneId: "lane-1",
                   kind: "branch",
-                  uri: "branch:marceltuinstra/sc-328-beta-core",
+                  uri: "branch:marceltuinstra/sc-328-main-core",
                   label: "Lane branch"
                 },
                 {
@@ -465,9 +465,9 @@ describe("supervisor-execution-workflow", () => {
           },
           pullRequest: {
             title: "Add supervisor execution workflow v1",
-            baseRef: "origin/beta",
-            headRef: "marceltuinstra/sc-328-beta-core",
-            summary: ["Adds a thin delegated orchestration layer over the existing beta modules."],
+            baseRef: "origin/main",
+            headRef: "marceltuinstra/sc-328-main-core",
+            summary: ["Adds a thin delegated orchestration layer over the existing supervisor modules."],
             before: "Operators had to stitch together planning, dispatch, recovery, and review helpers manually.",
             after: "Operators can drive one delegated run through explicit checkpoints and durable reconstruction.",
             example: ["One delegated lane pauses for approval, resumes, and reaches review ready with an auditable trace."],
@@ -495,7 +495,7 @@ describe("supervisor-execution-workflow", () => {
         complete: true
       })),
       sessionOwners: ["DEV"],
-      baseRef: "origin/beta"
+      baseRef: "origin/main"
     });
     const reconstructed = workflow.reconstructRun("run-sc-328");
     const summary = workflow.buildRunSummary({
@@ -515,7 +515,7 @@ describe("supervisor-execution-workflow", () => {
     expect(approvalBlocked.stage).toBe("approval");
     expect(approvalBlocked.status).toBe("blocked");
     expect(approvalBlocked.nextAction).toBe("await-approval");
-    expect(approvalBlocked.remediation).toContain("Await explicit merge approval for merge lane-1 into origin/beta.");
+    expect(approvalBlocked.remediation).toContain("Await explicit merge approval for merge lane-1 into origin/main.");
     expect(approvalResumed.dispatch.decisions[0]?.action).toBe("resume-session");
     expect(reviewBoundaryBlocked.status).toBe("blocked");
     expect(reviewBoundaryBlocked.nextAction).toBe("remediate-blockers");
@@ -565,7 +565,7 @@ describe("supervisor-execution-workflow", () => {
       {
         id: "workflow-core",
         workUnit: normalizeWorkUnit({
-          objective: "Ship the beta supervisor execution workflow core.",
+          objective: "Ship the supervisor execution workflow core.",
           source: {
             kind: "ad-hoc",
             title: "Workflow core"

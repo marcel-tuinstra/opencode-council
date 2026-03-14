@@ -541,7 +541,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
     scheduler.run({
       runId: "run-alpha",
@@ -550,7 +550,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
 
     // Act
@@ -585,7 +585,7 @@ describe("supervisor-scheduler", () => {
         }
       }],
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
 
     // Assert
@@ -627,7 +627,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
     scheduler.run({
       runId: "run-alpha",
@@ -636,7 +636,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
 
     // Act
@@ -703,7 +703,7 @@ describe("supervisor-scheduler", () => {
         }
       }],
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
     const state = store.getRunState("run-alpha");
 
@@ -777,7 +777,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
     scheduler.run({
       runId: "run-alpha",
@@ -786,7 +786,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
 
     // Act
@@ -847,7 +847,7 @@ describe("supervisor-scheduler", () => {
         }
       }],
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
     const state = store.getRunState("run-alpha");
 
@@ -909,7 +909,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
     scheduler.run({
       runId: "run-alpha",
@@ -918,7 +918,7 @@ describe("supervisor-scheduler", () => {
       repoRiskTier: "medium-moderate-risk",
       lanes,
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
 
     // Act
@@ -986,7 +986,7 @@ describe("supervisor-scheduler", () => {
         }
       }],
       sessionOwners: ["developer-a"],
-      baseRef: "beta"
+      baseRef: "main"
     });
     const state = store.getRunState("run-alpha");
 

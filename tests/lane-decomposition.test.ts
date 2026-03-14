@@ -54,7 +54,7 @@ describe("lane-decomposition", () => {
     const result = decomposeSupervisorGoalIntoLanes({
       goalPlan,
       workUnits,
-      scheduler: { branchPrefix: "beta/sc-436" }
+      scheduler: { branchPrefix: "work/sc-436" }
     });
 
     // Assert
@@ -83,14 +83,14 @@ describe("lane-decomposition", () => {
         sequence: 1,
         workUnitIds: ["core-implementation"],
         dependsOnLaneIds: [],
-        branch: "beta/sc-436/lane-01"
+        branch: "work/sc-436/lane-01"
       },
       {
         laneId: "lane-2",
         sequence: 2,
         workUnitIds: ["validation"],
         dependsOnLaneIds: ["lane-1"],
-        branch: "beta/sc-436/lane-02"
+        branch: "work/sc-436/lane-02"
       }
     ]);
   });
