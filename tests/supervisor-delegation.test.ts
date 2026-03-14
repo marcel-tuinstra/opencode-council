@@ -405,4 +405,45 @@ describe("supervisor-delegation", () => {
     expect(result.valid).toBe(true);
     expect(result.violations).toEqual([]);
   });
+
+  it("does not flag planning language like build the test plan or develop roadmap", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "PM" as const,
+          agentLabel: "PM",
+          worktreePath: "/tmp/wt-pm",
+          responsibilities: ["Build the test plan"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "CTO" as const,
+          agentLabel: "CTO",
+          worktreePath: "/tmp/wt-cto",
+          responsibilities: ["Develop roadmap"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "MARKETING" as const,
+          agentLabel: "MARKETING",
+          worktreePath: "/tmp/wt-marketing",
+          responsibilities: ["Develop positioning"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
 });

@@ -6,7 +6,6 @@ const MANAGER_ROLES = Object.freeze(["CEO", "CTO", "PM", "PO", "RESEARCH", "MARK
 const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|ship|write|deliver|write code|develop|patch|refactor|debug|wire up)\b/i;
 const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\bimplement\b/i,
-  /\bbuild\b/i,
   /\bfix\b/i,
   /\bpatch\b/i,
   /\brefactor\b/i,
@@ -14,13 +13,15 @@ const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\bwire up\b/i,
   /\bwrite (the )?(migration|feature|fix|patch|implementation|workflow)\b/i,
   /\bwrite (the )?(api client|client|integration)\b/i,
+  /\bbuild (the )?(feature|implementation|workflow|api client|client|integration)\b/i,
+  /\bdevelop (the )?(feature|implementation|workflow|api client|client|integration)\b/i,
   /\bdeliver (the )?(feature|fix|implementation|workflow|patch)\b/i,
   /\brun tests?\b/i,
   /\btest (the )?(release candidate|rc|fix|change|implementation|workflow|feature)\b/i,
   /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature)\b/i,
   /\btest (the )?(fix|change|implementation|workflow|feature)\b/i
 ]);
-const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|test plan|review test plan|deliver roadmap|deliver messaging plan|write release notes|validate architecture|validate scope)\b/i;
+const NON_IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(review|architecture|architect|scope|plan|research|message|position|document|docs|requirements|acceptance|risk|test plan|review test plan|build the test plan|deliver roadmap|deliver messaging plan|develop roadmap|develop positioning|write release notes|validate architecture|validate scope)\b/i;
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;
@@ -132,11 +133,15 @@ const hasImplementationResponsibility = (responsibilities: readonly string[]): b
       return true;
     }
 
+    if (NON_IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized)) {
+      return false;
+    }
+
     if (!IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized)) {
       return false;
     }
 
-    return !NON_IMPLEMENTATION_RESPONSIBILITY_REGEX.test(normalized);
+    return true;
   });
 
 const isDelegationPlan = (input: SupervisorDelegationPlanInput | SupervisorDelegationPlan): input is SupervisorDelegationPlan => {
