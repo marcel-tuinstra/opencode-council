@@ -3,7 +3,7 @@ import type { Role } from "./types";
 
 const EXECUTION_ROLES = Object.freeze(["DEV", "FE", "BE", "UX"] as const satisfies readonly Role[]);
 const MANAGER_ROLES = Object.freeze(["CEO", "CTO", "PM", "PO", "RESEARCH", "MARKETING"] as const satisfies readonly Role[]);
-const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|ship|write code|develop|patch|refactor|debug|wire up)\b/i;
+const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|ship|write|deliver|write code|develop|patch|refactor|debug|wire up)\b/i;
 const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\bimplement\b/i,
   /\bbuild\b/i,
@@ -12,6 +12,8 @@ const IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
   /\brefactor\b/i,
   /\bdebug\b/i,
   /\bwire up\b/i,
+  /\bwrite (the )?(migration|feature|fix|patch|implementation|workflow)\b/i,
+  /\bdeliver (the )?(feature|fix|implementation|workflow|patch)\b/i,
   /\brun tests?\b/i,
   /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature)\b/i,
   /\btest (the )?(fix|change|implementation|workflow|feature)\b/i

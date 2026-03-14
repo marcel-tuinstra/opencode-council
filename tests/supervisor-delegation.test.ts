@@ -295,4 +295,42 @@ describe("supervisor-delegation", () => {
       "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
     ]));
   });
+
+  it("rejects write and deliver phrasing when they imply execution ownership", () => {
+    // Arrange
+    const input = {
+      assignments: [
+        {
+          storyId: "sc-v1-boundary",
+          role: "CTO" as const,
+          agentLabel: "CTO",
+          worktreePath: "/tmp/wt-cto",
+          responsibilities: ["Write the migration"]
+        },
+        {
+          storyId: "sc-v1-boundary",
+          role: "CEO" as const,
+          agentLabel: "CEO",
+          worktreePath: "/tmp/wt-ceo",
+          responsibilities: ["Deliver the feature"]
+        }
+      ],
+      integration: {
+        agentLabel: "INTEGRATION",
+        worktreePath: "/tmp/wt-integration",
+        responsibilities: ["Review outputs"]
+      }
+    };
+
+    // Act
+    const result = validateSupervisorDelegationPlan(input);
+
+    // Assert
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(expect.arrayContaining([
+      "Assignment 'CTO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Assignment 'CEO' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.",
+      "Implementation-scoped runs require at least one DEV, FE, BE, or UX assignment."
+    ]));
+  });
 });
