@@ -2,7 +2,29 @@ import { getSupervisorPolicy, type SupervisorExecutionPolicy } from "./superviso
 import type { Role } from "./types";
 
 const EXECUTION_ROLES = Object.freeze(["DEV", "FE", "BE", "UX"] as const satisfies readonly Role[]);
-const IMPLEMENTATION_RESPONSIBILITY_REGEX = /\b(implement|build|code|fix|ship|deliver|write|develop|test|validate|patch|refactor)\b/i;
+const MANAGER_ROLES = Object.freeze(["CEO", "CTO", "PM", "PO", "RESEARCH", "MARKETING"] as const satisfies readonly Role[]);
+const IMPLEMENTATION_VERB_REGEX = /\b(implement|build|code|fix|ship|write|deliver|develop|patch|refactor|debug|wire up|test|validate|run)\b/i;
+const IMPLEMENTATION_TARGET_REGEX = /\b(feature|fix|workflow|implementation|migration|api client|client|integration|patch|release flow|release candidate|tests?|flow|generator)\b/i;
+const EXPLICIT_IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
+  /\brun tests?\b/i,
+  /\bwrite code\b/i,
+  /\bwire up\b/i,
+  /\btest (the )?(migration|api client|client|integration|release candidate|rc|fix|change|implementation|workflow|feature)\b/i,
+  /\bvalidate (the )?(fix|change|implementation|release flow|workflow|feature|api client|client|integration|migration)\b/i
+]);
+const NON_IMPLEMENTATION_PHRASE_REGEXES = Object.freeze([
+  /\breview the fix\b/i,
+  /\bbuild the test plan\b/i,
+  /\breview test plan\b/i,
+  /\bdeliver roadmap\b/i,
+  /\bdeliver messaging plan\b/i,
+  /\bdevelop roadmap\b/i,
+  /\bdevelop positioning\b/i,
+  /\bwrite release notes\b/i,
+  /\bvalidate architecture\b/i,
+  /\bvalidate scope\b/i,
+  /\bdocument requirements\b/i
+]);
 
 export type SupervisorDelegationAssignmentInput = {
   storyId?: string;
@@ -104,8 +126,26 @@ const normalizeIntegration = (input: SupervisorIntegrationAssignmentInput): Supe
 
 const isExecutionRole = (role: Role): boolean => (EXECUTION_ROLES as readonly Role[]).includes(role);
 
+const isManagerRole = (role: Role): boolean => (MANAGER_ROLES as readonly Role[]).includes(role);
+
 const hasImplementationResponsibility = (responsibilities: readonly string[]): boolean => responsibilities
-  .some((responsibility) => IMPLEMENTATION_RESPONSIBILITY_REGEX.test(responsibility));
+  .some((responsibility) => {
+    const normalized = responsibility.trim();
+
+    if (EXPLICIT_IMPLEMENTATION_PHRASE_REGEXES.some((regex) => regex.test(normalized))) {
+      return true;
+    }
+
+    if (NON_IMPLEMENTATION_PHRASE_REGEXES.some((regex) => regex.test(normalized))) {
+      return false;
+    }
+
+    if (!IMPLEMENTATION_VERB_REGEX.test(normalized)) {
+      return false;
+    }
+
+    return IMPLEMENTATION_TARGET_REGEX.test(normalized);
+  });
 
 const isDelegationPlan = (input: SupervisorDelegationPlanInput | SupervisorDelegationPlan): input is SupervisorDelegationPlan => {
   return typeof (input as SupervisorDelegationPlan).supervisorLabel === "string"
@@ -142,7 +182,7 @@ export const validateSupervisorDelegationPlan = (
   const implementationAssignments = plan.assignments.filter((assignment) => hasImplementationResponsibility(assignment.responsibilities));
 
   for (const assignment of implementationAssignments) {
-    if (!isExecutionRole(assignment.role)) {
+    if (isManagerRole(assignment.role)) {
       violations.push(
         `Assignment '${assignment.agentLabel}' cannot own implementation responsibilities directly; delegate that work to DEV, FE, BE, or UX.`
       );
