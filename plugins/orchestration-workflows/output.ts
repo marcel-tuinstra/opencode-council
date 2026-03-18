@@ -336,7 +336,7 @@ export const appendSupervisorDecisionNotes = (
     );
   }
 
-  if (provenance.addedByOrchestrator) {
+  if (provenance.addedByOrchestrator && provenance.addedByOrchestrator.length > 0) {
     provenanceLines.push(
       `[Supervisor] provenance.orchestrator-additions: added by orchestrator: ${formatProvenanceRoles(provenance.addedByOrchestrator)}.`
     );

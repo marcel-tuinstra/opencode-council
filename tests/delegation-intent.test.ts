@@ -77,8 +77,8 @@ describe("issue #57: delegation intent detection", () => {
       const intent = detectIntent(text);
       const delegation = detectDelegationRequest(text);
 
-      // Assert — no delegation keywords, should be a domain intent
-      expect(intent).not.toBe("delegation");
+      // Assert — no delegation keywords, should classify as a concrete domain intent
+      expect(intent).toBe("backend");
       expect(delegation).toBeNull();
     });
   });

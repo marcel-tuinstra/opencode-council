@@ -308,7 +308,9 @@ export const AgentConversations: Plugin = async () => {
 
       if (policy.roles.length > 1) {
         nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
-        nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "multi-role-thread");
+        nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "multi-role-thread", {
+          requestedByUser: policy.delegation?.requestedByUser ?? policy.roles
+        });
       }
 
       if (policy.mcpProviders.length > 1) {
