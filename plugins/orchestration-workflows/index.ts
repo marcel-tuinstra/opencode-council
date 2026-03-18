@@ -36,6 +36,7 @@ import {
   stripControlLeakage
 } from "./output";
 import {
+  buildDelegationPlan,
   detectDelegationRequest,
   detectRolesFromMentions,
   detectRolesFromText
@@ -122,6 +123,9 @@ export const AgentConversations: Plugin = async () => {
 
       const intent = detectIntent(sourceText);
       const delegation = detectDelegationRequest(sourceText);
+      const delegationPlan = delegation
+        ? buildDelegationPlan(delegation, roles, sourceText)
+        : null;
       const compactedInput = compactWorkflowContext(sourceText, intent);
       const workingSourceText = compactedInput.text;
       const activeRoles = delegation && roles.includes(delegation.primaryRole)
@@ -148,6 +152,7 @@ export const AgentConversations: Plugin = async () => {
         heartbeat,
         intent,
         delegation,
+        delegationPlan,
         mcpProviders,
         mcpHints,
         staleSensitive,
@@ -190,7 +195,7 @@ export const AgentConversations: Plugin = async () => {
       const mcpProviders = policy?.mcpProviders ?? [];
       const staleSensitive = policy?.staleSensitive ?? false;
 
-      output.system.push(buildSystemInstruction(roles, targets, heartbeat, mcpProviders, staleSensitive));
+      output.system.push(buildSystemInstruction(roles, targets, heartbeat, mcpProviders, staleSensitive, policy?.delegationPlan ?? null));
       systemInjectedForSession.add(input.sessionID);
 
       debugLog("system.transform.injected", {
@@ -293,10 +298,12 @@ export const AgentConversations: Plugin = async () => {
           activeTargets = buildTurnTargets(activeRoles, nextText);
           nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
           nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "delegated-thread", {
-            requestedByUser: policy.delegation?.requestedByUser ?? policy.roles,
+            requestedByUser: policy.delegationPlan?.requestedByUser ?? policy.delegation?.requestedByUser ?? policy.roles,
             delegatedBy: delegated.delegatedBy,
             delegatedRoles: delegated.delegatedRoles,
-            addedByOrchestrator: []
+            addedByOrchestrator: [],
+            waves: policy.delegationPlan?.waves,
+            maxParallelAgents: policy.delegationPlan?.maxParallelAgents
           });
           debugLog("text.complete.delegation_upgraded", {
             sessionID: input.sessionID,

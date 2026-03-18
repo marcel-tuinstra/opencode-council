@@ -1,12 +1,13 @@
 import { getSupervisorPolicy } from "./supervisor-config";
-import type { Role } from "./types";
+import type { DelegationPlan, Role } from "./types";
 
 export const buildSystemInstruction = (
   roles: Role[],
   targets: Record<Role, number>,
   heartbeat: boolean,
   mcpProviders: string[],
-  staleSensitive: boolean
+  staleSensitive: boolean,
+  delegationPlan: DelegationPlan | null = null
 ): string => {
   if (roles.length === 1) {
     const role = roles[0];
@@ -14,7 +15,7 @@ export const buildSystemInstruction = (
       ? `MCP allowed for: ${mcpProviders.join(", ")}.`
       : "MCP disabled (no provider mentioned).";
 
-    return [
+    const base = [
       `You are the ${role} persona.`,
       "Provide a complete, actionable response with tradeoffs and rationale.",
       "If confidence is low or cross-functional input is needed, emit one delegation marker line: <<DELEGATE:ROLE1,ROLE2>> (supported roles only).",
@@ -23,6 +24,17 @@ export const buildSystemInstruction = (
       staleSensitive ? "Data may be stale; suggest /mcp if confidence is low." : "",
       "Do not prefix response with role label unless you are delegating into threaded mode."
     ].filter(Boolean).join("\n");
+
+    if (delegationPlan) {
+      return [
+        base,
+        `You are the delegation lead (${delegationPlan.leadRole}). You may delegate work to: ${delegationPlan.provenance.delegatedRoles.join(", ")}.`,
+        "Emit <<DELEGATE:ROLE1,ROLE2>> when ready to fan out.",
+        `Max parallel agents per wave: ${delegationPlan.maxParallelAgents}.`
+      ].join("\n");
+    }
+
+    return base;
   }
 
   const leadRole = roles[0];

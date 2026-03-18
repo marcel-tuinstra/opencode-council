@@ -15,6 +15,8 @@ type SupervisorDecisionProvenance = {
   delegatedBy?: Role;
   delegatedRoles?: readonly Role[];
   addedByOrchestrator?: readonly Role[];
+  waves?: readonly { wave: number; roles: Role[]; goal: string; dependsOn: number[] }[];
+  maxParallelAgents?: number;
 };
 
 const DELEGATION_REGEX = /<<DELEGATE:([^>]+)>>/i;
@@ -30,7 +32,10 @@ const LEAKED_CONTROL_PREFIXES = [
   "Use the above message and context to generate a prompt and call the task tool with subagent:",
   "# Plan Mode - System Reminder",
   "CRITICAL: Plan mode ACTIVE",
-  "No markdown. Plain lines only."
+  "No markdown. Plain lines only.",
+  "ctrl+x",
+  "ctrl+c",
+  "view subagents",
 ];
 
 const INLINE_LEAK_MARKERS = [
@@ -69,7 +74,9 @@ export const stripControlLeakage = (text: string): string => {
     .replace(/Format:\s*\[n\]\s*ROLE:\s*message\s*\|\s*Start with[^\n]*(?:\n(?:Heartbeat:.*|MCP:.*|Suggest \/mcp.*|No markdown\..*))*/gi, "")
     .replace(/Format:\s*plain prose, no role prefix, no markdown\.(?:\n(?:Delegation .*|MCP:.*|Include concrete recommendations\.|No markdown\..*))*/gi, "")
     .replace(/Use the above message and context to generate a prompt and call the task tool with subagent:\s*[a-z]+/gi, "");
-  const lines = withoutReminders.split("\n");
+  const withoutCliHints = withoutReminders
+    .replace(/^(?:ctrl\+[a-z](?:\s+\w+)*|view\s+subagents).*$/gmi, "");
+  const lines = withoutCliHints.split("\n");
   const filtered = lines.filter((line) => {
     const trimmed = line.trim();
     if (!trimmed) {
@@ -78,7 +85,7 @@ export const stripControlLeakage = (text: string): string => {
     return !LEAKED_CONTROL_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
   });
 
-  return filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return filtered.join("\n").replace(/\n{2,}/g, "\n").trim();
 };
 
 export const extractDelegatedRoles = (text: string, leadRole: Role): DelegationExtractionResult => {
@@ -304,6 +311,35 @@ export const applyBudgetAction = (
   return `${truncated}\n\n${formatSupervisorReason(createSupervisorReasonDetail("budget.output-truncate", { actionReason: reason }))}`;
 };
 
+const rewriteOrchestratorNarration = (
+  text: string,
+  delegatedBy: Role,
+  delegatedRoles: readonly Role[]
+): string => {
+  const lines = text.split("\n");
+  const rewritten: string[] = [];
+  let injectedLaunchLine = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (
+      !trimmed ||
+      /^\[?\d+\]?\s*[A-Z]+:/.test(trimmed) ||
+      /^Task\s+[A-Z]:/i.test(trimmed) ||
+      /^Task\s+[A-Z]+\s/i.test(trimmed)
+    ) {
+      rewritten.push(line);
+      continue;
+    }
+    if (!injectedLaunchLine) {
+      rewritten.push(`[Supervisor] delegation.launch: delegated launch by ${delegatedBy}: ${delegatedRoles.join(", ")}.`);
+      injectedLaunchLine = true;
+    }
+  }
+
+  return rewritten.join("\n");
+};
+
 export const appendSupervisorDecisionNotes = (
   text: string,
   roles: Role[],
@@ -314,6 +350,10 @@ export const appendSupervisorDecisionNotes = (
   if (roles.length <= 1) {
     return text;
   }
+
+  const processedText = (route === "delegated-thread" && provenance.delegatedBy && provenance.delegatedRoles?.length)
+    ? rewriteOrchestratorNarration(text, provenance.delegatedBy, provenance.delegatedRoles)
+    : text;
 
   const routeCode = route === "delegated-thread" ? "route.delegated-thread" : "route.multi-role-thread";
   const routeLine = formatSupervisorReason(createSupervisorReasonDetail(routeCode, { roles }));
@@ -331,9 +371,16 @@ export const appendSupervisorDecisionNotes = (
   }
 
   if (provenance.delegatedBy && provenance.delegatedRoles && provenance.delegatedRoles.length > 0) {
-    provenanceLines.push(
-      `[Supervisor] provenance.delegated-by-agent: delegated by ${provenance.delegatedBy}: ${formatProvenanceRoles(provenance.delegatedRoles)}.`
-    );
+    const effectiveWaves = provenance.waves && provenance.waves.length > 0
+      ? provenance.waves
+      : [{ wave: 1, roles: [...provenance.delegatedRoles] as Role[], goal: "", dependsOn: [] as number[] }];
+
+    for (const wave of effectiveWaves) {
+      const waveRoles = wave.roles.length > 0 ? wave.roles.join(", ") : formatProvenanceRoles(provenance.delegatedRoles);
+      provenanceLines.push(
+        `[Supervisor] provenance.delegated-wave: delegated wave ${wave.wave} by ${provenance.delegatedBy}: ${waveRoles}.`
+      );
+    }
   }
 
   if (provenance.addedByOrchestrator && provenance.addedByOrchestrator.length > 0) {
@@ -342,5 +389,11 @@ export const appendSupervisorDecisionNotes = (
     );
   }
 
-  return `${text}\n\n---\n${routeLine}\n${assignmentLine}${provenanceLines.length > 0 ? `\n${provenanceLines.join("\n")}` : ""}`;
+  if (provenance.maxParallelAgents !== undefined && provenance.maxParallelAgents > 0) {
+    provenanceLines.push(
+      `[Supervisor] provenance.max-parallel: max parallel agents: ${provenance.maxParallelAgents}.`
+    );
+  }
+
+  return `${processedText}\n\n---\n${routeLine}\n${assignmentLine}${provenanceLines.length > 0 ? `\n${provenanceLines.join("\n")}` : ""}`;
 };
