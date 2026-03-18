@@ -42,6 +42,9 @@ export type SupervisorReasonCode =
   | "governance.explicit-policy"
   | "governance.policy-default"
   | "governance.policy-missing"
+  | "delegation.launch"
+  | "provenance.delegated-wave"
+  | "provenance.max-parallel"
   | "blocked.missing-mcp-provider"
   | "blocked.mcp-access";
 

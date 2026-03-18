@@ -22,6 +22,25 @@ export type DelegationRequest = {
   requestedByUser: Role[];
 };
 
+export type DelegationWave = {
+  wave: number;
+  roles: Role[];
+  goal: string;
+  dependsOn: number[];
+};
+
+export type DelegationPlan = {
+  leadRole: Role;
+  requestedByUser: Role[];
+  waves: DelegationWave[];
+  maxParallelAgents: number;
+  provenance: {
+    delegatedBy: Role;
+    delegatedRoles: Role[];
+    addedByOrchestrator: Role[];
+  };
+};
+
 export type McpProviderConfig = {
   key: string;
   regex: RegExp;
@@ -35,6 +54,7 @@ export type SessionPolicy = {
   heartbeat: boolean;
   intent: Intent;
   delegation: DelegationRequest | null;
+  delegationPlan: DelegationPlan | null;
   mcpProviders: string[];
   mcpHints: string[];
   staleSensitive: boolean;

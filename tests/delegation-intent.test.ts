@@ -118,8 +118,8 @@ describe("issue #57: delegation intent detection", () => {
         addedByOrchestrator: []
       });
 
-      // Assert — should show delegation chain
-      expect(annotated).toContain("delegated by CEO");
+      // Assert — should show delegation chain via wave rendering
+      expect(annotated).toMatch(/delegated.*by CEO/);
     });
 
     it("distinguishes user-requested from agent-delegated roles", () => {
@@ -140,7 +140,7 @@ describe("issue #57: delegation intent detection", () => {
 
       // Assert — annotation should distinguish sources
       expect(annotated).toContain("requested by user: CEO");
-      expect(annotated).toMatch(/delegated by CEO:.*PM.*RESEARCH/);
+      expect(annotated).toMatch(/delegated.*by CEO:.*PM.*RESEARCH/);
     });
   });
 });

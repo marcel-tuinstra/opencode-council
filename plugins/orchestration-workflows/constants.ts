@@ -165,3 +165,5 @@ export const INTENT_ROLE_WEIGHTS: Record<Intent, Record<Role, number>> = {
     RESEARCH: 2
   }
 };
+
+export const MAX_PARALLEL_AGENTS_REGEX = /\bmax\s+parallel\s+agents?\s+(\d+)\b/i;

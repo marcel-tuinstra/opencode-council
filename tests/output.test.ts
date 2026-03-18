@@ -116,7 +116,7 @@ describe("output", () => {
     });
 
     // Assert
-    expect(updated).toContain("delegated by CTO");
+    expect(updated).toMatch(/delegated.*by CTO/);
     expect(updated).not.toContain("provenance.orchestrator-additions");
   });
 

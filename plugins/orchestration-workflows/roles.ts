@@ -1,11 +1,12 @@
 import {
   DELEGATION_PATTERNS,
   MARKER_REGEX,
+  MAX_PARALLEL_AGENTS_REGEX,
   MENTION_REGEX
 } from "./constants";
 import { getSupervisorPolicy } from "./supervisor-config";
 import { SUPPORTED_ROLES } from "./types";
-import type { DelegationRequest, Role } from "./types";
+import type { DelegationPlan, DelegationRequest, DelegationWave, Role } from "./types";
 
 export const isSupportedRole = (role: string): role is Role => {
   return SUPPORTED_ROLES.includes(role as Role);
@@ -113,4 +114,34 @@ export const detectDelegationRequest = (text: string): DelegationRequest | null 
   }
 
   return null;
+};
+
+export const extractMaxParallelAgents = (text: string): number | null => {
+  const match = text.match(MAX_PARALLEL_AGENTS_REGEX);
+  return match ? parseInt(match[1], 10) : null;
+};
+
+export const buildDelegationPlan = (
+  delegation: DelegationRequest,
+  allRoles: Role[],
+  sourceText: string
+): DelegationPlan => {
+  const maxParallel = extractMaxParallelAgents(sourceText) ?? 3;
+  const delegatedRoles = allRoles.filter(r => r !== delegation.primaryRole);
+
+  const waves: DelegationWave[] = delegatedRoles.length > 0
+    ? [{ wave: 1, roles: delegatedRoles, goal: "", dependsOn: [] }]
+    : [];
+
+  return {
+    leadRole: delegation.primaryRole,
+    requestedByUser: delegation.requestedByUser,
+    waves,
+    maxParallelAgents: maxParallel,
+    provenance: {
+      delegatedBy: delegation.primaryRole,
+      delegatedRoles,
+      addedByOrchestrator: []
+    }
+  };
 };
