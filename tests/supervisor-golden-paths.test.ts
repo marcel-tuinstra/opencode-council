@@ -33,6 +33,7 @@ const createSessionPolicy = (): SessionPolicy => ({
   targets: threadTargets,
   heartbeat: true,
   intent: "backend",
+  delegation: null,
   mcpProviders: ["github"],
   mcpHints: ["GitHub MCP"],
   staleSensitive: true,

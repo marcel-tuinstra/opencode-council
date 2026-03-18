@@ -1,10 +1,11 @@
 import {
+  DELEGATION_PATTERNS,
   MARKER_REGEX,
   MENTION_REGEX
 } from "./constants";
 import { getSupervisorPolicy } from "./supervisor-config";
 import { SUPPORTED_ROLES } from "./types";
-import type { Role } from "./types";
+import type { DelegationRequest, Role } from "./types";
 
 export const isSupportedRole = (role: string): role is Role => {
   return SUPPORTED_ROLES.includes(role as Role);
@@ -83,4 +84,33 @@ export const detectRolesFromText = (text: string): Role[] | null => {
 
   const mentionRoles = detectRolesFromMentions(text);
   return mentionRoles.length > 0 ? mentionRoles : null;
+};
+
+const toDelegationRequest = (primaryRole: Role, requestedByUser: Role[]): DelegationRequest => ({
+  mode: "agent-led",
+  primaryRole,
+  requestedByUser
+});
+
+export const detectDelegationRequest = (text: string): DelegationRequest | null => {
+  const requestedByUser = detectRolesFromMentions(text);
+  if (requestedByUser.length === 0) {
+    return null;
+  }
+
+  const sanitizedText = stripCodeSegments(text);
+  for (const pattern of DELEGATION_PATTERNS) {
+    const match = sanitizedText.match(pattern);
+    const candidate = match?.[1] ?? match?.[2];
+    if (!candidate) {
+      continue;
+    }
+
+    const primaryRole = normalizeRole(candidate);
+    if (primaryRole && requestedByUser.includes(primaryRole)) {
+      return toDelegationRequest(primaryRole, requestedByUser);
+    }
+  }
+
+  return null;
 };

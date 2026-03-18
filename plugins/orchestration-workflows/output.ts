@@ -2,6 +2,21 @@ import type { Role } from "./types";
 import { createSupervisorReasonDetail, formatSupervisorReason } from "./reason-codes";
 import { normalizeRole } from "./roles";
 
+type DelegationExtractionResult = {
+  roles: Role[];
+  text: string;
+  delegatedBy?: Role;
+  delegatedRoles: Role[];
+  delegationSource?: "agent-delegated";
+};
+
+type SupervisorDecisionProvenance = {
+  requestedByUser?: readonly Role[];
+  delegatedBy?: Role;
+  delegatedRoles?: readonly Role[];
+  addedByOrchestrator?: readonly Role[];
+};
+
 const DELEGATION_REGEX = /<<DELEGATE:([^>]+)>>/i;
 const DELEGATION_REMOVAL_REGEX = /\s*<<DELEGATE:[^>]+>>\s*/gi;
 
@@ -66,10 +81,10 @@ export const stripControlLeakage = (text: string): string => {
   return filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 };
 
-export const extractDelegatedRoles = (text: string, leadRole: Role): { roles: Role[]; text: string } => {
+export const extractDelegatedRoles = (text: string, leadRole: Role): DelegationExtractionResult => {
   const match = text.match(DELEGATION_REGEX);
   if (!match) {
-    return { roles: [leadRole], text };
+    return { roles: [leadRole], text, delegatedRoles: [] };
   }
 
   const cleanedText = text.replace(DELEGATION_REMOVAL_REGEX, " ").replace(/\s+\n/g, "\n").trim();
@@ -89,8 +104,19 @@ export const extractDelegatedRoles = (text: string, leadRole: Role): { roles: Ro
   const capped = unique.slice(0, 3);
   return {
     roles: [leadRole, ...capped],
-    text: cleanedText || text
+    text: cleanedText || text,
+    delegatedBy: capped.length > 0 ? leadRole : undefined,
+    delegatedRoles: capped,
+    delegationSource: capped.length > 0 ? "agent-delegated" : undefined
   };
+};
+
+const formatProvenanceRoles = (roles: readonly Role[] | undefined, fallback = "none") => {
+  if (!roles || roles.length === 0) {
+    return fallback;
+  }
+
+  return roles.join(", ");
 };
 
 export const normalizeThreadOutput = (text: string, roles: Role[], targets: Record<Role, number>): string => {
@@ -282,7 +308,8 @@ export const appendSupervisorDecisionNotes = (
   text: string,
   roles: Role[],
   targets: Record<Role, number>,
-  route: "multi-role-thread" | "delegated-thread"
+  route: "multi-role-thread" | "delegated-thread",
+  provenance: SupervisorDecisionProvenance = {}
 ): string => {
   if (roles.length <= 1) {
     return text;
@@ -296,5 +323,24 @@ export const appendSupervisorDecisionNotes = (
     targets
   }));
 
-  return `${text}\n\n---\n${routeLine}\n${assignmentLine}`;
+  const provenanceLines: string[] = [];
+  if (provenance.requestedByUser && provenance.requestedByUser.length > 0) {
+    provenanceLines.push(
+      `[Supervisor] provenance.requested-by-user: requested by user: ${formatProvenanceRoles(provenance.requestedByUser)}.`
+    );
+  }
+
+  if (provenance.delegatedBy && provenance.delegatedRoles && provenance.delegatedRoles.length > 0) {
+    provenanceLines.push(
+      `[Supervisor] provenance.delegated-by-agent: delegated by ${provenance.delegatedBy}: ${formatProvenanceRoles(provenance.delegatedRoles)}.`
+    );
+  }
+
+  if (provenance.addedByOrchestrator) {
+    provenanceLines.push(
+      `[Supervisor] provenance.orchestrator-additions: added by orchestrator: ${formatProvenanceRoles(provenance.addedByOrchestrator)}.`
+    );
+  }
+
+  return `${text}\n\n---\n${routeLine}\n${assignmentLine}${provenanceLines.length > 0 ? `\n${provenanceLines.join("\n")}` : ""}`;
 };

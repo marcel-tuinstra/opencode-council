@@ -14,6 +14,14 @@ export const SUPPORTED_ROLES = [
 export type Role = (typeof SUPPORTED_ROLES)[number];
 export type Intent = "frontend" | "backend" | "design" | "marketing" | "roadmap" | "research" | "mixed";
 
+export type DelegationMode = "agent-led";
+
+export type DelegationRequest = {
+  mode: DelegationMode;
+  primaryRole: Role;
+  requestedByUser: Role[];
+};
+
 export type McpProviderConfig = {
   key: string;
   regex: RegExp;
@@ -26,6 +34,7 @@ export type SessionPolicy = {
   targets: Record<Role, number>;
   heartbeat: boolean;
   intent: Intent;
+  delegation: DelegationRequest | null;
   mcpProviders: string[];
   mcpHints: string[];
   staleSensitive: boolean;
