@@ -35,7 +35,11 @@ import {
   normalizeThreadOutput,
   stripControlLeakage
 } from "./output";
-import { detectRolesFromMentions, detectRolesFromText } from "./roles";
+import {
+  detectDelegationRequest,
+  detectRolesFromMentions,
+  detectRolesFromText
+} from "./roles";
 import { getSupervisorPolicy } from "./supervisor-config";
 import {
   resetSessionState,
@@ -117,10 +121,14 @@ export const AgentConversations: Plugin = async () => {
       }
 
       const intent = detectIntent(sourceText);
+      const delegation = detectDelegationRequest(sourceText);
       const compactedInput = compactWorkflowContext(sourceText, intent);
       const workingSourceText = compactedInput.text;
-      const targets = buildTurnTargets(roles, workingSourceText);
-      const heartbeat = shouldUseHeartbeat(roles);
+      const activeRoles = delegation && roles.includes(delegation.primaryRole)
+        ? [delegation.primaryRole, ...roles.filter((role) => role !== delegation.primaryRole)]
+        : roles;
+      const targets = buildTurnTargets(activeRoles, workingSourceText);
+      const heartbeat = shouldUseHeartbeat(activeRoles);
       const mcpProviders = detectMcpProviders(workingSourceText);
       const mcpHints = buildMcpHints(mcpProviders);
       const staleSensitive = STALE_SENSITIVE_REGEX.test(workingSourceText);
@@ -130,15 +138,16 @@ export const AgentConversations: Plugin = async () => {
       for (const part of message.parts) {
         if (part.type === "text") {
           const withCompaction = part.text === sourceText ? workingSourceText : part.text;
-          part.text = enforceUserContract(withCompaction, roles, targets, heartbeat, mcpProviders, staleSensitive);
+          part.text = enforceUserContract(withCompaction, activeRoles, targets, heartbeat, mcpProviders, staleSensitive);
         }
       }
 
       sessionPolicy.set(message.info.sessionID, {
-        roles,
+        roles: activeRoles,
         targets,
         heartbeat,
         intent,
+        delegation,
         mcpProviders,
         mcpHints,
         staleSensitive,
@@ -150,7 +159,8 @@ export const AgentConversations: Plugin = async () => {
 
       debugLog("messages.transform.policy_set", {
         sessionID: message.info.sessionID,
-        roles,
+        roles: activeRoles,
+        delegation,
         heartbeat,
         intent,
         mcpProviders,
@@ -282,7 +292,12 @@ export const AgentConversations: Plugin = async () => {
           activeRoles = delegated.roles;
           activeTargets = buildTurnTargets(activeRoles, nextText);
           nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
-          nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "delegated-thread");
+          nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "delegated-thread", {
+            requestedByUser: policy.delegation?.requestedByUser ?? policy.roles,
+            delegatedBy: delegated.delegatedBy,
+            delegatedRoles: delegated.delegatedRoles,
+            addedByOrchestrator: []
+          });
           debugLog("text.complete.delegation_upgraded", {
             sessionID: input.sessionID,
             leadRole: policy.roles[0],
@@ -293,7 +308,9 @@ export const AgentConversations: Plugin = async () => {
 
       if (policy.roles.length > 1) {
         nextText = normalizeThreadOutput(nextText, activeRoles, activeTargets);
-        nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "multi-role-thread");
+        nextText = appendSupervisorDecisionNotes(nextText, activeRoles, activeTargets, "multi-role-thread", {
+          requestedByUser: policy.delegation?.requestedByUser ?? policy.roles
+        });
       }
 
       if (policy.mcpProviders.length > 1) {

@@ -39,6 +39,12 @@ export const MARKER_REMOVAL_REGEX = /\n*<<ORCHESTRATION_WORKFLOWS:[^>]+>>/g;
 export const MARKER_PREFIX = "<<ORCHESTRATION_WORKFLOWS:";
 export const MARKER_SUFFIX = ">>";
 
+export const DELEGATION_PATTERNS = [
+  /\blet\s+@([A-Za-z][A-Za-z0-9_-]*)\s+delegate\b/i,
+  /\bhave\s+@([A-Za-z][A-Za-z0-9_-]*)\s+(?:decide|choose)\b/i,
+  /\buse\s+@([A-Za-z][A-Za-z0-9_-]*)\s+first\b[\s\S]{0,120}?\blet\s+(?:it|them|@([A-Za-z][A-Za-z0-9_-]*))\s+(?:pull\s+in|bring\s+in|involve|delegate)\b/i
+] as const;
+
 export const STALE_SENSITIVE_REGEX =
   /\b(current|latest|today|this week|this month|recent|live|regression|incident|status|right now|fresh|up-to-date)\b/i;
 

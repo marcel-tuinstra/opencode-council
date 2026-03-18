@@ -23,6 +23,7 @@ const basePolicy = (): SessionPolicy => ({
   },
   heartbeat: false,
   intent: "backend",
+  delegation: null,
   mcpProviders: ["sentry"],
   mcpHints: [],
   staleSensitive: false,

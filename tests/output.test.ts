@@ -103,6 +103,37 @@ describe("output", () => {
     expect(updated).toContain("CTO:2 DEV:1");
   });
 
+  it("omits orchestrator-additions line when addedByOrchestrator is empty", () => {
+    // Arrange
+    const text = "[1] CTO: Investigate\n\n[2] DEV: Validate";
+
+    // Act
+    const updated = appendSupervisorDecisionNotes(text, ["CTO", "DEV"], targets, "delegated-thread", {
+      requestedByUser: ["CTO"],
+      delegatedBy: "CTO",
+      delegatedRoles: ["DEV"],
+      addedByOrchestrator: []
+    });
+
+    // Assert
+    expect(updated).toContain("delegated by CTO");
+    expect(updated).not.toContain("provenance.orchestrator-additions");
+  });
+
+  it("includes requested-by-user provenance when passed to multi-role-thread", () => {
+    // Arrange
+    const text = "[1] CTO: Investigate\n\n[2] DEV: Validate";
+
+    // Act
+    const updated = appendSupervisorDecisionNotes(text, ["CTO", "DEV"], targets, "multi-role-thread", {
+      requestedByUser: ["CTO", "DEV"]
+    });
+
+    // Assert
+    expect(updated).toContain("route.multi-role-thread");
+    expect(updated).toContain("requested by user: CTO, DEV");
+  });
+
   it("extracts delegated roles and removes marker", () => {
     // Arrange
     const text = "<<DELEGATE:PM,RESEARCH,PM>>\n[1] CEO: Opening";
