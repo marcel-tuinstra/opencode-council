@@ -2,154 +2,271 @@
 
 [![CI](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/releases)
+[![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-green.svg)](https://github.com/sst/opencode)
 
-Structured multi-agent orchestration for OpenCode, with a supervisor/worktree foundation for staged parallel execution.
+**AI agents that debate before they act.**
 
-Note: this is an independent community plugin for OpenCode and is not affiliated with or endorsed by OpenCode.
+Multi-agent orchestration for [OpenCode](https://github.com/sst/opencode) where specialized roles deliberate, challenge assumptions, and synthesize recommendations -- instead of blindly executing tasks.
 
-## Why This Exists
+---
 
-Vanilla multi-mention prompts often produce uneven participation, unclear ownership, and ad-hoc tool usage. This project makes those flows more deliberate:
+## Quick Start
 
-- role-based discussion stays readable
-- MCP usage stays explicit and auditable
-- coordination rules become predictable instead of implicit
-- the repo now also lays the groundwork for safer supervisor/worktree execution later
+```bash
+# Clone the repo
+git clone https://github.com/marcel-tuinstra/opencode-orchestration-workflows.git
+cd opencode-orchestration-workflows
 
-## Live Today
+# Copy plugin and agents into OpenCode
+mkdir -p ~/.opencode/plugins ~/.opencode/agents
+cp plugins/orchestration-workflows.ts ~/.opencode/plugins/
+cp -R plugins/orchestration-workflows ~/.opencode/plugins/
+cp agents/*.md ~/.opencode/agents/
+```
 
-- Mention-driven role orchestration in OpenCode chats
-- Numbered threaded output like `[n] ROLE: message`
-- Relevance-weighted participation and heartbeat phases for 3+ roles (`Frame -> Challenge -> Synthesize`)
-- Mention-gated MCP behavior for installed providers
-- Runtime compaction and budget controls
-- Initial runtime-visible budget, handoff, review-ready, and reason-coded supervisor reminders where the plugin is wired locally
+Restart OpenCode, then try:
 
-## Foundation Shipped
-
-The repository also ships typed Supervisor helpers, docs, and tests for staged adoption:
-
-- work units
-- lane planning
-- lane lifecycle
-- durable run state store
-- supervisor scheduler and dispatch loop
-- lane worktree provisioner and reconciler
-- session runtime adapter and lifecycle
-- turn ownership and handoff contracts
-- review-ready evidence packet enforcement
-- merge policy
-- budget governance
-- observability snapshots
-- ad-hoc run history
-- runbook, KPI baseline, epic pilot packaging, and alpha end-to-end validation evidence
-
-These are real repo assets, but they are not the same thing as a fully user-invokable supervisor/runtime mode yet.
-
-## How The Orchestration Model Works
-
-1. Parse mentions and create a per-session role policy.
-2. Infer intent and calculate weighted turn targets.
-3. For 3+ roles, guide discussion through heartbeat phases: Frame -> Challenge -> Synthesize.
-4. Gate MCP access based on explicit provider mentions.
-5. Normalize the final output into a predictable thread.
-6. Apply budget, compaction, and governance signals where relevant.
-
-## What You Can Do Today
-
-Prompt:
-
-```text
+```
 @cto @dev @pm Investigate why API latency regressed this week and propose a fix plan using sentry and github.
 ```
 
-Typical result with the plugin:
+That's it. Three agents, structured discussion, actionable output.
 
-```text
-[1] CTO: We need to isolate whether this is compute saturation, query contention, or an external dependency regression; start with p95/p99 breakdown and release correlation.
+---
 
-[2] DEV: I will inspect Sentry trace waterfalls for the hottest endpoint and map spans to the last two deployment windows.
+## What You Get
 
-[3] PM: I will prepare a rollback threshold, owner checklist, and a 48-hour mitigation timeline.
+**Deliberative multi-agent discussions** -- not fire-and-forget task delegation. Agents think through problems together using a structured heartbeat model before recommending action.
 
-[4] CTO: Recommendation: run a short Sentry trace audit plus GitHub change diff first, then commit to either rollback or targeted fix.
+| Capability | What it does |
+|---|---|
+| Mention-driven roles | `@cto @dev @pm` activates exactly the agents you need |
+| Heartbeat phases | Frame, Challenge, Synthesize -- structured reasoning for every discussion |
+| Threaded output | Clean `[n] ROLE: message` format, easy to follow and reference |
+| Delegation mode | `@cto delegate [prompt]` -- one lead agent plans and coordinates specialists |
+| MCP gating | Tools like Sentry and GitHub only activate when explicitly mentioned |
+| Budget governance | Token budgets, reason codes, and policy profiles prevent runaway execution |
+| 10 specialized agents | CTO, CEO, PO, PM, DEV, FE, BE, UX, Research, Marketing |
+| 197 passing tests | CI on every PR, typed contracts throughout |
+
+---
+
+## Architecture
+
+```
+  You: @cto @dev @pm [your prompt]
+  |
+  v
+  +--------------------------+
+  | Role detection           |    Parse @mentions, detect intent
+  | Intent parsing           |    Calculate weighted turn targets
+  +--------------------------+
+  |
+  v
+  +--------------------------+
+  | Session policy           |    Roles, MCP gates, budget limits
+  +--------------------------+
+  |
+  v
+  +--------------------------+
+  | Heartbeat phases         |    Frame --> Challenge --> Synthesize
+  |                          |    (for 3+ role discussions)
+  +--------------------------+
+  |
+  v
+  +--------------------------+
+  | Governance checks        |    Budget enforcement, reason codes
+  +--------------------------+
+  |
+  v
+  [1] CTO: ...
+  [2] DEV: ...
+  [3] PM: ...
+  [4] CTO: Recommendation: ...
 ```
 
-In multi-role mode, this usually follows a heartbeat rhythm:
+For delegation mode:
 
-- `Frame`: set the problem and decision space
-- `Challenge`: react, test assumptions, or bring contrary evidence
-- `Synthesize`: close with a lead recommendation or next step
+```
+  You: @cto delegate [your prompt]
+  |
+  v
+  +--------------------------+
+  | Lead agent identified    |    CTO takes ownership
+  +--------------------------+
+  |
+  v
+  +--------------------------+
+  | DelegationPlan built     |    Waves, max-parallel, goals
+  +--------------------------+
+  |
+  v
+  +--------------------------+
+  | Lead-first instruction   |    CTO frames, then delegates
+  +--------------------------+
+  |
+  v
+  +--------------------------+
+  | Wave-based execution     |    Specialists execute with provenance
+  | Supervisor annotations   |    Every delegation step is auditable
+  +--------------------------+
+```
 
-## Installation And Quick Start
+---
 
-- Install: [`docs/getting-started/install.md`](./docs/getting-started/install.md)
-- Quick start: [`docs/getting-started/quickstart.md`](./docs/getting-started/quickstart.md)
-- Customization: [`docs/guides/customization.md`](./docs/guides/customization.md)
+## Live Example
 
-## Supervisor Policy Config
+**Prompt:**
 
-Supervisor policy defaults now resolve from a typed `v1-safe` profile and can be overridden with a repo-local `.opencode/supervisor-policy.json` file.
+```
+@cto @dev @pm Investigate why API latency regressed this week and propose a fix plan using sentry and github.
+```
 
-- Missing config keeps the built-in safe defaults.
-- Invalid config logs diagnostics and falls back to safe defaults for invalid fields.
-- Current override surface covers role aliases, MCP provider patterns, lane/worktree/session limits, approval gates, and budget/compaction thresholds.
+**Output:**
 
-Runtime checkpoints now use a shared typed reason-code catalog so operators and reviewers can see compact explanations for routing, weighted turn assignment, budget actions, compaction fallbacks, approval pauses, and blocked MCP steps.
+```
+[1] CTO: We need to isolate whether this is compute saturation, query contention,
+    or an external dependency regression; start with p95/p99 breakdown and release
+    correlation.
 
-See [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md) for the contract and [`docs/guides/customization.md`](./docs/guides/customization.md) for the config shape.
+[2] DEV: I will inspect Sentry trace waterfalls for the hottest endpoint and map
+    spans to the last two deployment windows.
 
-## Docs For Operators And Contributors
+[3] PM: I will prepare a rollback threshold, owner checklist, and a 48-hour
+    mitigation timeline.
 
-- Docs index: [`docs/README.md`](./docs/README.md)
-- Product positioning: [`docs/overview/product-positioning.md`](./docs/overview/product-positioning.md)
-- Architecture overview: [`docs/overview/architecture.md`](./docs/overview/architecture.md)
-- Status and roadmap: [`docs/overview/status-and-roadmap.md`](./docs/overview/status-and-roadmap.md)
-- Policy profiles: [`docs/guides/policy-profiles.md`](./docs/guides/policy-profiles.md)
-- Supervisor work units: [`docs/supervisor/work-units.md`](./docs/supervisor/work-units.md)
-- Durable state store: [`docs/supervisor/durable-state-store.md`](./docs/supervisor/durable-state-store.md)
-- Lane worktree provisioner: [`docs/supervisor/lane-worktree-provisioner.md`](./docs/supervisor/lane-worktree-provisioner.md)
-- Session runtime adapter: [`docs/supervisor/session-runtime-adapter.md`](./docs/supervisor/session-runtime-adapter.md)
-- Recovery and repair playbooks: [`docs/supervisor/recovery-repair-playbooks.md`](./docs/supervisor/recovery-repair-playbooks.md)
-- Scheduler and dispatch loop: [`docs/supervisor/scheduler-dispatch-loop.md`](./docs/supervisor/scheduler-dispatch-loop.md)
-- Operations runbook: [`docs/supervisor/operations-runbook.md`](./docs/supervisor/operations-runbook.md)
-- Pilot KPI baseline: [`docs/supervisor/pilot-kpi-baseline.md`](./docs/supervisor/pilot-kpi-baseline.md)
-- Epic pilot package: [`docs/supervisor/epic-pilot.md`](./docs/supervisor/epic-pilot.md)
-- Alpha end-to-end validation: [`docs/supervisor/alpha-end-to-end-validation.md`](./docs/supervisor/alpha-end-to-end-validation.md)
-- Evidence packet template: [`docs/reference/evidence-packet-template.md`](./docs/reference/evidence-packet-template.md)
-- Testing guide: [`docs/testing/testing.md`](./docs/testing/testing.md)
+[4] CTO: Recommendation: run a short Sentry trace audit plus GitHub change diff
+    first, then commit to either rollback or targeted fix.
+```
 
-## Roadmap And Current Limits
+Notice the rhythm: CTO frames the problem, DEV and PM challenge with their expertise, CTO synthesizes a recommendation. That's the heartbeat model in action.
 
-Live now:
+---
 
-- conversation-first orchestration plugin
-- MCP gating, heartbeat phases, thread normalization, and compaction behavior
-- shipped policy/governance/runtime helper foundation
+## How It Works
 
-Coming next:
+Most multi-agent systems use **task delegation**: an orchestrator tells agents what to do. The agents execute, report back, done.
 
-- deeper runtime wiring of the Supervisor helpers
-- dedicated supervisor/worktree execution mode
-- real pilot execution evidence and follow-up hardening
+This plugin uses **deliberative discussion**. When you mention multiple roles, they engage in structured reasoning through three heartbeat phases:
 
-Current limit:
+| Phase | Purpose | Example |
+|---|---|---|
+| **Frame** | Set the problem and decision space | CTO defines the investigation scope |
+| **Challenge** | Test assumptions, bring contrary evidence, fill gaps | DEV identifies specific traces; PM raises timeline risk |
+| **Synthesize** | Close with a lead recommendation or next step | CTO recommends a concrete action plan |
 
-- the repo already contains substantial Supervisor contracts and operating docs, but that does not yet mean a full supervisor mode is available as a normal end-user runtime flow
+For two-role prompts, agents exchange perspectives naturally. For three or more roles, the heartbeat phases activate automatically to keep the discussion focused and productive.
 
-## Repository Layout
+Single-role prompts (`@cto What's the best approach for...`) produce a direct expert response without threading overhead.
 
-- Plugin entrypoint: `plugins/orchestration-workflows.ts`
-- Plugin modules: `plugins/orchestration-workflows/*.ts`
-- Tests: `tests/*.test.ts`
-- Agent personas: `agents/*.md`
-- Docs: `docs/**`
+---
+
+## Agent Roster
+
+| Agent | Focus |
+|---|---|
+| **CTO** | Technical strategy, architecture decisions, system-level tradeoffs |
+| **CEO** | High-level strategy, priorities, success metrics |
+| **PO** | Product outcomes, requirements, acceptance criteria |
+| **PM** | Delivery planning, scope management, risk mitigation |
+| **DEV** | Full-stack implementation, debugging, feature delivery |
+| **FE** | Frontend UI/UX implementation, components, layout |
+| **BE** | Backend services, APIs, data flows, infrastructure |
+| **UX** | Interaction design, usability, UI quality review |
+| **Research** | Investigation, evidence gathering, options analysis |
+| **Marketing** | Messaging, positioning, launch content |
+
+Every agent has a dedicated persona file in `agents/` that shapes its perspective, expertise, and communication style.
+
+---
+
+## Delegation Mode
+
+*New in v0.3.0*
+
+Sometimes you want one agent to lead and pull in specialists as needed. Delegation mode lets a single lead agent build a structured plan and coordinate execution.
+
+```
+@cto delegate Refactor the authentication module to support OAuth2 and migrate existing sessions.
+```
+
+The CTO takes ownership, breaks the work into waves, and delegates to DEV, BE, FE, or other specialists -- with full provenance tracking on every delegated step.
+
+Key properties:
+
+- **Lead-first planning**: The lead agent frames the approach before any specialist acts
+- **Wave-based execution**: Work is organized into dependency-ordered waves
+- **Provenance tracking**: Every delegation step is annotated with who delegated what and why
+- **Supervisor annotations**: Decision rationale is visible in the output thread
+
+---
+
+## Governance and Safety
+
+This is where the plugin diverges most from other multi-agent approaches.
+
+**Budget governance** -- every session runs under token budget limits. When a discussion approaches its budget ceiling, the plugin compacts output and signals agents to synthesize rather than expand. No surprise cost spikes from runaway agent conversations.
+
+**Reason codes** -- every routing decision, turn assignment, budget action, and MCP gating step produces a machine-readable reason code. Operators and reviewers can trace exactly why an agent was activated, why a tool was gated, or why a budget action was triggered.
+
+**Policy profiles** -- session behavior resolves from a typed policy profile (`v1-safe` by default). Override with a repo-local `.opencode/supervisor-policy.json` to customize role aliases, MCP provider patterns, budget thresholds, and approval gates. Invalid config falls back to safe defaults with diagnostics.
+
+**MCP gating** -- external tools (Sentry, GitHub, Shortcut) only activate when the user explicitly mentions them in the prompt. No ambient tool calls. If you don't mention `sentry`, no Sentry API calls happen.
+
+---
+
+## Roadmap
+
+**Available now (v0.3.0):**
+- Multi-role deliberative orchestration with heartbeat phases
+- Single-role delegation with wave-based execution and provenance
+- MCP gating, budget governance, reason codes, policy profiles
+- 10 specialized agent personas
+
+**Coming next:**
+- One-command install (`npx` installer for zero-friction setup)
+- Governed parallel execution with audit trails (supervisor mode)
+- Async delegation with governance-aware background agents
+- Contract freeze and backward-compatibility guarantees
+
+The supervisor foundation -- work units, lane planning, durable state store, scheduler, merge policy, and evidence packets -- is already shipped and tested. The next milestone is wiring it into a user-invokable runtime.
+
+---
+
+## Documentation
+
+| Area | Link |
+|---|---|
+| Getting started | [Install](./docs/getting-started/install.md) / [Quick start](./docs/getting-started/quickstart.md) |
+| Configuration | [Customization](./docs/guides/customization.md) / [Policy profiles](./docs/guides/policy-profiles.md) |
+| Architecture | [Overview](./docs/overview/architecture.md) / [Product positioning](./docs/overview/product-positioning.md) |
+| Troubleshooting | [Local sync and agents](./docs/guides/local-sync-and-agents.md) |
+| Testing | [Testing guide](./docs/testing/testing.md) |
+| Full docs index | [docs/README.md](./docs/README.md) |
+
+---
+
+## Contributing
+
+Contributions are welcome. The project uses TypeScript with Vitest for testing.
+
+```bash
+npm install
+npm test
+```
+
+197 tests, CI on every PR. See the [testing guide](./docs/testing/testing.md) for details on the test structure and conventions.
 
 ## Contact
 
-- Website: [`https://marcel.tuinstra.dev`](https://marcel.tuinstra.dev)
-- Email: `marcel@tuinstra.dev`
+- Website: [marcel.tuinstra.dev](https://marcel.tuinstra.dev)
+- Email: marcel@tuinstra.dev
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+MIT. See [LICENSE](./LICENSE) for details.
+
+---
+
+<sub>This is an independent community plugin for OpenCode and is not affiliated with or endorsed by the OpenCode project.</sub>
