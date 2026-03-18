@@ -378,6 +378,33 @@ export const createSupervisorReasonDetail = (
           ? `Blocked the MCP action: ${context.actionReason}.`
           : "Blocked the MCP action because it did not satisfy the current policy."
       };
+    case "delegation.launch":
+      return {
+        code,
+        category: "route-selection",
+        short: "Delegation launch.",
+        explanation: context.leadRole
+          ? `Delegated launch by ${context.leadRole}: ${formatRoleList(context.roles ?? [])}.`
+          : "Delegated launch to downstream agents."
+      };
+    case "provenance.delegated-wave":
+      return {
+        code,
+        category: "assignment",
+        short: "Delegated wave.",
+        explanation: context.leadRole
+          ? `Delegated wave by ${context.leadRole}: ${formatRoleList(context.roles ?? [])}.`
+          : "Delegated wave to downstream agents."
+      };
+    case "provenance.max-parallel":
+      return {
+        code,
+        category: "assignment",
+        short: "Max parallel agents.",
+        explanation: context.usagePercent !== undefined
+          ? `Max parallel agents: ${context.usagePercent}.`
+          : "Max parallel agents constraint applied."
+      };
   }
 };
 
