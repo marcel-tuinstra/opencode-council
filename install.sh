@@ -3,9 +3,9 @@
 # Install orchestration-workflows plugin + agent files for OpenCode.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.4.0/install.sh | bash
 #   # — or —
-#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/main/install.sh -o install.sh
+#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.4.0/install.sh -o install.sh
 #   bash install.sh
 #
 # Environment variables:
@@ -17,8 +17,9 @@ set -e
 # ─── Constants ───────────────────────────────────────────────────────────────
 
 VERSION="0.4.0"
+REF="v${VERSION}"
 REPO_URL="https://github.com/marcel-tuinstra/opencode-council.git"
-RAW_BASE="https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/main"
+RAW_BASE="https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/${REF}"
 INSTALL_DIR="${OPENCODE_DIR:-$HOME/.opencode}"
 
 # ─── File manifests ──────────────────────────────────────────────────────────
@@ -189,6 +190,41 @@ create_directories() {
   mkdir -p "${INSTALL_DIR}/${AGENTS_DIR}"
 }
 
+# ─── Prune stale files ───────────────────────────────────────────────────────
+# Remove .ts files from the module directory that are not in MODULE_FILES.
+# Agent files are left alone — other plugins may own their own agent .md files.
+
+prune_stale_module_files() {
+  _prune_dir="${INSTALL_DIR}/${MODULE_DIR}"
+  _pruned=0
+
+  # Nothing to prune if directory doesn't exist yet
+  [ -d "$_prune_dir" ] || return 0
+
+  for _existing in "$_prune_dir"/*.ts; do
+    # Guard against the literal glob when no files match
+    [ -e "$_existing" ] || continue
+
+    _base="$(basename "$_existing")"
+    _keep=0
+    for _m in ${MODULE_FILES}; do
+      if [ "$_base" = "$_m" ]; then
+        _keep=1
+        break
+      fi
+    done
+
+    if [ "$_keep" -eq 0 ]; then
+      rm -f "$_existing"
+      _pruned=$(( _pruned + 1 ))
+    fi
+  done
+
+  if [ "$_pruned" -gt 0 ]; then
+    status_line "Pruned stale files from ${MODULE_DIR}/" "${YELLOW}${_pruned} removed${RESET}"
+  fi
+}
+
 # ─── curl download method ───────────────────────────────────────────────────
 
 download_with_curl() {
@@ -242,6 +278,8 @@ download_with_curl() {
   if [ "$_fail" -gt 0 ]; then
     die "${_fail} file(s) failed to download. Check your network and try again."
   fi
+
+  prune_stale_module_files
 }
 
 # ─── git download method (fallback) ─────────────────────────────────────────
@@ -251,7 +289,7 @@ download_with_git() {
   trap 'rm -rf "$TMPDIR_GIT"' EXIT INT TERM
 
   printf "  %-50s " "Cloning repository (shallow)..."
-  if git clone --depth 1 --quiet "$REPO_URL" "$TMPDIR_GIT" 2>/dev/null; then
+  if git clone --depth 1 --branch "$REF" --quiet "$REPO_URL" "$TMPDIR_GIT" 2>/dev/null; then
     printf "%b\n" "${GREEN}done${RESET}"
   else
     die "Git clone failed. Check your network and try again."
@@ -300,6 +338,8 @@ download_with_git() {
     _ag_bad=$(( _ag_total - _ag_ok ))
     status_line "${AGENTS_DIR}/ (${_ag_ok}/${_ag_total} files)" "${YELLOW}${_ag_bad} missing${RESET}"
   fi
+
+  prune_stale_module_files
 
   # Cleanup happens via trap
 }

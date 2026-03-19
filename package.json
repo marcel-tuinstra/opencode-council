@@ -35,6 +35,9 @@
   "bugs": {
     "url": "https://github.com/marcel-tuinstra/opencode-council/issues"
   },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.8.3",
