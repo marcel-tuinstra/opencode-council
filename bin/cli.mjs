@@ -11,7 +11,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  statSync,
+  lstatSync,
 } from "node:fs";
 import { join, dirname, relative, resolve } from "node:path";
 import { homedir } from "node:os";
@@ -63,10 +63,10 @@ const PKG_VERSION = existsSync(pkgJsonPath)
 // Known agent manifest -- files we own (used by verify & refresh prune)
 // ---------------------------------------------------------------------------
 
-const KNOWN_AGENTS = [
-  "be.md", "ceo.md", "cto.md", "dev.md", "fe.md",
-  "marketing.md", "pm.md", "po.md", "research.md", "ux.md",
-];
+const KNOWN_AGENTS = existsSync(SRC_AGENTS_DIR)
+  ? readdirSync(SRC_AGENTS_DIR).filter((f) => f.endsWith(".md"))
+  : ["be.md", "ceo.md", "cto.md", "dev.md", "fe.md",
+     "marketing.md", "pm.md", "po.md", "research.md", "ux.md"];
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing (minimal -- no dependencies)
@@ -77,6 +77,12 @@ const rawArgs = process.argv.slice(2);
 // Separate flags from positional arguments
 const flags = rawArgs.filter((a) => a.startsWith("-"));
 const positionalArgs = rawArgs.filter((a) => !a.startsWith("-"));
+
+const KNOWN_FLAGS = ["--help", "-h", "--dry-run", "-n", "--force", "-f", "--backup", "-b", "--version", "-v"];
+const unknownFlags = flags.filter((f) => !KNOWN_FLAGS.includes(f));
+if (unknownFlags.length > 0) {
+  console.error(colors.yellow(`  Warning: unknown flag(s) ignored: ${unknownFlags.join(", ")}`));
+}
 
 const FLAG_HELP    = flags.includes("--help") || flags.includes("-h");
 const FLAG_DRY_RUN = flags.includes("--dry-run") || flags.includes("-n");
@@ -134,7 +140,9 @@ function countFiles(dir) {
   let count = 0;
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
+    const stat = lstatSync(full);
+    if (stat.isSymbolicLink()) continue;
+    if (stat.isDirectory()) {
       count += countFiles(full);
     } else {
       count++;
@@ -149,7 +157,9 @@ function collectFiles(dir, prefix = "") {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     const rel  = prefix ? join(prefix, entry) : entry;
-    if (statSync(full).isDirectory()) {
+    const stat = lstatSync(full);
+    if (stat.isSymbolicLink()) continue;
+    if (stat.isDirectory()) {
       result.push(...collectFiles(full, rel));
     } else {
       result.push(rel);
@@ -453,8 +463,8 @@ async function cmdUninstall() {
 // Command: init / refresh  (shared install flow)
 // ---------------------------------------------------------------------------
 
-async function cmdInstall({ prune }) {
-  const label = prune ? "refresh" : "init";
+async function cmdInstall({ mode = "init" }) {
+  const label = mode;
   const t0 = Date.now();
 
   printBanner();
@@ -466,8 +476,8 @@ async function cmdInstall({ prune }) {
 
   printDestinations();
 
-  if (existingInstall && !prune) {
-    console.log(colors.yellow("  Warning: Existing installation detected. Files will be overwritten."));
+  if (existingInstall && mode === "init") {
+    console.log(colors.yellow("  Note: Existing installation detected. Files will be overwritten."));
     console.log("");
   }
 
@@ -475,10 +485,8 @@ async function cmdInstall({ prune }) {
   if (FLAG_DRY_RUN) {
     console.log(colors.yellow("  Dry run -- no files will be written."));
     console.log("");
-    if (prune) {
-      prunePluginDir(true);
-      console.log("");
-    }
+    prunePluginDir(true);
+    console.log("");
     printPlan();
     console.log(colors.yellow("  Run without --dry-run to apply changes."));
     console.log("");
@@ -487,7 +495,7 @@ async function cmdInstall({ prune }) {
 
   // Confirmation (skip with --force)
   if (!FLAG_FORCE) {
-    const msg = prune
+    const msg = mode === "refresh"
       ? colors.cyan("  Refresh will overwrite all installed files. Proceed? [Y/n] ")
       : colors.cyan("  Proceed with installation? [Y/n] ");
 
@@ -595,11 +603,11 @@ if (FLAG_HELP) {
 
 switch (command) {
   case "init":
-    await cmdInstall({ prune: true });
+    await cmdInstall({ mode: "init" });
     break;
 
   case "refresh":
-    await cmdInstall({ prune: true });
+    await cmdInstall({ mode: "refresh" });
     break;
 
   case "verify":
