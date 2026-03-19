@@ -575,7 +575,7 @@ async function cmdInstall({ mode = "init" }) {
   console.log(colors.dim(`       @cto @dev @pm Investigate why API latency regressed this week.`));
   console.log("");
 
-  if (prune) {
+  if (mode === "refresh") {
     console.log(colors.dim("  Stale files have been pruned. Installation is up to date."));
   } else {
     console.log(colors.dim("  After pulling updates, run `npx opencode-council refresh` to sync."));
