@@ -1,11 +1,42 @@
 {
-  "name": "opencode-orchestration-workflows",
-  "private": true,
+  "name": "opencode-council",
+  "version": "0.4.0",
+  "description": "AI agents that debate before they act. Multi-agent orchestration for OpenCode with governance, heartbeat deliberation, and delegation.",
   "type": "module",
+  "bin": {
+    "opencode-council": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "plugins/",
+    "agents/"
+  ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
+  },
+  "keywords": [
+    "opencode",
+    "ai-agents",
+    "multi-agent",
+    "orchestration",
+    "governance",
+    "deliberation",
+    "plugin"
+  ],
+  "author": "Marcel Tuinstra <marcel@tuinstra.dev> (https://marcel.tuinstra.dev)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcel-tuinstra/opencode-council.git"
+  },
+  "homepage": "https://github.com/marcel-tuinstra/opencode-council#readme",
+  "bugs": {
+    "url": "https://github.com/marcel-tuinstra/opencode-council/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
