@@ -1,8 +1,8 @@
-# OpenCode Orchestration Workflows
+# OpenCode Council
 
-[![CI](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/actions/workflows/ci.yml)
+[![CI](https://github.com/marcel-tuinstra/opencode-council/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-council/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/marcel-tuinstra/opencode-orchestration-workflows/releases)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/marcel-tuinstra/opencode-council/releases)
 [![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-green.svg)](https://github.com/sst/opencode)
 
 **AI agents that debate before they act.**
@@ -12,13 +12,13 @@ Multi-agent orchestration for [OpenCode](https://github.com/sst/opencode) where 
 ## Quick Start
 
 ```bash
-git clone https://github.com/marcel-tuinstra/opencode-orchestration-workflows.git
-cd opencode-orchestration-workflows
+npx opencode-council init
+```
 
-mkdir -p ~/.opencode/plugins ~/.opencode/agents
-cp plugins/orchestration-workflows.ts ~/.opencode/plugins/
-cp -R plugins/orchestration-workflows ~/.opencode/plugins/
-cp agents/*.md ~/.opencode/agents/
+Or without Node.js:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/main/install.sh | bash
 ```
 
 Restart OpenCode, then try:
@@ -57,11 +57,19 @@ Restart OpenCode, then try:
 
 CTO frames the problem, DEV and PM challenge with their expertise, CTO synthesizes. That's the heartbeat model.
 
+## Manage Your Install
+
+```bash
+npx opencode-council refresh     # Update to latest version
+npx opencode-council verify      # Check install health
+npx opencode-council uninstall   # Clean removal
+```
+
 ## Roadmap
 
-**Now (v0.3.0):** Deliberative orchestration, delegation mode, MCP gating, budget governance, 10 agent personas.
+**Now (v0.4.0):** Deliberative orchestration, delegation mode, MCP gating, budget governance, 10 agent personas, one-command install.
 
-**Next:** One-command install, governed parallel execution (supervisor mode), async delegation with governance.
+**Next:** Governed parallel execution (supervisor mode), async delegation with governance, contract freeze.
 
 ## Documentation
 

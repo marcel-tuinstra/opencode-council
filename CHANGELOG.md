@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-19
+
+### Added
+
+- **One-command install**: `npx opencode-council init` installs plugin + all 10 agents in one command
+- **Shell installer**: `curl -fsSL .../install.sh | bash` for non-Node users
+- **Install management**: `refresh`, `verify`, and `uninstall` commands
+- **Config detection**: existing install detection, supervisor-policy.json preservation, dry-run mode, backup support
+
+### Changed
+
+- **Renamed to OpenCode Council**: repo, npm package, and all references updated from `opencode-orchestration-workflows` to `opencode-council`
+- Package published to npm as `opencode-council` (no longer `private: true`)
+- README rewritten as compact product page with one-command install
+
 ## [0.3.0] - 2026-03-18
 
 ### Added
@@ -49,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime-visible budget checkpoints and handoff reminders
 - Intent detection and weighted turn targeting
 
-[0.3.0]: https://github.com/marcel-tuinstra/opencode-orchestration-workflows/releases/tag/v0.3.0
-[0.2.0]: https://github.com/marcel-tuinstra/opencode-orchestration-workflows/releases/tag/v0.2.0
-[0.1.0]: https://github.com/marcel-tuinstra/opencode-orchestration-workflows/releases/tag/v0.1.0
+[0.4.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.4.0
+[0.3.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.3.0
+[0.2.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.2.0
+[0.1.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.1.0

@@ -369,7 +369,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
           laneId: supervisorAlphaEndToEndFixture.lanes[1].id,
           kind: "pull-request",
           status: "ready",
-          uri: "https://github.com/marcel-tuinstra/opencode-orchestration-workflows/pull/placeholder",
+          uri: "https://github.com/marcel-tuinstra/opencode-council/pull/placeholder",
           updatedAt: "2026-03-13T18:18:00.000Z"
         },
         {
