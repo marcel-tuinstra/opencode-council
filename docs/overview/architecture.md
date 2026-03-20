@@ -50,7 +50,7 @@ Starting in `v0.5.0`, the package root is reserved for the minimal stable runtim
 - `DelegationPlan`
 - `SessionPolicy`
 
-This is the contract consumers can build against with `v0.5.x` stability expectations. The goal is to freeze the runtime-facing types that describe live conversation orchestration without also freezing supervisor internals too early.
+This is the contract consumers can build against with `v0.5.x` stability expectations. The canonical compatibility and deprecation policy lives in [`../guides/compatibility-and-deprecations.md`](../guides/compatibility-and-deprecations.md). The goal is to freeze the runtime-facing types that describe live conversation orchestration without also freezing supervisor internals too early.
 
 ## 2. Supervisor foundation
 

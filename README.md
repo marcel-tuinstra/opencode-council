@@ -40,19 +40,11 @@ Restart OpenCode, then try:
 
 ## Stable Contract
 
-Starting in `v0.5.0`, the package root intentionally exposes a small stable runtime contract for consumers that build on the live orchestration plugin:
+Starting in `v0.5.0`, the package root intentionally exposes a small stable runtime contract for consumers that build on the live orchestration plugin. The canonical compatibility and deprecation policy lives in [`docs/guides/compatibility-and-deprecations.md`](./docs/guides/compatibility-and-deprecations.md).
 
-- `AgentConversations`
-- `SUPPORTED_ROLES`
-- `Role`
-- `Intent`
-- `DelegationMode`
-- `DelegationRequest`
-- `DelegationWave`
-- `DelegationPlan`
-- `SessionPolicy`
+That document defines the stable root exports, CLI compatibility, documented env var and policy-key guarantees, and the deprecation/removal process for `v0.5.x`.
 
-Supervisor helpers and other pre-`v0.6.0` orchestration internals remain available under an experimental supervisor entry point instead of the root barrel. This keeps the runtime contract stable while supervisor APIs continue to evolve.
+Supervisor helpers and other pre-`v0.6.0` orchestration internals remain available under an experimental supervisor entry point instead of the root barrel.
 
 ## Example
 
@@ -83,9 +75,9 @@ npx opencode-council uninstall   # Clean removal
 
 ## Roadmap
 
-**Now (v0.4.0):** Deliberative orchestration, delegation mode, MCP gating, budget governance, 10 agent personas, one-command install.
+**Now (v0.5.0):** Deliberative orchestration, delegation mode, MCP gating, budget governance, 10 agent personas, one-command install, and a defined compatibility policy for the stable runtime contract.
 
-**Next:** Governed parallel execution (supervisor mode), async delegation with governance, contract freeze.
+**Next:** Governed parallel execution (supervisor mode) and async delegation with governance.
 
 ## Documentation
 
@@ -93,6 +85,7 @@ npx opencode-council uninstall   # Clean removal
 |---|---|
 | Getting started | [Install](./docs/getting-started/install.md) / [Quick start](./docs/getting-started/quickstart.md) |
 | Upgrading | [Upgrade to v0.5.0](./docs/guides/upgrading-to-0.5.0.md) |
+| Compatibility | [Compatibility and deprecations](./docs/guides/compatibility-and-deprecations.md) |
 | Configuration | [Customization](./docs/guides/customization.md) / [Policy profiles](./docs/guides/policy-profiles.md) |
 | Architecture | [Overview](./docs/overview/architecture.md) / [Positioning](./docs/overview/product-positioning.md) |
 | Troubleshooting | [Local sync and agents](./docs/guides/local-sync-and-agents.md) |

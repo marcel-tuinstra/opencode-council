@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Upgrade guidance for the `v0.5.0` barrel reorganization in `docs/guides/upgrading-to-0.5.0.md`
 - Explicit documentation for the stable runtime contract versus the experimental supervisor contract
+- Compatibility notes covering stable CLI verbs plus additive-only env var and policy-key changes for `v0.5.x`
 
 ### Changed
 
@@ -22,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - If you import only the live runtime contract from `opencode-council`, no migration is required
 - If you import supervisor helpers, move those imports from `opencode-council` to `opencode-council/supervisor`
+- Existing CLI commands keep working across `v0.5.x`
+- Existing documented env vars and policy keys stay valid across `v0.5.x`; new ones are additive
 - See `docs/guides/upgrading-to-0.5.0.md` for import migration examples
 
 ## [0.4.0] - 2026-03-19

@@ -1,6 +1,6 @@
 # Upgrading to v0.5.0
 
-`v0.5.0` freezes the minimal stable runtime contract at the package root and moves supervisor-oriented helpers behind an experimental entry point until `v0.6.0`.
+`v0.5.0` freezes the minimal stable runtime contract at the package root and moves supervisor-oriented helpers behind an experimental entry point.
 
 ## What changed
 
@@ -16,6 +16,11 @@
   - `SessionPolicy`
 - Supervisor planning, routing, lifecycle, state-store, review, and other helper exports move off the root barrel.
 - Those supervisor APIs now live under the experimental supervisor entry point: `opencode-council/supervisor`.
+- Compatibility, deprecation, and removal rules now live in the canonical policy doc: [`compatibility-and-deprecations.md`](./compatibility-and-deprecations.md).
+
+## Compatibility policy for `v0.5.x`
+
+See the canonical compatibility and deprecation policy: [`compatibility-and-deprecations.md`](./compatibility-and-deprecations.md).
 
 ## If you only use the live runtime
 
@@ -89,9 +94,13 @@ import {
 1. Keep root imports only for the frozen stable contract.
 2. Move all supervisor-specific value exports to `opencode-council/supervisor`.
 3. Move all supervisor-specific type imports to `opencode-council/supervisor`.
-4. Treat the supervisor entry point as experimental until `v0.6.0`; expect further iteration there.
+4. Treat the supervisor entry point as experimental; expect further iteration there.
+5. Keep existing CLI automation as-is.
+6. Check the canonical policy doc before depending on compatibility or deprecation behavior.
 
 ## Expected compatibility
 
 - Root-barrel users of the stable runtime contract should see no API churn in `v0.5.x`.
+- CLI-driven installs and upgrades should not require command changes in `v0.5.x`.
+- Existing documented env vars and policy keys remain valid in `v0.5.x` per the canonical policy doc.
 - Supervisor consumers should update imports now so future stable-contract work does not require more root-barrel changes.
