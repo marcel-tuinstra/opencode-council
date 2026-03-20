@@ -75,9 +75,9 @@ npx opencode-council uninstall   # Clean removal
 
 ## Roadmap
 
-**Now (v0.5.0):** Deliberative orchestration, delegation mode, MCP gating, budget governance, 10 agent personas, one-command install, and a defined compatibility policy for the stable runtime contract.
+**Now (`v0.5.0`):** Deliberative orchestration plus scope, contract, compatibility, and observability hardening for the stable runtime surface. This release centers on making the `v0.5.x` foundation explicit and dependable, not on shipping the full `v1.0` feature scope today.
 
-**Next:** Governed parallel execution (supervisor mode) and async delegation with governance.
+**Planned for `v1.0`:** Governed parallel execution (supervisor mode), async delegation with governance, and the broader `v1.0` delivery scope described in [`docs/overview/v1.0-scope.md`](./docs/overview/v1.0-scope.md).
 
 ## Documentation
 
@@ -87,7 +87,7 @@ npx opencode-council uninstall   # Clean removal
 | Upgrading | [Upgrade to v0.5.0](./docs/guides/upgrading-to-0.5.0.md) |
 | Compatibility | [Compatibility and deprecations](./docs/guides/compatibility-and-deprecations.md) |
 | Configuration | [Customization](./docs/guides/customization.md) / [Policy profiles](./docs/guides/policy-profiles.md) |
-| Architecture | [Overview](./docs/overview/architecture.md) / [Positioning](./docs/overview/product-positioning.md) |
+| Architecture | [Overview](./docs/overview/architecture.md) / [Positioning](./docs/overview/product-positioning.md) / [v1.0 scope](./docs/overview/v1.0-scope.md) |
 | Troubleshooting | [Local sync and agents](./docs/guides/local-sync-and-agents.md) |
 | Testing | [Guide](./docs/testing/testing.md) / [Role sanity](./docs/testing/role-sanity-script.md) |
 
