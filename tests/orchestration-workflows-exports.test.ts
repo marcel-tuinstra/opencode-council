@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import * as stableRoot from "../plugins/orchestration-workflows.js";
+import * as pluginEntry from "../plugins/orchestration-workflows.js";
+import * as packageRoot from "../index.js";
 import * as supervisorRoot from "../plugins/orchestration-workflows-supervisor.js";
 import {
   AgentConversations,
@@ -11,7 +12,7 @@ import {
   type Intent,
   type Role,
   type SessionPolicy
-} from "../plugins/orchestration-workflows.js";
+} from "../index.js";
 import {
   createFileBackedSupervisorStateStore,
   createSupervisorDispatchPlan,
@@ -28,16 +29,28 @@ import type {
 } from "../plugins/orchestration-workflows/types.js";
 
 describe("orchestration workflow package barrels", () => {
-  it("exports only the stable root runtime surface", () => {
-    expect(Object.keys(stableRoot).sort()).toEqual([
+  it("plugin entry exports ONLY the plugin factory", () => {
+    const exports = Object.keys(pluginEntry);
+    expect(exports).toEqual(["AgentConversations"]);
+    expect(typeof pluginEntry.AgentConversations).toBe("function");
+  });
+
+  it("plugin entry contains no non-function exports", () => {
+    for (const [, value] of Object.entries(pluginEntry)) {
+      expect(typeof value).toBe("function");
+    }
+  });
+
+  it("package root exports the stable runtime surface", () => {
+    expect(Object.keys(packageRoot).sort()).toEqual([
       "AgentConversations",
       "SUPPORTED_ROLES"
     ]);
-    expect(stableRoot.AgentConversations).toBe(AgentConversations);
-    expect(stableRoot.SUPPORTED_ROLES).toBe(SUPPORTED_ROLES);
+    expect(packageRoot.AgentConversations).toBe(AgentConversations);
+    expect(packageRoot.SUPPORTED_ROLES).toBe(SUPPORTED_ROLES);
   });
 
-  it("exports the stable root type surface", () => {
+  it("package root exports the stable type surface", () => {
     expectTypeOf<Role>().toEqualTypeOf<SourceRole>();
     expectTypeOf<Intent>().toEqualTypeOf<SourceIntent>();
     expectTypeOf<DelegationMode>().toEqualTypeOf<SourceDelegationMode>();
@@ -47,14 +60,14 @@ describe("orchestration workflow package barrels", () => {
     expectTypeOf<SessionPolicy>().toEqualTypeOf<SourceSessionPolicy>();
   });
 
-  it("keeps supervisor exports out of the stable root", () => {
-    expect("createSupervisorDispatchPlan" in stableRoot).toBe(false);
-    expect("createFileBackedSupervisorStateStore" in stableRoot).toBe(false);
-    expect("DEFAULT_SUPERVISOR_PROFILE" in stableRoot).toBe(false);
-    // These MCP helper types are intentionally internal-only and should not leak
-    // through either the stable root or the experimental supervisor barrel.
-    expect("McpProviderConfig" in stableRoot).toBe(false);
-    expect("McpBlockResult" in stableRoot).toBe(false);
+  it("keeps supervisor exports out of the plugin entry and package root", () => {
+    expect("createSupervisorDispatchPlan" in pluginEntry).toBe(false);
+    expect("createSupervisorDispatchPlan" in packageRoot).toBe(false);
+    expect("createFileBackedSupervisorStateStore" in packageRoot).toBe(false);
+    expect("DEFAULT_SUPERVISOR_PROFILE" in packageRoot).toBe(false);
+    // MCP helper types are intentionally internal-only
+    expect("McpProviderConfig" in packageRoot).toBe(false);
+    expect("McpBlockResult" in packageRoot).toBe(false);
   });
 
   it("exports supervisor symbols from the experimental supervisor barrel", () => {

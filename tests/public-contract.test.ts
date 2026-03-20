@@ -2,7 +2,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import * as stableRoot from "../plugins/orchestration-workflows.js";
+import * as pluginEntry from "../plugins/orchestration-workflows.js";
+import * as packageRoot from "../index.js";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const packageJsonPath = fileURLToPath(new URL("../package.json", import.meta.url));
@@ -18,7 +19,7 @@ describe("public contract guardrails", () => {
 
     expect(packageJson.name).toBe("opencode-council");
     expect(packageJson.exports).toEqual({
-      ".": "./plugins/orchestration-workflows.ts",
+      ".": "./index.ts",
       "./supervisor": "./plugins/orchestration-workflows-supervisor.ts"
     });
     expect(packageJson.bin).toEqual({
@@ -26,15 +27,21 @@ describe("public contract guardrails", () => {
     });
   });
 
-  it("keeps the stable root barrel frozen and supervisor-only symbols off it", () => {
-    expect(Object.keys(stableRoot).sort()).toEqual([
+  it("plugin entry exports only the plugin factory function", () => {
+    const exports = Object.keys(pluginEntry);
+    expect(exports).toEqual(["AgentConversations"]);
+    expect(typeof pluginEntry.AgentConversations).toBe("function");
+  });
+
+  it("package root exports the stable barrel and supervisor-only symbols stay off it", () => {
+    expect(Object.keys(packageRoot).sort()).toEqual([
       "AgentConversations",
       "SUPPORTED_ROLES"
     ]);
 
-    expect("createSupervisorDispatchPlan" in stableRoot).toBe(false);
-    expect("createSupervisorExecutionWorkflow" in stableRoot).toBe(false);
-    expect("DEFAULT_SUPERVISOR_POLICY_PATH" in stableRoot).toBe(false);
+    expect("createSupervisorDispatchPlan" in packageRoot).toBe(false);
+    expect("createSupervisorExecutionWorkflow" in packageRoot).toBe(false);
+    expect("DEFAULT_SUPERVISOR_POLICY_PATH" in packageRoot).toBe(false);
   });
 
   it("keeps stable CLI command names and intents discoverable in help output", () => {
