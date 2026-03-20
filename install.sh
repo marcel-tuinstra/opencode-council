@@ -1,11 +1,11 @@
 #!/bin/sh
-# opencode-council installer v0.5.0
+# opencode-council installer v0.6.0
 # Install orchestration-workflows plugin + agent files for OpenCode.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.5.0/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.6.0/install.sh | bash
 #   # — or —
-#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.5.0/install.sh -o install.sh
+#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.6.0/install.sh -o install.sh
 #   bash install.sh
 #
 # Environment variables:
@@ -16,7 +16,7 @@ set -e
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 
-VERSION="0.5.0"
+VERSION="0.6.0"
 REF="v${VERSION}"
 REPO_URL="https://github.com/marcel-tuinstra/opencode-council.git"
 RAW_BASE="https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/${REF}"
@@ -33,11 +33,13 @@ ad-hoc-run-history.ts
 approval-gates.ts
 budget.ts
 budget-governance.ts
+child-session-lifecycle.ts
 compact.ts
 constants.ts
 contracts.ts
 data-lifecycle.ts
 debug.ts
+delegation-bridge.ts
 durable-state-store.ts
 governance-policy.ts
 guardrail-thresholds.ts
@@ -64,6 +66,7 @@ supervisor-bootstrap.ts
 supervisor-config.ts
 supervisor-delegation.ts
 supervisor-dispatch-planning.ts
+supervisor-event-catalog.ts
 supervisor-execution-workflow.ts
 supervisor-goal-plan.ts
 supervisor-routing.ts
@@ -347,8 +350,8 @@ download_with_git() {
 # ─── Success message ─────────────────────────────────────────────────────────
 
 print_success() {
-  # Count: 1 barrel + 43 modules + 10 agents = 54
-  _total=54
+  # Count: 1 barrel + 46 modules + 10 agents = 57
+  _total=57
 
   echo ""
   success "${BOLD}Done!${RESET}${GREEN} ${_total} files installed to ${INSTALL_DIR}/${RESET}"
