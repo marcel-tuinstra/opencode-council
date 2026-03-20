@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true
   },
   "include": [
     "plugins/orchestration-workflows/constants.ts",
@@ -17,6 +18,7 @@
     "plugins/orchestration-workflows/turn-ownership.ts",
     "plugins/orchestration-workflows/types.ts",
     "plugins/orchestration-workflows/work-unit.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "types/**/*.d.ts"
   ]
 }
