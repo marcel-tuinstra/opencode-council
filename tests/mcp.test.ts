@@ -84,6 +84,10 @@ describe("mcp access", () => {
     // Assert
     expect(result.blocked).toBe(true);
     expect(result.warning).toContain("unavailable in this runtime session");
+    expect(result.reasonCode).toBe("blocked.mcp-access");
+    expect(result.remediation).toEqual(expect.arrayContaining([
+      expect.stringContaining("config.json")
+    ]));
   });
 
   it("blocks when no provider is mentioned", () => {
@@ -100,6 +104,7 @@ describe("mcp access", () => {
     // Assert
     expect(result.blocked).toBe(true);
     expect(result.warning).toContain("mention 'sentry' explicitly");
+    expect(result.reasonCode).toBe("blocked.mcp-access");
   });
 
   it("blocks when provider is not mentioned", () => {
@@ -114,6 +119,7 @@ describe("mcp access", () => {
     // Assert
     expect(result.blocked).toBe(true);
     expect(result.warning).toContain("Allowed providers for this session");
+    expect(result.remediation?.[0]).toContain("approved providers");
   });
 
   it("enforces fairness across multiple providers", () => {
@@ -131,6 +137,7 @@ describe("mcp access", () => {
     // Assert
     expect(result.blocked).toBe(true);
     expect(result.warning).toContain("Retry 'github'");
+    expect(result.remediation?.[0]).toContain("missing provider checks");
   });
 
   it("enforces default cap and allows deep cap", () => {
@@ -155,6 +162,7 @@ describe("mcp access", () => {
     // Assert
     expect(blocked.blocked).toBe(true);
     expect(blocked.warning).toContain("limit (2)");
+    expect(blocked.remediation?.[0]).toContain("Reduce the number of MCP calls");
     expect(allowed.blocked).toBe(false);
   });
 

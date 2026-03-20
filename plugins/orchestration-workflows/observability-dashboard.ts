@@ -43,6 +43,7 @@ export type SupervisorBlockerSnapshot = {
 };
 
 export type SupervisorPolicyDecisionInput = {
+  runId?: string;
   category: SupervisorPolicyDecisionCategory;
   laneId: string;
   summary: string;
@@ -52,6 +53,7 @@ export type SupervisorPolicyDecisionInput = {
 };
 
 export type SupervisorPolicyDecision = {
+  runId?: string;
   category: SupervisorPolicyDecisionCategory;
   laneId: string;
   summary: string;
@@ -66,11 +68,13 @@ export type SupervisorThresholdEventInput = {
 };
 
 export type SupervisorObservedThresholdEvent = SupervisorThresholdEvent & {
+  runId?: string;
   laneId: string;
   occurredAt: string;
 };
 
 export type SupervisorEscalationEvent = {
+  runId?: string;
   laneId: string;
   sessionId?: string;
   status: Extract<BudgetGovernanceStatus, "escalation-required" | "hard-stop">;
@@ -80,6 +84,7 @@ export type SupervisorEscalationEvent = {
 };
 
 export type SupervisorLaneObservabilityInput = {
+  runId?: string;
   laneId: string;
   state: LaneLifecycleState;
   session?: SupervisorHeartbeatSnapshotInput;
@@ -92,6 +97,7 @@ export type SupervisorLaneObservabilityInput = {
 };
 
 export type SupervisorLaneObservabilitySnapshot = {
+  runId?: string;
   laneId: string;
   state: LaneLifecycleState;
   session?: SupervisorHeartbeatSnapshot;
@@ -103,6 +109,7 @@ export type SupervisorLaneObservabilitySnapshot = {
 };
 
 export type SupervisorObservabilityDashboardInput = {
+  runId?: string;
   generatedAt: string;
   lanes: readonly SupervisorLaneObservabilityInput[];
   recentEventLimit?: number;
@@ -212,6 +219,7 @@ const normalizeBlocker = (input?: SupervisorBlockerSnapshotInput): SupervisorBlo
 const normalizePolicyDecision = (
   input: SupervisorPolicyDecisionInput
 ): SupervisorPolicyDecision => ({
+  runId: input.runId ? assertNonEmptyValue(input.runId, "policy decision run id") : undefined,
   category: input.category,
   laneId: assertNonEmptyValue(input.laneId, "policy decision lane id"),
   summary: assertNonEmptyValue(input.summary, "policy decision summary"),
@@ -221,15 +229,18 @@ const normalizePolicyDecision = (
 });
 
 const normalizeThresholdEvent = (
+  runId: string | undefined,
   laneId: string,
   input: SupervisorThresholdEventInput
 ): SupervisorObservedThresholdEvent => ({
   ...input.event,
+  runId: runId ? assertNonEmptyValue(runId, "threshold event run id") : undefined,
   laneId: assertNonEmptyValue(laneId, "threshold event lane id"),
   occurredAt: assertTimestamp(input.occurredAt, "threshold event timestamp")
 });
 
 const buildEscalationEvent = (
+  runId: string | undefined,
   laneId: string,
   session: SupervisorHeartbeatSnapshot | undefined,
   budget: BudgetGovernanceDecision,
@@ -242,6 +253,7 @@ const buildEscalationEvent = (
   const recommendationSummary = budget.recommendations.join(", ");
 
   return {
+    runId,
     laneId,
     sessionId: session?.sessionId,
     status: budget.status,
@@ -284,18 +296,22 @@ export const createSupervisorObservabilityDashboard = (
   const ownershipTransitions: LaneTurnHandoffContract[] = [];
 
   const lanes = input.lanes.map((lane) => {
+    const runId = lane.runId ?? input.runId;
     const laneId = assertNonEmptyValue(lane.laneId, "lane id");
     const session = resolveHeartbeatHealth(generatedAt, lane.session);
     const blocker = normalizeBlocker(lane.blocker);
-    const normalizedPolicyDecisions = (lane.policyDecisions ?? []).map(normalizePolicyDecision);
+    const normalizedPolicyDecisions = (lane.policyDecisions ?? []).map((decision) => normalizePolicyDecision({
+      ...decision,
+      runId: decision.runId ?? runId
+    }));
     const normalizedThresholdEvents = [
       ...((lane.budget && lane.budgetEvaluatedAt)
-        ? lane.budget.thresholdEvents.map((event) => normalizeThresholdEvent(laneId, {
+        ? lane.budget.thresholdEvents.map((event) => normalizeThresholdEvent(runId, laneId, {
           occurredAt: lane.budgetEvaluatedAt as string,
           event
         }))
         : []),
-      ...(lane.thresholdEvents ?? []).map((event) => normalizeThresholdEvent(laneId, event))
+      ...(lane.thresholdEvents ?? []).map((event) => normalizeThresholdEvent(runId, laneId, event))
     ];
     const normalizedOwnershipTransitions = [...(lane.ownershipTransitions ?? [])];
 
@@ -335,7 +351,7 @@ export const createSupervisorObservabilityDashboard = (
     }
 
     if (lane.budget && lane.budgetEvaluatedAt) {
-      const escalation = buildEscalationEvent(laneId, session, lane.budget, lane.budgetEvaluatedAt);
+        const escalation = buildEscalationEvent(runId, laneId, session, lane.budget, lane.budgetEvaluatedAt);
 
       if (escalation) {
         escalationEvents.push(escalation);
@@ -346,9 +362,10 @@ export const createSupervisorObservabilityDashboard = (
     thresholdEvents.push(...normalizedThresholdEvents);
     ownershipTransitions.push(...normalizedOwnershipTransitions);
 
-    return {
-      laneId,
-      state: lane.state,
+      return {
+        runId,
+        laneId,
+        state: lane.state,
       session,
       blocker,
       budget: lane.budget,

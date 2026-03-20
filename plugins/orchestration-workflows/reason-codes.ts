@@ -42,11 +42,15 @@ export type SupervisorReasonCode =
   | "governance.explicit-policy"
   | "governance.policy-default"
   | "governance.policy-missing"
+  | "governance.policy-invalid"
   | "delegation.launch"
   | "provenance.delegated-wave"
   | "provenance.max-parallel"
   | "blocked.missing-mcp-provider"
-  | "blocked.mcp-access";
+  | "blocked.mcp-access"
+  | "blocked.unknown-run"
+  | "blocked.unknown-lane"
+  | "blocked.unknown-session";
 
 export type SupervisorReasonDetail = {
   code: SupervisorReasonCode;
@@ -360,6 +364,17 @@ export const createSupervisorReasonDetail = (
         explanation: `No governance policy is configured for ${checkpoint}, so the evaluator failed open to ${outcome} and recorded a warning.`
       };
     }
+    case "governance.policy-invalid": {
+      const checkpoint = context.path ?? "supervisor policy";
+      const outcome = context.actionReason ?? "safe defaults";
+      const ruleSummary = context.policyId ? ` Diagnostics: ${context.policyId}.` : "";
+      return {
+        code,
+        category: "governance-policy",
+        short: "Supervisor policy invalid.",
+        explanation: `The ${checkpoint} configuration is invalid, so the runtime failed safe to ${outcome}.${ruleSummary}`.trim()
+      };
+    }
     case "blocked.missing-mcp-provider": {
       const providers = context.missingProviders?.join(", ") ?? "the required providers";
       return {
@@ -377,6 +392,33 @@ export const createSupervisorReasonDetail = (
         explanation: context.actionReason
           ? `Blocked the MCP action: ${context.actionReason}.`
           : "Blocked the MCP action because it did not satisfy the current policy."
+      };
+    case "blocked.unknown-run":
+      return {
+        code,
+        category: "blocked-action",
+        short: "Supervisor run not found.",
+        explanation: context.actionReason
+          ? `Blocked the workflow action because the supervisor run could not be found: ${context.actionReason}.`
+          : "Blocked the workflow action because the supervisor run could not be found."
+      };
+    case "blocked.unknown-lane":
+      return {
+        code,
+        category: "blocked-action",
+        short: "Lane not found.",
+        explanation: context.actionReason
+          ? `Blocked the workflow action because the lane could not be found: ${context.actionReason}.`
+          : "Blocked the workflow action because the lane could not be found."
+      };
+    case "blocked.unknown-session":
+      return {
+        code,
+        category: "blocked-action",
+        short: "Session not found.",
+        explanation: context.actionReason
+          ? `Blocked the workflow action because the runtime session could not be found: ${context.actionReason}.`
+          : "Blocked the workflow action because the runtime session could not be found."
       };
     case "delegation.launch":
       return {
