@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/marcel-tuinstra/opencode-council/actions/workflows/ci.yml/badge.svg)](https://github.com/marcel-tuinstra/opencode-council/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/marcel-tuinstra/opencode-council/releases)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/marcel-tuinstra/opencode-council/releases)
 [![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-green.svg)](https://github.com/sst/opencode)
 
 **AI agents that debate before they act.**

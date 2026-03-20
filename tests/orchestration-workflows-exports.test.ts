@@ -51,6 +51,8 @@ describe("orchestration workflow package barrels", () => {
     expect("createSupervisorDispatchPlan" in stableRoot).toBe(false);
     expect("createFileBackedSupervisorStateStore" in stableRoot).toBe(false);
     expect("DEFAULT_SUPERVISOR_PROFILE" in stableRoot).toBe(false);
+    // These MCP helper types are intentionally internal-only and should not leak
+    // through either the stable root or the experimental supervisor barrel.
     expect("McpProviderConfig" in stableRoot).toBe(false);
     expect("McpBlockResult" in stableRoot).toBe(false);
   });
