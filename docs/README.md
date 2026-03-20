@@ -7,6 +7,7 @@
 
 ## Guides
 
+- [Compatibility and deprecations](./guides/compatibility-and-deprecations.md) -- canonical `0.5.x` compatibility, deprecation, and removal policy
 - [Customization](./guides/customization.md) -- roles, MCP providers, agent personas
 - [Policy profiles](./guides/policy-profiles.md) -- supervisor policy defaults, repo config, and budget override precedence
 - [Local sync and agents](./guides/local-sync-and-agents.md) -- troubleshooting agent loading

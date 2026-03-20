@@ -16,6 +16,12 @@ curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/ma
 
 Restart OpenCode after installing.
 
+## Compatibility notes for `v0.5.x`
+
+- The canonical compatibility and deprecation policy lives in [`../guides/compatibility-and-deprecations.md`](../guides/compatibility-and-deprecations.md).
+- Root package exports and CLI verbs are covered there for `v0.5.x`.
+- The supervisor entry point, `opencode-council/supervisor`, remains experimental.
+
 ## Managing your install
 
 ```bash
@@ -25,6 +31,8 @@ npx opencode-council uninstall   # Clean removal
 ```
 
 Use `--dry-run` with any command to see what would happen without making changes. Use `--backup` with `refresh` to create `.bak` copies before overwriting.
+
+If you already use `init`, `refresh`, `verify`, or `uninstall`, you do not need new command names for `v0.5.x`.
 
 ## Manual install
 
@@ -69,6 +77,8 @@ ORCHESTRATION_WORKFLOWS_DEBUG=1 opencode web
 ```
 
 This enables plugin debug logging to stderr. `1`, `true`, `yes`, and `on` all enable it. Look for lines prefixed with `[orchestration-workflows]`.
+
+For debug env var and policy compatibility expectations, use the canonical policy doc: [`../guides/compatibility-and-deprecations.md`](../guides/compatibility-and-deprecations.md).
 
 Useful events include:
 
