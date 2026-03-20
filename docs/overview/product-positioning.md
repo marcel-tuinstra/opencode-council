@@ -6,7 +6,7 @@ OpenCode Council brings deliberative multi-agent discussion to [OpenCode](https:
 
 ## What makes this different
 
-Most multi-agent approaches use a **delegation model**: an orchestrator decides what needs to happen, assigns tasks to specialist agents, and collects results. This works for straightforward execution but breaks down when the problem requires judgment, trade-off analysis, or cross-functional reasoning.
+Most multi-agent approaches use a **delegation model**: an orchestrator decides what needs to happen, assigns tasks to specialist agents, and collects results. This works well for straightforward execution but is less suited when the problem requires judgment, trade-off analysis, or cross-functional reasoning.
 
 This plugin uses a **deliberation model**. When you mention multiple roles, they engage in structured discussion through heartbeat phases (Frame, Challenge, Synthesize). The output is not just a task completed -- it's a recommendation with visible reasoning from multiple expert perspectives.
 

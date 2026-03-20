@@ -15,6 +15,7 @@
 ## Overview
 
 - [Product positioning](./overview/product-positioning.md) -- what this plugin is and why it exists
+- [v1.0 scope](./overview/v1.0-scope.md) -- canonical scope, non-goals, and competitive framing for `v1.0.0`
 - [Architecture](./overview/architecture.md) -- how the plugin and supervisor foundation are structured
 
 ## Testing
