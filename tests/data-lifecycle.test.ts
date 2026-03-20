@@ -7,7 +7,7 @@ describe("data-lifecycle", () => {
   it("fails closed for durable runs with active governance and evidence signals", () => {
     // Arrange
     const runState = {
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
       run: {
         runId: "run-retain",
         status: "review_ready" as const,
@@ -45,6 +45,7 @@ describe("data-lifecycle", () => {
           updatedAt: "2026-02-10T10:00:00.000Z"
         }
       ],
+      childSessions: [],
       approvals: [
         {
           approvalId: "approval-1",
@@ -141,10 +142,11 @@ describe("data-lifecycle", () => {
   it("marks quiet durable runs for archive or delete review by age window", () => {
     // Arrange
     const baseRunState = {
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
       lanes: [],
       worktrees: [],
       sessions: [],
+      childSessions: [],
       approvals: [],
       artifacts: [],
       appliedMutations: [],

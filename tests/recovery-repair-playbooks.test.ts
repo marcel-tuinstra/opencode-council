@@ -4,7 +4,7 @@ import { classifySupervisorRecoveryPlaybook, getSupervisorLaneRecoveryContext } 
 import type { SupervisorLaneWorktreeReconciliationReport } from "../plugins/orchestration-workflows/lane-worktree-provisioner";
 
 const createRunState = (): SupervisorRunState => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   run: {
     runId: "run-recovery",
     status: "active",
@@ -86,6 +86,7 @@ const createRunState = (): SupervisorRunState => ({
       updatedAt: "2026-03-13T16:03:00.000Z"
     }
   ],
+  childSessions: [],
   appliedMutations: [],
   auditLog: []
 });

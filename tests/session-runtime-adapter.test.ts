@@ -320,4 +320,164 @@ describe("session-runtime-adapter", () => {
     expect(result.session.status).toBe("stalled");
     expect(result.session.failureReason).toBe("Heartbeat expired while the lane was waiting for output.");
   });
+
+  it("creates both a SupervisorSessionRecord and a ChildSessionRecord on launch", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    // Act
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-dual",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+    const state = await store.getRunState("run-session");
+
+    // Assert – supervisor session
+    expect(state?.sessions).toHaveLength(1);
+    expect(state?.sessions[0]?.sessionId).toBe("run-session:lane-1:session-01");
+
+    // Assert – child session
+    expect(state?.childSessions).toHaveLength(1);
+    expect(state?.childSessions[0]).toMatchObject({
+      sessionId: "run-session:lane-1:session-01",
+      parentRunId: "run-session",
+      laneId: "lane-1",
+      worktreeId: "run-session:lane-1",
+      state: "launching",
+      owner: "developer-a",
+      heartbeatCount: 0
+    });
+  });
+
+  it("transitions child session from launching to active on first heartbeat", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-hb",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Act
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-heartbeat-1",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      lastHeartbeatAt: "2026-03-13T14:02:00.000Z"
+    });
+    const state = await store.getRunState("run-session");
+
+    // Assert
+    expect(state?.childSessions[0]?.state).toBe("active");
+    expect(state?.childSessions[0]?.previousState).toBe("launching");
+    expect(state?.childSessions[0]?.heartbeatCount).toBe(1);
+    expect(state?.childSessions[0]?.lastHeartbeatAt).toBe("2026-03-13T14:02:00.000Z");
+  });
+
+  it("cancels a child session through cancelling → cancelled transition", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-cancel",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Promote to active via heartbeat first
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-heartbeat-pre-cancel",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      lastHeartbeatAt: "2026-03-13T14:02:00.000Z"
+    });
+
+    // Act
+    const result = await lifecycle.cancelSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-cancel",
+      occurredAt: "2026-03-13T14:03:00.000Z",
+      cancelledReason: "User requested cancellation."
+    });
+    const state = await store.getRunState("run-session");
+
+    // Assert
+    expect(result.action).toBe("cancelled");
+    expect(result.session.status).toBe("failed");
+    expect(result.session.failureReason).toBe("User requested cancellation.");
+
+    expect(state?.childSessions[0]?.state).toBe("cancelled");
+    expect(state?.childSessions[0]?.cancelledReason).toBe("User requested cancellation.");
+  });
+
+  it("rejects invalid child session state transitions", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-invalid",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Promote to active, then cancel
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-hb-invalid",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      lastHeartbeatAt: "2026-03-13T14:02:00.000Z"
+    });
+    await lifecycle.cancelSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-cancel-invalid",
+      occurredAt: "2026-03-13T14:03:00.000Z",
+      cancelledReason: "Done."
+    });
+
+    // Assert – child session is now cancelled (terminal), cannot be resumed
+    const state = await store.getRunState("run-session");
+    expect(state?.childSessions[0]?.state).toBe("cancelled");
+
+    // The assertChildSessionTransition function prevents invalid jumps
+    const { assertChildSessionTransition } = await import("../plugins/orchestration-workflows/child-session-lifecycle");
+    expect(() => assertChildSessionTransition("cancelled", "active")).toThrow(
+      "Invalid child-session transition: cancelled -> active"
+    );
+  });
 });

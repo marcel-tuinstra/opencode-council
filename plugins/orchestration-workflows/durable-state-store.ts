@@ -1,8 +1,9 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { LaneLifecycleState } from "./lane-lifecycle";
+import type { ChildSessionRecord } from "./child-session-lifecycle";
 
-export const SUPERVISOR_STATE_STORE_SCHEMA_VERSION = 1;
+export const SUPERVISOR_STATE_STORE_SCHEMA_VERSION = 2;
 export const DEFAULT_SUPERVISOR_STATE_ROOT = ".opencode/supervisor/state";
 
 export type SupervisorPersistedRunStatus =
@@ -130,6 +131,7 @@ export type SupervisorRunState = {
   lanes: readonly SupervisorLaneRecord[];
   worktrees: readonly SupervisorWorktreeRecord[];
   sessions: readonly SupervisorSessionRecord[];
+  childSessions: readonly ChildSessionRecord[];
   approvals: readonly SupervisorApprovalRecord[];
   artifacts: readonly SupervisorArtifactRecord[];
   appliedMutations: readonly string[];
@@ -146,6 +148,7 @@ export type SupervisorRunStateMutation = {
   laneUpserts?: readonly SupervisorLaneRecord[];
   worktreeUpserts?: readonly SupervisorWorktreeRecord[];
   sessionUpserts?: readonly SupervisorSessionRecord[];
+  childSessionUpserts?: readonly ChildSessionRecord[];
   approvalUpserts?: readonly SupervisorApprovalRecord[];
   artifactUpserts?: readonly SupervisorArtifactRecord[];
   sideEffects?: readonly string[];
@@ -329,6 +332,7 @@ const buildInitialRunState = (input: SupervisorRunRecordInput): SupervisorRunSta
   lanes: freezeList([]),
   worktrees: freezeList([]),
   sessions: freezeList([]),
+  childSessions: freezeList([]),
   approvals: freezeList([]),
   artifacts: freezeList([]),
   appliedMutations: freezeList([]),
@@ -411,16 +415,33 @@ const normalizeRunState = (input: SupervisorRunState): SupervisorRunState => fre
   lanes: freezeList(input.lanes.map(normalizeLaneRecord).sort((left, right) => compareById(left, right, (value) => value.laneId))),
   worktrees: freezeList(input.worktrees.map(normalizeWorktreeRecord).sort((left, right) => compareById(left, right, (value) => value.worktreeId))),
   sessions: freezeList(input.sessions.map(normalizeSessionRecord).sort((left, right) => compareById(left, right, (value) => value.sessionId))),
+  childSessions: freezeList([...(input.childSessions ?? [])].sort((left, right) => compareById(left, right, (value) => value.sessionId))),
   approvals: freezeList(input.approvals.map(normalizeApprovalRecord).sort((left, right) => compareById(left, right, (value) => value.approvalId))),
   artifacts: freezeList(input.artifacts.map(normalizeArtifactRecord).sort((left, right) => compareById(left, right, (value) => value.artifactId))),
   appliedMutations: freezeList(Array.from(new Set(input.appliedMutations.map((value) => assertNonEmpty(value, "mutation id"))).values()).sort()),
   auditLog: freezeList(input.auditLog.map(normalizeAuditEntry).sort((left, right) => left.sequence - right.sequence))
 });
 
+const SUPPORTED_SCHEMA_VERSIONS: ReadonlySet<number> = new Set([1, SUPERVISOR_STATE_STORE_SCHEMA_VERSION]);
+
 const assertKnownSchemaVersion = (value: unknown): void => {
-  if (value !== SUPERVISOR_STATE_STORE_SCHEMA_VERSION) {
+  if (typeof value !== "number" || !SUPPORTED_SCHEMA_VERSIONS.has(value)) {
     throw new Error(`Unsupported supervisor durable state schema version: ${String(value)}`);
   }
+};
+
+const migrateRunState = (raw: Record<string, unknown>): SupervisorRunState => {
+  const version = raw.schemaVersion as number;
+
+  if (version === 1) {
+    return {
+      ...(raw as unknown as Omit<SupervisorRunState, "schemaVersion" | "childSessions">),
+      schemaVersion: SUPERVISOR_STATE_STORE_SCHEMA_VERSION,
+      childSessions: []
+    } as SupervisorRunState;
+  }
+
+  return raw as unknown as SupervisorRunState;
 };
 
 const getRunStorageLocation = (rootDir: string, runId: string): SupervisorRunStorageLocation => {
@@ -467,9 +488,9 @@ export const createFileBackedSupervisorStateStore = (
       const location = getRunStorageLocation(rootDir, runId);
 
       try {
-        const raw = readJsonFile<SupervisorRunState>(location.stateFile);
+        const raw = readJsonFile<Record<string, unknown>>(location.stateFile);
         assertKnownSchemaVersion(raw.schemaVersion);
-        return normalizeRunState(raw);
+        return normalizeRunState(migrateRunState(raw));
       } catch (error) {
         const nodeError = error as NodeJS.ErrnoException;
         if (nodeError.code === "ENOENT") {
@@ -489,9 +510,9 @@ export const createFileBackedSupervisorStateStore = (
       const currentState = (() => {
         const existing = (() => {
           try {
-            const raw = readJsonFile<SupervisorRunState>(location.stateFile);
+            const raw = readJsonFile<Record<string, unknown>>(location.stateFile);
             assertKnownSchemaVersion(raw.schemaVersion);
-            return normalizeRunState(raw);
+            return normalizeRunState(migrateRunState(raw));
           } catch (error) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code === "ENOENT") {
@@ -536,6 +557,11 @@ export const createFileBackedSupervisorStateStore = (
         sessions: upsertRecords(
           currentState.sessions,
           (mutation.sessionUpserts ?? []).map(normalizeSessionRecord),
+          (value) => value.sessionId
+        ),
+        childSessions: upsertRecords(
+          currentState.childSessions,
+          mutation.childSessionUpserts ?? [],
           (value) => value.sessionId
         ),
         approvals: upsertRecords(

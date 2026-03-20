@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createFileBackedSupervisorStateStore } from "../plugins/orchestration-workflows/durable-state-store";
+import { createFileBackedSupervisorStateStore, SUPERVISOR_STATE_STORE_SCHEMA_VERSION } from "../plugins/orchestration-workflows/durable-state-store";
+import type { ChildSessionRecord } from "../plugins/orchestration-workflows/child-session-lifecycle";
 
 const tempDirs: string[] = [];
 
@@ -247,5 +248,154 @@ describe("durable-state-store", () => {
       { kind: "lane", id: "lane-review", state: "review_ready" },
       { kind: "artifact", id: "artifact-pr-1", state: "ready" }
     ]);
+  });
+
+  it("migrates v1 state by adding childSessions when reading from disk", async () => {
+    // Arrange – write a v1 state file directly (no childSessions field)
+    const rootDir = createTempRoot();
+    const runDir = path.join(rootDir, "runs", "run-v1-migrate");
+    mkdirSync(path.join(runDir, "events"), { recursive: true });
+    const v1State = {
+      schemaVersion: 1,
+      run: {
+        runId: "run-v1-migrate",
+        status: "active",
+        objective: "Test v1 -> v2 migration.",
+        sourceOfTruth: "control-plane-state",
+        createdAt: "2026-03-20T10:00:00.000Z",
+        updatedAt: "2026-03-20T10:00:00.000Z"
+      },
+      lanes: [],
+      worktrees: [],
+      sessions: [],
+      approvals: [],
+      artifacts: [],
+      appliedMutations: [],
+      auditLog: []
+    };
+    writeFileSync(path.join(runDir, "state.json"), JSON.stringify(v1State, null, 2), "utf8");
+
+    const store = createFileBackedSupervisorStateStore({ rootDir });
+
+    // Act
+    const state = await store.getRunState("run-v1-migrate");
+
+    // Assert
+    expect(state).not.toBeNull();
+    expect(state?.schemaVersion).toBe(SUPERVISOR_STATE_STORE_SCHEMA_VERSION);
+    expect(state?.childSessions).toEqual([]);
+  });
+
+  it("inserts and updates child sessions via childSessionUpserts", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = createFileBackedSupervisorStateStore({ rootDir });
+
+    const childSession: ChildSessionRecord = {
+      sessionId: "child-sess-1",
+      parentRunId: "run-cs",
+      laneId: "lane-1",
+      correlationId: "run-cs:lane-1:child-sess-1",
+      state: "launching",
+      heartbeatIntervalMs: 30_000,
+      heartbeatCount: 0,
+      retryCount: 0,
+      maxRetries: 2,
+      startedAt: "2026-03-20T10:00:00.000Z",
+      updatedAt: "2026-03-20T10:00:00.000Z"
+    };
+
+    await store.commitMutation("run-cs", {
+      mutationId: "mutation-cs-create",
+      actor: "supervisor",
+      summary: "Create run with child session.",
+      occurredAt: "2026-03-20T10:00:00.000Z",
+      createRun: {
+        runId: "run-cs",
+        status: "active",
+        objective: "Test child session upserts.",
+        createdAt: "2026-03-20T10:00:00.000Z"
+      },
+      childSessionUpserts: [childSession]
+    });
+
+    // Act – insert
+    const stateAfterInsert = await store.getRunState("run-cs");
+    expect(stateAfterInsert?.childSessions).toHaveLength(1);
+    expect(stateAfterInsert?.childSessions[0]?.sessionId).toBe("child-sess-1");
+    expect(stateAfterInsert?.childSessions[0]?.state).toBe("launching");
+
+    // Act – update (upsert same sessionId with new state)
+    const updatedChildSession: ChildSessionRecord = {
+      ...childSession,
+      state: "active",
+      previousState: "launching",
+      heartbeatCount: 1,
+      lastHeartbeatAt: "2026-03-20T10:01:00.000Z",
+      updatedAt: "2026-03-20T10:01:00.000Z"
+    };
+
+    await store.commitMutation("run-cs", {
+      mutationId: "mutation-cs-update",
+      actor: "supervisor",
+      summary: "Update child session to active.",
+      occurredAt: "2026-03-20T10:01:00.000Z",
+      childSessionUpserts: [updatedChildSession]
+    });
+
+    const stateAfterUpdate = await store.getRunState("run-cs");
+    expect(stateAfterUpdate?.childSessions).toHaveLength(1);
+    expect(stateAfterUpdate?.childSessions[0]?.state).toBe("active");
+    expect(stateAfterUpdate?.childSessions[0]?.heartbeatCount).toBe(1);
+    expect(stateAfterUpdate?.childSessions[0]?.lastHeartbeatAt).toBe("2026-03-20T10:01:00.000Z");
+  });
+
+  it("persists child sessions across a full read/write cycle", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const writer = createFileBackedSupervisorStateStore({ rootDir });
+
+    const childSession: ChildSessionRecord = {
+      sessionId: "child-persist-1",
+      parentRunId: "run-persist",
+      laneId: "lane-1",
+      correlationId: "run-persist:lane-1:child-persist-1",
+      state: "active",
+      heartbeatIntervalMs: 30_000,
+      heartbeatCount: 3,
+      retryCount: 0,
+      maxRetries: 2,
+      startedAt: "2026-03-20T10:00:00.000Z",
+      lastHeartbeatAt: "2026-03-20T10:03:00.000Z",
+      updatedAt: "2026-03-20T10:03:00.000Z"
+    };
+
+    await writer.commitMutation("run-persist", {
+      mutationId: "mutation-persist-1",
+      actor: "supervisor",
+      summary: "Create run with active child session.",
+      occurredAt: "2026-03-20T10:00:00.000Z",
+      createRun: {
+        runId: "run-persist",
+        status: "active",
+        objective: "Verify child sessions survive a read/write cycle.",
+        createdAt: "2026-03-20T10:00:00.000Z"
+      },
+      childSessionUpserts: [childSession]
+    });
+
+    // Act – read from a separate store instance (simulates process restart)
+    const reader = createFileBackedSupervisorStateStore({ rootDir });
+    const state = await reader.getRunState("run-persist");
+
+    // Assert
+    expect(state?.childSessions).toHaveLength(1);
+    expect(state?.childSessions[0]).toMatchObject({
+      sessionId: "child-persist-1",
+      parentRunId: "run-persist",
+      state: "active",
+      heartbeatCount: 3,
+      lastHeartbeatAt: "2026-03-20T10:03:00.000Z"
+    });
   });
 });

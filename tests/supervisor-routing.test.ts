@@ -5,7 +5,7 @@ import { routeSupervisorWorkUnit } from "../plugins/orchestration-workflows/supe
 import { normalizeWorkUnit } from "../plugins/orchestration-workflows/work-unit";
 
 const createRunState = (): SupervisorRunState => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   run: {
     runId: "run-alpha",
     status: "active",
@@ -44,6 +44,7 @@ const createRunState = (): SupervisorRunState => ({
       updatedAt: "2026-03-13T10:00:00.000Z"
     }
   ],
+  childSessions: [],
   approvals: [],
   artifacts: [],
   appliedMutations: [],
