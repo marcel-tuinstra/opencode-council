@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - Planned
+
+### Added
+
+- Upgrade guidance for the `v0.5.0` barrel reorganization in `docs/guides/upgrading-to-0.5.0.md`
+- Explicit documentation for the stable runtime contract versus the experimental supervisor contract
+
+### Changed
+
+- The package root is now frozen to the minimal stable runtime contract: `AgentConversations`, `SUPPORTED_ROLES`, `Role`, `Intent`, `DelegationMode`, `DelegationRequest`, `DelegationWave`, `DelegationPlan`, and `SessionPolicy`
+- Supervisor helpers and other non-runtime root-barrel exports move to the experimental supervisor entry point, `opencode-council/supervisor`
+- `v0.5.0` formalizes the contract split so the live runtime can remain stable while supervisor APIs continue iterating toward `v0.6.0`
+
+### Upgrade Notes
+
+- If you import only the live runtime contract from `opencode-council`, no migration is required
+- If you import supervisor helpers, move those imports from `opencode-council` to `opencode-council/supervisor`
+- See `docs/guides/upgrading-to-0.5.0.md` for import migration examples
+
 ## [0.4.0] - 2026-03-19
 
 ### Added
