@@ -30,7 +30,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
     launched,
     attached,
 
-    launchSession: (input) => {
+    launchSession: async (input) => {
       launched.push({ ...input });
 
       return {
@@ -42,7 +42,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
       };
     },
 
-    attachSession: (input) => {
+    attachSession: async (input) => {
       attached.push({ ...input });
 
       return {
@@ -56,10 +56,10 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
   };
 };
 
-const seedRunWithLaneWorktree = (rootDir: string) => {
+const seedRunWithLaneWorktree = async (rootDir: string) => {
   const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
 
-  store.commitMutation("run-session", {
+  await store.commitMutation("run-session", {
     mutationId: "run-session-create",
     actor: "supervisor",
     summary: "Create a run with a provisioned lane worktree.",
@@ -101,15 +101,15 @@ afterEach(() => {
 });
 
 describe("session-runtime-adapter", () => {
-  it("launches one runtime session for a lane worktree and persists owner metadata", () => {
+  it("launches one runtime session for a lane worktree and persists owner metadata", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const store = seedRunWithLaneWorktree(rootDir);
+    const store = await seedRunWithLaneWorktree(rootDir);
     const runtime = createFakeRuntime();
     const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
 
     // Act
-    const result = lifecycle.launchSession({
+    const result = await lifecycle.launchSession({
       runId: "run-session",
       laneId: "lane-1",
       owner: "developer-a",
@@ -117,7 +117,7 @@ describe("session-runtime-adapter", () => {
       mutationId: "lane-1-launch-session",
       occurredAt: "2026-03-13T14:01:00.000Z"
     });
-    const state = store.getRunState("run-session");
+    const state = await store.getRunState("run-session");
 
     // Assert
     expect(result.action).toBe("launched");
@@ -140,14 +140,14 @@ describe("session-runtime-adapter", () => {
     expect(runtime.launched).toHaveLength(1);
   });
 
-  it("resumes a stalled session by reattaching the runtime session to the same worktree", () => {
+  it("resumes a stalled session by reattaching the runtime session to the same worktree", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const store = seedRunWithLaneWorktree(rootDir);
+    const store = await seedRunWithLaneWorktree(rootDir);
     const runtime = createFakeRuntime();
     const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
 
-    lifecycle.launchSession({
+    await lifecycle.launchSession({
       runId: "run-session",
       laneId: "lane-1",
       owner: "developer-a",
@@ -155,7 +155,7 @@ describe("session-runtime-adapter", () => {
       mutationId: "lane-1-launch-session",
       occurredAt: "2026-03-13T14:01:00.000Z"
     });
-    lifecycle.detectStalledSession({
+    await lifecycle.detectStalledSession({
       runId: "run-session",
       laneId: "lane-1",
       actor: "supervisor",
@@ -165,7 +165,7 @@ describe("session-runtime-adapter", () => {
     });
 
     // Act
-    const result = lifecycle.resumeSession({
+    const result = await lifecycle.resumeSession({
       runId: "run-session",
       laneId: "lane-1",
       owner: "developer-b",
@@ -195,14 +195,14 @@ describe("session-runtime-adapter", () => {
     ]);
   });
 
-  it("marks an active lane session as paused while waiting for approval", () => {
+  it("marks an active lane session as paused while waiting for approval", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const store = seedRunWithLaneWorktree(rootDir);
+    const store = await seedRunWithLaneWorktree(rootDir);
     const runtime = createFakeRuntime();
     const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
 
-    lifecycle.launchSession({
+    await lifecycle.launchSession({
       runId: "run-session",
       laneId: "lane-1",
       owner: "developer-a",
@@ -212,7 +212,7 @@ describe("session-runtime-adapter", () => {
     });
 
     // Act
-    const result = lifecycle.pauseSession({
+    const result = await lifecycle.pauseSession({
       runId: "run-session",
       laneId: "lane-1",
       actor: "supervisor",
@@ -226,14 +226,14 @@ describe("session-runtime-adapter", () => {
     expect(result.session.updatedAt).toBe("2026-03-13T14:02:00.000Z");
   });
 
-  it("replaces a failed lane session and keeps replacement lineage in durable state", () => {
+  it("replaces a failed lane session and keeps replacement lineage in durable state", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const store = seedRunWithLaneWorktree(rootDir);
+    const store = await seedRunWithLaneWorktree(rootDir);
     const runtime = createFakeRuntime();
     const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
 
-    lifecycle.launchSession({
+    await lifecycle.launchSession({
       runId: "run-session",
       laneId: "lane-1",
       owner: "developer-a",
@@ -241,7 +241,7 @@ describe("session-runtime-adapter", () => {
       mutationId: "lane-1-launch-session",
       occurredAt: "2026-03-13T14:01:00.000Z"
     });
-    lifecycle.recordHeartbeat({
+    await lifecycle.recordHeartbeat({
       runId: "run-session",
       laneId: "lane-1",
       actor: "supervisor",
@@ -252,7 +252,7 @@ describe("session-runtime-adapter", () => {
     });
 
     // Act
-    const result = lifecycle.replaceSession({
+    const result = await lifecycle.replaceSession({
       runId: "run-session",
       laneId: "lane-1",
       owner: "developer-c",
@@ -260,7 +260,7 @@ describe("session-runtime-adapter", () => {
       mutationId: "lane-1-replace-session",
       occurredAt: "2026-03-13T14:04:00.000Z"
     });
-    const state = store.getRunState("run-session");
+    const state = await store.getRunState("run-session");
 
     // Assert
     expect(result.action).toBe("replaced");
@@ -288,14 +288,14 @@ describe("session-runtime-adapter", () => {
     ]);
   });
 
-  it("marks the current session as stalled when heartbeat age exceeds the timeout", () => {
+  it("marks the current session as stalled when heartbeat age exceeds the timeout", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const store = seedRunWithLaneWorktree(rootDir);
+    const store = await seedRunWithLaneWorktree(rootDir);
     const runtime = createFakeRuntime();
     const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
 
-    lifecycle.launchSession({
+    await lifecycle.launchSession({
       runId: "run-session",
       laneId: "lane-1",
       owner: "developer-a",
@@ -305,7 +305,7 @@ describe("session-runtime-adapter", () => {
     });
 
     // Act
-    const result = lifecycle.detectStalledSession({
+    const result = await lifecycle.detectStalledSession({
       runId: "run-session",
       laneId: "lane-1",
       actor: "supervisor",

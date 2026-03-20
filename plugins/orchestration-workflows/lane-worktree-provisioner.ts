@@ -116,9 +116,9 @@ export type SupervisorLaneWorktreeReconciliationReport = {
 };
 
 export type SupervisorLaneWorktreeProvisioner = {
-  provisionLaneWorktree(input: ProvisionSupervisorLaneWorktreeInput): ProvisionSupervisorLaneWorktreeResult;
-  releaseLaneWorktree(input: ReleaseSupervisorLaneWorktreeInput): ReleaseSupervisorLaneWorktreeResult;
-  reconcileLaneWorktrees(runId: string): SupervisorLaneWorktreeReconciliationReport;
+  provisionLaneWorktree(input: ProvisionSupervisorLaneWorktreeInput): Promise<ProvisionSupervisorLaneWorktreeResult>;
+  releaseLaneWorktree(input: ReleaseSupervisorLaneWorktreeInput): Promise<ReleaseSupervisorLaneWorktreeResult>;
+  reconcileLaneWorktrees(runId: string): Promise<SupervisorLaneWorktreeReconciliationReport>;
 };
 
 const freezeRecord = <T extends Record<string, unknown>>(value: T): Readonly<T> => Object.freeze({ ...value });
@@ -373,9 +373,9 @@ export const createSupervisorLaneWorktreeProvisioner = (
   const worktreeRootDir = path.resolve(options.worktreeRootDir ?? DEFAULT_SUPERVISOR_WORKTREE_ROOT);
   const system = options.system ?? createNodeSupervisorLaneWorktreeSystem(repoRoot);
 
-  const reconcileLaneWorktrees = (runId: string): SupervisorLaneWorktreeReconciliationReport => {
+  const reconcileLaneWorktrees = async (runId: string): Promise<SupervisorLaneWorktreeReconciliationReport> => {
     const normalizedRunId = assertNonEmpty(runId, "run id");
-    const state = store.getRunState(normalizedRunId);
+    const state = await store.getRunState(normalizedRunId);
 
     if (!state) {
       throw new Error(`Cannot reconcile lane worktrees for unknown run '${normalizedRunId}'.`);
@@ -486,20 +486,20 @@ export const createSupervisorLaneWorktreeProvisioner = (
     return createReconciliationReport(normalizedRunId, runWorktreeRoot, healthy, drift, collisions, orphans);
   };
 
-  const provisionLaneWorktree = (input: ProvisionSupervisorLaneWorktreeInput): ProvisionSupervisorLaneWorktreeResult => {
+  const provisionLaneWorktree = async (input: ProvisionSupervisorLaneWorktreeInput): Promise<ProvisionSupervisorLaneWorktreeResult> => {
     const normalizedRunId = assertNonEmpty(input.runId, "run id");
     const normalizedLaneId = assertNonEmpty(input.laneId, "lane id");
     const normalizedBranch = assertNonEmpty(input.branch, "branch");
     const baseRef = assertNonEmpty(input.baseRef ?? "HEAD", "base ref");
     const worktreeId = buildWorktreeId(normalizedRunId, normalizedLaneId);
     const worktreePath = buildSupervisorManagedWorktreePath(normalizedRunId, normalizedLaneId, worktreeRootDir);
-    const state = store.getRunState(normalizedRunId);
+    const state = await store.getRunState(normalizedRunId);
 
     if (!state) {
       throw new Error(`Cannot provision a lane worktree for unknown run '${normalizedRunId}'.`);
     }
 
-    const reconciliation = reconcileLaneWorktrees(normalizedRunId);
+    const reconciliation = await reconcileLaneWorktrees(normalizedRunId);
     const lane = findLane(state, normalizedLaneId);
     const existingWorktree = findWorktree(state, worktreeId);
     const normalizedExistingPath = existingWorktree ? normalizeWorktreePath(existingWorktree.path) : undefined;
@@ -545,7 +545,7 @@ export const createSupervisorLaneWorktreeProvisioner = (
     if (existingWorktree && normalizedExistingPath === worktreePath && system.pathExists(worktreePath) && gitAtTargetPath?.branch === normalizedBranch) {
       const nextLane = buildLaneRecord(lane, input, worktreeId);
       const nextWorktree = buildWorktreeRecord(normalizedLaneId, worktreeId, worktreePath, normalizedBranch, input.occurredAt);
-      store.commitMutation(normalizedRunId, {
+      await store.commitMutation(normalizedRunId, {
         mutationId: input.mutationId,
         actor: input.actor,
         summary: input.summary ?? `Reuse lane worktree for '${normalizedLaneId}'.`,
@@ -573,7 +573,7 @@ export const createSupervisorLaneWorktreeProvisioner = (
 
     const nextLane = buildLaneRecord(lane, input, worktreeId);
     const nextWorktree = buildWorktreeRecord(normalizedLaneId, worktreeId, worktreePath, normalizedBranch, input.occurredAt);
-    store.commitMutation(normalizedRunId, {
+    await store.commitMutation(normalizedRunId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Provision lane worktree for '${normalizedLaneId}'.`,
@@ -592,10 +592,10 @@ export const createSupervisorLaneWorktreeProvisioner = (
     };
   };
 
-  const releaseLaneWorktree = (input: ReleaseSupervisorLaneWorktreeInput): ReleaseSupervisorLaneWorktreeResult => {
+  const releaseLaneWorktree = async (input: ReleaseSupervisorLaneWorktreeInput): Promise<ReleaseSupervisorLaneWorktreeResult> => {
     const normalizedRunId = assertNonEmpty(input.runId, "run id");
     const normalizedLaneId = assertNonEmpty(input.laneId, "lane id");
-    const state = store.getRunState(normalizedRunId);
+    const state = await store.getRunState(normalizedRunId);
 
     if (!state) {
       throw new Error(`Cannot release a lane worktree for unknown run '${normalizedRunId}'.`);
@@ -618,7 +618,7 @@ export const createSupervisorLaneWorktreeProvisioner = (
 
     const nextLane = buildReleaseLaneRecord(lane, input.occurredAt);
     const nextWorktree = buildWorktreeRecord(normalizedLaneId, worktree.worktreeId, normalizedPath, worktree.branch, input.occurredAt, "released");
-    store.commitMutation(normalizedRunId, {
+    await store.commitMutation(normalizedRunId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Release lane worktree for '${normalizedLaneId}'.`,

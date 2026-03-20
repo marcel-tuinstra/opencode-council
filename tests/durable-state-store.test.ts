@@ -19,12 +19,12 @@ afterEach(() => {
 });
 
 describe("durable-state-store", () => {
-  it("persists and reloads supervisor run control-plane state from disk", () => {
+  it("persists and reloads supervisor run control-plane state from disk", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const writer = createFileBackedSupervisorStateStore({ rootDir });
 
-    writer.commitMutation("run-001", {
+    await writer.commitMutation("run-001", {
       mutationId: "mutation-001",
       actor: "supervisor",
       summary: "Start the run and persist initial execution state.",
@@ -99,7 +99,7 @@ describe("durable-state-store", () => {
     const reader = createFileBackedSupervisorStateStore({ rootDir });
 
     // Act
-    const state = reader.getRunState("run-001");
+    const state = await reader.getRunState("run-001");
 
     // Assert
     expect(state).not.toBeNull();
@@ -147,7 +147,7 @@ describe("durable-state-store", () => {
     ]);
   });
 
-  it("deduplicates retried mutations by mutation id", () => {
+  it("deduplicates retried mutations by mutation id", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const store = createFileBackedSupervisorStateStore({ rootDir });
@@ -173,10 +173,10 @@ describe("durable-state-store", () => {
       sideEffects: ["pause-for-review"]
     } as const;
 
-    store.commitMutation("run-002", mutation);
+    await store.commitMutation("run-002", mutation);
 
     // Act
-    const secondState = store.commitMutation("run-002", mutation);
+    const secondState = await store.commitMutation("run-002", mutation);
 
     // Assert
     expect(secondState.appliedMutations).toEqual(["mutation-retry-1"]);
@@ -191,12 +191,12 @@ describe("durable-state-store", () => {
     ]);
   });
 
-  it("writes an auditable event file for each committed mutation", () => {
+  it("writes an auditable event file for each committed mutation", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const store = createFileBackedSupervisorStateStore({ rootDir });
 
-    store.commitMutation("run-003", {
+    await store.commitMutation("run-003", {
       mutationId: "mutation-003",
       actor: "supervisor",
       summary: "Persist review-ready promotion and PR artifact.",

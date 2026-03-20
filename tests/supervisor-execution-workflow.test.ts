@@ -92,7 +92,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
     launched,
     attached,
 
-    launchSession: (input) => {
+    launchSession: async (input) => {
       launched.push({ ...input });
 
       return {
@@ -104,7 +104,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
       };
     },
 
-    attachSession: (input) => {
+    attachSession: async (input) => {
       attached.push({ ...input });
 
       return {
@@ -125,7 +125,7 @@ afterEach(() => {
 });
 
 describe("supervisor-execution-workflow", () => {
-  it("executes one delegated run through dispatch, recovery, governance, review, and reconstruction", () => {
+  it("executes one delegated run through dispatch, recovery, governance, review, and reconstruction", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const repoRoot = path.join(rootDir, "repo");
@@ -164,7 +164,7 @@ describe("supervisor-execution-workflow", () => {
       }
     ];
 
-    const bootstrap = workflow.bootstrapRun({
+    const bootstrap = await workflow.bootstrapRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:00:00.000Z",
@@ -191,7 +191,7 @@ describe("supervisor-execution-workflow", () => {
     });
 
     // Act
-    const initialDispatch = workflow.advanceRun({
+    const initialDispatch = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:01:00.000Z",
@@ -200,7 +200,7 @@ describe("supervisor-execution-workflow", () => {
       sessionOwners: ["DEV"],
       baseRef: "origin/main"
     });
-    const launchDispatch = workflow.advanceRun({
+    const launchDispatch = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:02:00.000Z",
@@ -218,7 +218,7 @@ describe("supervisor-execution-workflow", () => {
       stallTimeoutMs: 5 * 60 * 1000,
       failureReason: "The delegated implementation session stopped heartbeating."
     });
-    const recoveryDispatch = workflow.advanceRun({
+    const recoveryDispatch = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:10:00.000Z",
@@ -227,7 +227,7 @@ describe("supervisor-execution-workflow", () => {
       sessionOwners: ["DEV"],
       baseRef: "origin/main"
     });
-    const approvalBlocked = workflow.advanceRun({
+    const approvalBlocked = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:11:00.000Z",
@@ -246,7 +246,7 @@ describe("supervisor-execution-workflow", () => {
       sessionOwners: ["DEV"],
       baseRef: "origin/main"
     });
-    const approvalResumed = workflow.advanceRun({
+    const approvalResumed = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:12:00.000Z",
@@ -271,7 +271,7 @@ describe("supervisor-execution-workflow", () => {
       sessionOwners: ["DEV"],
       baseRef: "origin/main"
     });
-    const reviewBoundaryBlocked = workflow.advanceRun({
+    const reviewBoundaryBlocked = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:13:00.000Z",
@@ -304,7 +304,7 @@ describe("supervisor-execution-workflow", () => {
       sessionOwners: ["DEV"],
       baseRef: "origin/main"
     });
-    const reviewReady = workflow.advanceRun({
+    const reviewReady = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:14:00.000Z",
@@ -381,7 +381,7 @@ describe("supervisor-execution-workflow", () => {
       sessionOwners: ["DEV"],
       baseRef: "origin/main"
     });
-    const reviewBundles = workflow.prepareReviewBundles({
+    const reviewBundles = await workflow.prepareReviewBundles({
       runId: "run-sc-328",
       bundles: [
         {
@@ -485,7 +485,7 @@ describe("supervisor-execution-workflow", () => {
         }
       ]
     });
-    const completed = workflow.advanceRun({
+    const completed = await workflow.advanceRun({
       runId: "run-sc-328",
       actor: "supervisor",
       occurredAt: "2026-03-13T20:15:00.000Z",
@@ -497,8 +497,8 @@ describe("supervisor-execution-workflow", () => {
       sessionOwners: ["DEV"],
       baseRef: "origin/main"
     });
-    const reconstructed = workflow.reconstructRun("run-sc-328");
-    const summary = workflow.buildRunSummary({
+    const reconstructed = await workflow.reconstructRun("run-sc-328");
+    const summary = await workflow.buildRunSummary({
       runId: "run-sc-328",
       generatedAt: "2026-03-13T20:16:00.000Z"
     });
@@ -548,12 +548,12 @@ describe("supervisor-execution-workflow", () => {
     expect(eventFiles.length).toBe(reconstructed.state.auditLog.length);
   });
 
-  it("fails closed at bootstrap when delegation governance is unsafe", () => {
+  it("fails closed at bootstrap when delegation governance is unsafe", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
     const dispatchLoop = {
-      run: () => ({
+      run: async () => ({
         policy: { maxActiveLanes: 1 },
         decisions: []
       })
@@ -584,7 +584,7 @@ describe("supervisor-execution-workflow", () => {
     ];
 
     // Act
-    const bootstrap = workflow.bootstrapRun({
+    const bootstrap = await workflow.bootstrapRun({
       runId: "run-sc-328-blocked",
       actor: "supervisor",
       occurredAt: "2026-03-13T21:00:00.000Z",
@@ -607,7 +607,7 @@ describe("supervisor-execution-workflow", () => {
         }
       }
     });
-    const reconstructed = workflow.reconstructRun("run-sc-328-blocked");
+    const reconstructed = await workflow.reconstructRun("run-sc-328-blocked");
 
     // Assert
     expect(bootstrap.status).toBe("blocked");
@@ -628,20 +628,20 @@ describe("supervisor-execution-workflow", () => {
     ]);
   });
 
-  it("emits stable unknown-run operator errors", () => {
+  it("emits stable unknown-run operator errors", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
     const workflow = createSupervisorExecutionWorkflow({
       store,
-      dispatchLoop: { run: () => ({ policy: { maxActiveLanes: 1 }, decisions: [] }) as never }
+      dispatchLoop: { run: async () => ({ policy: { maxActiveLanes: 1 }, decisions: [] }) as never }
     });
 
     // Act / Assert
-    expect(() => workflow.reconstructRun("missing-run")).toThrow("blocked.unknown-run");
-    expect(() => workflow.buildRunSummary({
+    await expect(workflow.reconstructRun("missing-run")).rejects.toThrow("blocked.unknown-run");
+    await expect(workflow.buildRunSummary({
       runId: "missing-run",
       generatedAt: "2026-03-13T22:00:00.000Z"
-    })).toThrow("Remediation: verify the run id was bootstrapped and persisted before retrying.");
+    })).rejects.toThrow("Remediation: verify the run id was bootstrapped and persisted before retrying.");
   });
 });

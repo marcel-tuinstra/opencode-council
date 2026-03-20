@@ -48,8 +48,8 @@ export type AttachSupervisorRuntimeSessionInput = {
 
 export type SupervisorSessionRuntimeAdapter = {
   runtime: SupervisorSessionRuntimeKind;
-  launchSession(input: LaunchSupervisorRuntimeSessionInput): SupervisorRuntimeSessionSnapshot;
-  attachSession(input: AttachSupervisorRuntimeSessionInput): SupervisorRuntimeSessionSnapshot;
+  launchSession(input: LaunchSupervisorRuntimeSessionInput): Promise<SupervisorRuntimeSessionSnapshot>;
+  attachSession(input: AttachSupervisorRuntimeSessionInput): Promise<SupervisorRuntimeSessionSnapshot>;
 };
 
 export type SupervisorSessionBinding = {
@@ -142,13 +142,13 @@ export type SupervisorSessionLifecycleResult = {
 };
 
 export type SupervisorSessionLifecycle = {
-  getLaneSessionBinding(runId: string, laneId: string): SupervisorSessionBinding;
-  launchSession(input: LaunchSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  pauseSession(input: PauseSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  resumeSession(input: ResumeSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  replaceSession(input: ReplaceSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  recordHeartbeat(input: RecordSupervisorSessionHeartbeatInput): SupervisorSessionLifecycleResult;
-  detectStalledSession(input: DetectStalledSupervisorSessionInput): SupervisorSessionLifecycleResult;
+  getLaneSessionBinding(runId: string, laneId: string): Promise<SupervisorSessionBinding>;
+  launchSession(input: LaunchSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  pauseSession(input: PauseSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  resumeSession(input: ResumeSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  replaceSession(input: ReplaceSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  recordHeartbeat(input: RecordSupervisorSessionHeartbeatInput): Promise<SupervisorSessionLifecycleResult>;
+  detectStalledSession(input: DetectStalledSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
 };
 
 export type CreateSupervisorSessionLifecycleOptions = {
@@ -194,9 +194,9 @@ const findSession = (state: SupervisorRunState, sessionId: string): SupervisorSe
   state.sessions.find((session) => session.sessionId === sessionId)
 );
 
-const resolveRunState = (store: SupervisorStateStore, runId: string): SupervisorRunState => {
+const resolveRunState = async (store: SupervisorStateStore, runId: string): Promise<SupervisorRunState> => {
   const normalizedRunId = assertNonEmpty(runId, "run id");
-  const state = store.getRunState(normalizedRunId);
+  const state = await store.getRunState(normalizedRunId);
 
   if (!state) {
     throw new Error(`Cannot manage sessions for unknown run '${normalizedRunId}'.`);
@@ -330,19 +330,19 @@ export const createSupervisorSessionLifecycle = (
   const store = options.store;
   const runtime = options.runtime;
 
-  const getLaneSessionBinding = (runId: string, laneId: string): SupervisorSessionBinding => (
-    resolveLaneSessionBinding(resolveRunState(store, runId), laneId)
+  const getLaneSessionBinding = async (runId: string, laneId: string): Promise<SupervisorSessionBinding> => (
+    resolveLaneSessionBinding(await resolveRunState(store, runId), laneId)
   );
 
-  const launchSession = (input: LaunchSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const launchSession = async (input: LaunchSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
     const owner = assertNonEmpty(input.owner, "session owner");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     validateLaunchableSession(binding);
     const attempt = countLaneSessionAttempts(state, binding.lane.laneId, binding.worktree.worktreeId) + 1;
     const sessionId = buildSupervisorSessionId(state.run.runId, binding.lane.laneId, attempt);
-    const snapshot = runtime.launchSession({
+    const snapshot = await runtime.launchSession({
       runId: state.run.runId,
       laneId: binding.lane.laneId,
       worktreeId: binding.worktree.worktreeId,
@@ -354,7 +354,7 @@ export const createSupervisorSessionLifecycle = (
     const lane = buildLaneRecord(binding.lane, sessionId, occurredAt);
     const session = buildSessionRecord(sessionId, binding, runtime, snapshot, occurredAt, occurredAt);
 
-    store.commitMutation(state.run.runId, {
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Launch runtime session for lane '${binding.lane.laneId}'.`,
@@ -372,13 +372,13 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const resumeSession = (input: ResumeSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const resumeSession = async (input: ResumeSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
     const owner = assertNonEmpty(input.owner, "session owner");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const existingSession = resolveExistingSession(binding, state, input.sessionId);
-    const snapshot = runtime.attachSession({
+    const snapshot = await runtime.attachSession({
       runId: state.run.runId,
       laneId: binding.lane.laneId,
       worktreeId: binding.worktree.worktreeId,
@@ -399,7 +399,7 @@ export const createSupervisorSessionLifecycle = (
       updatedAt: occurredAt
     });
 
-    store.commitMutation(state.run.runId, {
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Resume runtime session for lane '${binding.lane.laneId}'.`,
@@ -417,9 +417,9 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const pauseSession = (input: PauseSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const pauseSession = async (input: PauseSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const existingSession = resolveExistingSession(binding, state, input.sessionId);
 
@@ -438,7 +438,7 @@ export const createSupervisorSessionLifecycle = (
       lastHeartbeatAt: existingSession.lastHeartbeatAt
     });
 
-    store.commitMutation(state.run.runId, {
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Pause runtime session for lane '${binding.lane.laneId}'.`,
@@ -455,15 +455,15 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const replaceSession = (input: ReplaceSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const replaceSession = async (input: ReplaceSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
     const owner = assertNonEmpty(input.owner, "session owner");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const previousSession = resolveExistingSession(binding, state);
     const attempt = countLaneSessionAttempts(state, binding.lane.laneId, binding.worktree.worktreeId) + 1;
     const sessionId = buildSupervisorSessionId(state.run.runId, binding.lane.laneId, attempt);
-    const snapshot = runtime.launchSession({
+    const snapshot = await runtime.launchSession({
       runId: state.run.runId,
       laneId: binding.lane.laneId,
       worktreeId: binding.worktree.worktreeId,
@@ -480,7 +480,7 @@ export const createSupervisorSessionLifecycle = (
       replacedBySessionId: sessionId
     });
 
-    store.commitMutation(state.run.runId, {
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Replace runtime session for lane '${binding.lane.laneId}'.`,
@@ -499,9 +499,9 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const recordHeartbeat = (input: RecordSupervisorSessionHeartbeatInput): SupervisorSessionLifecycleResult => {
+  const recordHeartbeat = async (input: RecordSupervisorSessionHeartbeatInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const session = resolveExistingSession(binding, state, input.sessionId);
     const nextStatus = input.status ?? session.status;
@@ -520,7 +520,7 @@ export const createSupervisorSessionLifecycle = (
       updatedAt: occurredAt
     });
 
-    store.commitMutation(state.run.runId, {
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Record heartbeat for lane '${binding.lane.laneId}' session '${session.sessionId}'.`,
@@ -537,9 +537,9 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const detectStalledSession = (input: DetectStalledSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const detectStalledSession = async (input: DetectStalledSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const observedAt = assertTimestamp(input.observedAt, "stall observation timestamp");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const session = resolveExistingSession(binding, state);
 
@@ -573,7 +573,7 @@ export const createSupervisorSessionLifecycle = (
       failureReason: input.failureReason ?? `Heartbeat exceeded stall timeout after ${stallTimeoutMs}ms.`
     });
 
-    store.commitMutation(state.run.runId, {
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Mark lane '${binding.lane.laneId}' session '${session.sessionId}' as stalled.`,

@@ -88,7 +88,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
     launched,
     attached,
 
-    launchSession: (input) => {
+    launchSession: async (input) => {
       launched.push({ ...input });
 
       return {
@@ -100,7 +100,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
       };
     },
 
-    attachSession: (input) => {
+    attachSession: async (input) => {
       attached.push({ ...input });
 
       return {
@@ -114,13 +114,13 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
   };
 };
 
-const seedRun = (rootDir: string) => {
+const seedRun = async (rootDir: string) => {
   const stateRoot = path.join(rootDir, "state");
   const repoRoot = path.join(rootDir, "repo");
   const worktreeRootDir = path.join(rootDir, "worktrees");
   mkdirSync(repoRoot, { recursive: true });
   const store = createFileBackedSupervisorStateStore({ rootDir: stateRoot });
-  store.commitMutation("run-alpha", {
+  await store.commitMutation("run-alpha", {
     mutationId: "run-alpha-create",
     actor: "supervisor",
     summary: "Create a run for scheduler dispatch tests.",
@@ -143,7 +143,7 @@ afterEach(() => {
 });
 
 describe("supervisor-scheduler", () => {
-  it("creates deterministic lane definitions from work-unit dependencies", () => {
+  it("creates deterministic lane definitions from work-unit dependencies", async () => {
     // Arrange
     const intake: LanePlanningWorkUnit[] = [
       {
@@ -207,10 +207,10 @@ describe("supervisor-scheduler", () => {
     ]);
   });
 
-  it("activates ready lanes by provisioning worktrees first and then launching sessions", () => {
+  it("activates ready lanes by provisioning worktrees first and then launching sessions", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const { store, repoRoot, worktreeRootDir } = await seedRun(rootDir);
     const system = createFakeSystem();
     const runtime = createFakeRuntime();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
@@ -238,7 +238,7 @@ describe("supervisor-scheduler", () => {
     ] as const;
 
     // Act
-    const firstPass = scheduler.run({
+    const firstPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:01:00.000Z",
@@ -247,7 +247,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a", "developer-b"],
       baseRef: "epic/supervisor-alpha"
     });
-    const secondPass = scheduler.run({
+    const secondPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:02:00.000Z",
@@ -256,7 +256,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a", "developer-b"],
       baseRef: "epic/supervisor-alpha"
     });
-    const state = store.getRunState("run-alpha");
+    const state = await store.getRunState("run-alpha");
 
     // Assert
     expect(firstPass.decisions).toMatchObject([
@@ -317,10 +317,10 @@ describe("supervisor-scheduler", () => {
     ]);
   });
 
-  it("moves lanes through waiting, review ready, and complete states without human babysitting", () => {
+  it("moves lanes through waiting, review ready, and complete states without human babysitting", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const { store, repoRoot, worktreeRootDir } = await seedRun(rootDir);
     const system = createFakeSystem();
     const runtime = createFakeRuntime();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
@@ -338,7 +338,7 @@ describe("supervisor-scheduler", () => {
       }
     ] as const;
 
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:01:00.000Z",
@@ -347,7 +347,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "epic/supervisor-alpha"
     });
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:02:00.000Z",
@@ -358,7 +358,7 @@ describe("supervisor-scheduler", () => {
     });
 
     // Act
-    const waitingPass = scheduler.run({
+    const waitingPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:03:00.000Z",
@@ -367,7 +367,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "epic/supervisor-alpha"
     });
-    const reviewPass = scheduler.run({
+    const reviewPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:04:00.000Z",
@@ -448,7 +448,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "epic/supervisor-alpha"
     });
-    const completePass = scheduler.run({
+    const completePass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:05:00.000Z",
@@ -457,7 +457,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "epic/supervisor-alpha"
     });
-    const state = store.getRunState("run-alpha");
+    const state = await store.getRunState("run-alpha");
 
     // Assert
     expect(waitingPass.decisions).toMatchObject([
@@ -515,10 +515,10 @@ describe("supervisor-scheduler", () => {
     expect(state?.artifacts.map((artifact) => artifact.kind)).toEqual(["branch", "review-packet"]);
   });
 
-  it("blocks review-ready transitions when the lane output contract is missing", () => {
+  it("blocks review-ready transitions when the lane output contract is missing", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const { store, repoRoot, worktreeRootDir } = await seedRun(rootDir);
     const system = createFakeSystem();
     const runtime = createFakeRuntime();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
@@ -534,7 +534,7 @@ describe("supervisor-scheduler", () => {
       }
     }] as const;
 
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T16:01:00.000Z",
@@ -543,7 +543,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "main"
     });
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T16:02:00.000Z",
@@ -554,7 +554,7 @@ describe("supervisor-scheduler", () => {
     });
 
     // Act
-    const reviewPass = scheduler.run({
+    const reviewPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T16:03:00.000Z",
@@ -598,13 +598,13 @@ describe("supervisor-scheduler", () => {
       }
     ]);
     expect(reviewPass.decisions[0]?.reasons[0]).toContain("validated lane output contract");
-    expect(store.getRunState("run-alpha")?.lanes[0]?.state).toBe("active");
+    expect((await store.getRunState("run-alpha"))?.lanes[0]?.state).toBe("active");
   });
 
-  it("escalates review-ready checkpoints when ownership requires human resolution", () => {
+  it("escalates review-ready checkpoints when ownership requires human resolution", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const { store, repoRoot, worktreeRootDir } = await seedRun(rootDir);
     const system = createFakeSystem();
     const runtime = createFakeRuntime();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
@@ -620,7 +620,7 @@ describe("supervisor-scheduler", () => {
       }
     }] as const;
 
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T17:01:00.000Z",
@@ -629,7 +629,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "main"
     });
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T17:02:00.000Z",
@@ -640,7 +640,7 @@ describe("supervisor-scheduler", () => {
     });
 
     // Act
-    const reviewPass = scheduler.run({
+    const reviewPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T17:03:00.000Z",
@@ -705,7 +705,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "main"
     });
-    const state = store.getRunState("run-alpha");
+    const state = await store.getRunState("run-alpha");
 
     // Assert
     expect(reviewPass.decisions).toMatchObject([
@@ -751,10 +751,10 @@ describe("supervisor-scheduler", () => {
     ]);
   });
 
-  it("captures handoff evidence and blocks for repair when the handoff contract is incomplete", () => {
+  it("captures handoff evidence and blocks for repair when the handoff contract is incomplete", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const { store, repoRoot, worktreeRootDir } = await seedRun(rootDir);
     const system = createFakeSystem();
     const runtime = createFakeRuntime();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
@@ -770,7 +770,7 @@ describe("supervisor-scheduler", () => {
       }
     }] as const;
 
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T18:01:00.000Z",
@@ -779,7 +779,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "main"
     });
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T18:02:00.000Z",
@@ -790,7 +790,7 @@ describe("supervisor-scheduler", () => {
     });
 
     // Act
-    const reviewPass = scheduler.run({
+    const reviewPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T18:03:00.000Z",
@@ -849,7 +849,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "main"
     });
-    const state = store.getRunState("run-alpha");
+    const state = await store.getRunState("run-alpha");
 
     // Assert
     expect(reviewPass.decisions).toMatchObject([
@@ -883,10 +883,10 @@ describe("supervisor-scheduler", () => {
     ]);
   });
 
-  it("routes blocked review handoffs into an explicit scheduler hold", () => {
+  it("routes blocked review handoffs into an explicit scheduler hold", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const { store, repoRoot, worktreeRootDir } = await seedRun(rootDir);
     const system = createFakeSystem();
     const runtime = createFakeRuntime();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
@@ -902,7 +902,7 @@ describe("supervisor-scheduler", () => {
       }
     }] as const;
 
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T19:01:00.000Z",
@@ -911,7 +911,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "main"
     });
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T19:02:00.000Z",
@@ -922,7 +922,7 @@ describe("supervisor-scheduler", () => {
     });
 
     // Act
-    const reviewPass = scheduler.run({
+    const reviewPass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T19:03:00.000Z",
@@ -988,7 +988,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "main"
     });
-    const state = store.getRunState("run-alpha");
+    const state = await store.getRunState("run-alpha");
 
     // Assert
     expect(reviewPass.decisions).toMatchObject([
@@ -1019,10 +1019,10 @@ describe("supervisor-scheduler", () => {
     ]);
   });
 
-  it("pauses at approval gates and resumes only after an explicit approval event", () => {
+  it("pauses at approval gates and resumes only after an explicit approval event", async () => {
     // Arrange
     const rootDir = createTempRoot();
-    const { store, repoRoot, worktreeRootDir } = seedRun(rootDir);
+    const { store, repoRoot, worktreeRootDir } = await seedRun(rootDir);
     const system = createFakeSystem();
     const runtime = createFakeRuntime();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
@@ -1038,7 +1038,7 @@ describe("supervisor-scheduler", () => {
       }
     } as const;
 
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:01:00.000Z",
@@ -1047,7 +1047,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "epic/supervisor-alpha"
     });
-    scheduler.run({
+    await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:02:00.000Z",
@@ -1058,7 +1058,7 @@ describe("supervisor-scheduler", () => {
     });
 
     // Act
-    const pausePass = scheduler.run({
+    const pausePass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:03:00.000Z",
@@ -1080,7 +1080,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "epic/supervisor-alpha"
     });
-    const resumePass = scheduler.run({
+    const resumePass = await scheduler.run({
       runId: "run-alpha",
       actor: "supervisor",
       occurredAt: "2026-03-13T15:04:00.000Z",
@@ -1108,7 +1108,7 @@ describe("supervisor-scheduler", () => {
       sessionOwners: ["developer-a"],
       baseRef: "epic/supervisor-alpha"
     });
-    const state = store.getRunState("run-alpha");
+    const state = await store.getRunState("run-alpha");
 
     // Assert
     expect(pausePass.decisions).toMatchObject([

@@ -124,7 +124,7 @@ export type ReconstructSupervisorRunResult = {
 
 export type CreateSupervisorExecutionWorkflowOptions = {
   store: SupervisorStateStore;
-  dispatchLoop: { run(input: RunSupervisorDispatchLoopInput): RunSupervisorDispatchLoopResult };
+  dispatchLoop: { run(input: RunSupervisorDispatchLoopInput): Promise<RunSupervisorDispatchLoopResult> };
 };
 
 const WORKFLOW_STAGE_PREFIX = "workflow-stage:";
@@ -180,7 +180,7 @@ const recordWorkflowEvent = (input: {
   status: SupervisorWorkflowStageStatus;
   nextAction: SupervisorWorkflowNextAction;
   laneIds?: readonly string[];
-}): SupervisorRunState => input.store.commitMutation(input.runId, {
+}): Promise<SupervisorRunState> => input.store.commitMutation(input.runId, {
   mutationId: input.mutationId,
   actor: input.actor,
   summary: input.summary,
@@ -329,16 +329,16 @@ const createUnknownRunError = (runId: string, action: string): Error => {
 export const createSupervisorExecutionWorkflow = (
   options: CreateSupervisorExecutionWorkflowOptions
 ): {
-  bootstrapRun(input: BootstrapSupervisorRunInput): BootstrapSupervisorRunResult;
-  advanceRun(input: AdvanceSupervisorRunInput): AdvanceSupervisorRunResult;
-  prepareReviewBundles(input: PrepareSupervisorReviewBundlesInput): readonly ReviewCoordinationBundle[];
-  buildRunSummary(input: BuildSupervisorRunSummaryInput): SupervisorRunSummary;
-  reconstructRun(runId: string): ReconstructSupervisorRunResult;
+  bootstrapRun(input: BootstrapSupervisorRunInput): Promise<BootstrapSupervisorRunResult>;
+  advanceRun(input: AdvanceSupervisorRunInput): Promise<AdvanceSupervisorRunResult>;
+  prepareReviewBundles(input: PrepareSupervisorReviewBundlesInput): Promise<readonly ReviewCoordinationBundle[]>;
+  buildRunSummary(input: BuildSupervisorRunSummaryInput): Promise<SupervisorRunSummary>;
+  reconstructRun(runId: string): Promise<ReconstructSupervisorRunResult>;
 } => {
   const store = options.store;
   const dispatchLoop = options.dispatchLoop;
 
-  const bootstrapRun = (input: BootstrapSupervisorRunInput): BootstrapSupervisorRunResult => {
+  const bootstrapRun = async (input: BootstrapSupervisorRunInput): Promise<BootstrapSupervisorRunResult> => {
     const runId = assertNonEmpty(input.runId, "run id");
     const actor = assertNonEmpty(input.actor, "actor");
     const occurredAt = assertNonEmpty(input.occurredAt, "timestamp");
@@ -374,7 +374,7 @@ export const createSupervisorExecutionWorkflow = (
       : dispatchPlan.status === "supported"
         ? "dispatch-lanes"
         : "fix-bootstrap";
-    const state = store.commitMutation(runId, {
+    const state = await store.commitMutation(runId, {
       mutationId: input.mutationId ?? `${runId}:bootstrap`,
       actor,
       summary: status === "supported"
@@ -405,8 +405,8 @@ export const createSupervisorExecutionWorkflow = (
     };
   };
 
-  const advanceRun = (input: AdvanceSupervisorRunInput): AdvanceSupervisorRunResult => {
-    const beforeState = store.getRunState(input.runId);
+  const advanceRun = async (input: AdvanceSupervisorRunInput): Promise<AdvanceSupervisorRunResult> => {
+    const beforeState = await store.getRunState(input.runId);
     if (!beforeState) {
       debugLog("supervisor.execution.unknown_run", {
         runId: input.runId,
@@ -420,8 +420,8 @@ export const createSupervisorExecutionWorkflow = (
       throw createUnknownRunError(input.runId, "advance run");
     }
 
-    const dispatch = dispatchLoop.run(input);
-    const afterDispatchState = store.getRunState(input.runId);
+    const dispatch = await dispatchLoop.run(input);
+    const afterDispatchState = await store.getRunState(input.runId);
     if (!afterDispatchState) {
       debugLog("supervisor.execution.unknown_run", {
         runId: input.runId,
@@ -441,7 +441,7 @@ export const createSupervisorExecutionWorkflow = (
       dispatch
     });
     const laneIds = dedupe(dispatch.decisions.map((decision) => decision.laneId));
-    const state = recordWorkflowEvent({
+    const state = await recordWorkflowEvent({
       store,
       runId: input.runId,
       actor: input.actor,
@@ -464,8 +464,8 @@ export const createSupervisorExecutionWorkflow = (
     };
   };
 
-  const prepareReviewBundles = (input: PrepareSupervisorReviewBundlesInput): readonly ReviewCoordinationBundle[] => {
-    const state = store.getRunState(input.runId);
+  const prepareReviewBundles = async (input: PrepareSupervisorReviewBundlesInput): Promise<readonly ReviewCoordinationBundle[]> => {
+    const state = await store.getRunState(input.runId);
     if (!state) {
       debugLog("supervisor.execution.unknown_run", {
         runId: input.runId,
@@ -487,8 +487,8 @@ export const createSupervisorExecutionWorkflow = (
     })));
   };
 
-  const buildRunSummary = (input: BuildSupervisorRunSummaryInput): SupervisorRunSummary => {
-    const state = store.getRunState(input.runId);
+  const buildRunSummary = async (input: BuildSupervisorRunSummaryInput): Promise<SupervisorRunSummary> => {
+    const state = await store.getRunState(input.runId);
     if (!state) {
       debugLog("supervisor.execution.unknown_run", {
         runId: input.runId,
@@ -551,8 +551,8 @@ export const createSupervisorExecutionWorkflow = (
     };
   };
 
-  const reconstructRun = (runId: string): ReconstructSupervisorRunResult => {
-    const state = store.getRunState(runId);
+  const reconstructRun = async (runId: string): Promise<ReconstructSupervisorRunResult> => {
+    const state = await store.getRunState(runId);
     if (!state) {
       debugLog("supervisor.execution.unknown_run", {
         runId,

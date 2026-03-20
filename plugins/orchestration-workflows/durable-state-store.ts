@@ -159,8 +159,8 @@ export type SupervisorRunStorageLocation = {
 };
 
 export type SupervisorStateStore = {
-  getRunState(runId: string): SupervisorRunState | null;
-  commitMutation(runId: string, mutation: SupervisorRunStateMutation): SupervisorRunState;
+  getRunState(runId: string): Promise<SupervisorRunState | null>;
+  commitMutation(runId: string, mutation: SupervisorRunStateMutation): Promise<SupervisorRunState>;
   getRunStorageLocation(runId: string): SupervisorRunStorageLocation;
 };
 
@@ -463,7 +463,7 @@ export const createFileBackedSupervisorStateStore = (
   return {
     getRunStorageLocation: (runId: string): SupervisorRunStorageLocation => getRunStorageLocation(rootDir, runId),
 
-    getRunState: (runId: string): SupervisorRunState | null => {
+    getRunState: async (runId: string): Promise<SupervisorRunState | null> => {
       const location = getRunStorageLocation(rootDir, runId);
 
       try {
@@ -480,7 +480,7 @@ export const createFileBackedSupervisorStateStore = (
       }
     },
 
-    commitMutation: (runId: string, mutation: SupervisorRunStateMutation): SupervisorRunState => {
+    commitMutation: async (runId: string, mutation: SupervisorRunStateMutation): Promise<SupervisorRunState> => {
       const normalizedMutationId = assertNonEmpty(mutation.mutationId, "mutation id");
       const actor = assertNonEmpty(mutation.actor, "mutation actor");
       const summary = assertNonEmpty(mutation.summary, "mutation summary");

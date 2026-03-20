@@ -94,7 +94,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter => {
 
   return {
     runtime: "opencode",
-    launchSession: (input) => {
+    launchSession: async (input) => {
       launched.push({ ...input });
 
       return {
@@ -105,7 +105,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter => {
         lastHeartbeatAt: input.occurredAt
       };
     },
-    attachSession: (input) => {
+    attachSession: async (input) => {
       attached.push({ ...input });
 
       return {
@@ -296,7 +296,7 @@ const buildTrace = (input: {
   lanePlan: ReturnType<typeof planWorkUnitLanes>;
   governance: GoldenTrace["governance"];
   state: SupervisorRunState;
-  result: ReturnType<ScenarioHarness["workflow"]["advanceRun"]>;
+  result: Awaited<ReturnType<ScenarioHarness["workflow"]["advanceRun"]>>;
   actionTrace: readonly string[];
   workflowStages: readonly string[];
 }): GoldenTrace => ({
@@ -314,13 +314,13 @@ const buildTrace = (input: {
   }
 });
 
-const bootstrapScenario = (
+const bootstrapScenario = async (
   harness: ScenarioHarness,
   scenario: GoldenScenarioFixture,
   workUnits: ReturnType<typeof materializeWorkUnits>,
   laneInputs: readonly SupervisorDispatchLaneInput[]
-): void => {
-  const bootstrap = harness.workflow.bootstrapRun({
+): Promise<void> => {
+  const bootstrap = await harness.workflow.bootstrapRun({
     runId: `run-${scenario.id}`,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:00:00.000Z",
@@ -338,9 +338,9 @@ const collectStages = (state: SupervisorRunState): readonly string[] => state.au
   .flatMap((entry) => entry.sideEffects.filter((sideEffect) => sideEffect.startsWith("workflow-stage:")))
   .map((sideEffect) => sideEffect.slice("workflow-stage:".length));
 
-const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): GoldenTrace => {
+const runSingleLaneHappyPath = async (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): Promise<GoldenTrace> => {
   const runId = `run-${scenario.id}`;
-  const first = harness.workflow.advanceRun({
+  const first = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:01:00.000Z",
@@ -349,7 +349,7 @@ const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenar
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  const second = harness.workflow.advanceRun({
+  const second = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:02:00.000Z",
@@ -369,7 +369,7 @@ const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenar
     checkpoint: "review-ready",
     violations: createReviewReadyEvidencePacket(packet).handoffValidation.violations
   }));
-  const third = harness.workflow.advanceRun({
+  const third = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:03:00.000Z",
@@ -378,7 +378,7 @@ const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenar
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  const state = harness.store.getRunState(runId)!;
+  const state = (await harness.store.getRunState(runId))!;
 
   return buildTrace({
     scenarioId: scenario.id,
@@ -391,9 +391,9 @@ const runSingleLaneHappyPath = (harness: ScenarioHarness, scenario: GoldenScenar
   });
 };
 
-const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): GoldenTrace => {
+const runMultiLaneDependencyPath = async (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): Promise<GoldenTrace> => {
   const runId = `run-${scenario.id}`;
-  const first = harness.workflow.advanceRun({
+  const first = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:11:00.000Z",
@@ -402,7 +402,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     sessionOwners: ["developer-a", "developer-b"],
     baseRef: "origin/main"
   });
-  const second = harness.workflow.advanceRun({
+  const second = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:12:00.000Z",
@@ -418,7 +418,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     occurredAt: "2026-03-13T20:13:00.000Z",
     scenarioName: `${scenario.id}-foundation`
   });
-  const third = harness.workflow.advanceRun({
+  const third = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:13:00.000Z",
@@ -430,7 +430,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     sessionOwners: ["developer-a", "developer-b"],
     baseRef: "origin/main"
   });
-  const fourth = harness.workflow.advanceRun({
+  const fourth = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:14:00.000Z",
@@ -442,7 +442,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     sessionOwners: ["developer-a", "developer-b"],
     baseRef: "origin/main"
   });
-  const fifth = harness.workflow.advanceRun({
+  const fifth = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:15:00.000Z",
@@ -465,7 +465,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     checkpoint: "review-ready",
     violations: createReviewReadyEvidencePacket(packet).handoffValidation.violations
   }));
-  const sixth = harness.workflow.advanceRun({
+  const sixth = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:16:00.000Z",
@@ -477,7 +477,7 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
     sessionOwners: ["developer-a", "developer-b"],
     baseRef: "origin/main"
   });
-  const state = harness.store.getRunState(runId)!;
+  const state = (await harness.store.getRunState(runId))!;
 
   return buildTrace({
     scenarioId: scenario.id,
@@ -491,9 +491,9 @@ const runMultiLaneDependencyPath = (harness: ScenarioHarness, scenario: GoldenSc
   });
 };
 
-const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): GoldenTrace => {
+const runFailedHandoff = async (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): Promise<GoldenTrace> => {
   const runId = `run-${scenario.id}`;
-  const first = harness.workflow.advanceRun({
+  const first = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:21:00.000Z",
@@ -502,7 +502,7 @@ const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixt
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  const second = harness.workflow.advanceRun({
+  const second = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:22:00.000Z",
@@ -523,7 +523,7 @@ const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixt
     checkpoint: "review-ready",
     violations: createReviewReadyEvidencePacket(packet).handoffValidation.violations
   }));
-  const third = harness.workflow.advanceRun({
+  const third = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:23:00.000Z",
@@ -532,7 +532,7 @@ const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixt
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  const state = harness.store.getRunState(runId)!;
+  const state = (await harness.store.getRunState(runId))!;
 
   return buildTrace({
     scenarioId: scenario.id,
@@ -545,9 +545,9 @@ const runFailedHandoff = (harness: ScenarioHarness, scenario: GoldenScenarioFixt
   });
 };
 
-const runProtectedPathGovernanceBlock = (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): GoldenTrace => {
+const runProtectedPathGovernanceBlock = async (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): Promise<GoldenTrace> => {
   const runId = `run-${scenario.id}`;
-  const first = harness.workflow.advanceRun({
+  const first = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:31:00.000Z",
@@ -556,7 +556,7 @@ const runProtectedPathGovernanceBlock = (harness: ScenarioHarness, scenario: Gol
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  const second = harness.workflow.advanceRun({
+  const second = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:32:00.000Z",
@@ -579,7 +579,7 @@ const runProtectedPathGovernanceBlock = (harness: ScenarioHarness, scenario: Gol
   }), {
     protectedPathOutcome: protectedPathDecision.outcome
   });
-  const state = harness.store.getRunState(runId)!;
+  const state = (await harness.store.getRunState(runId))!;
 
   return buildTrace({
     scenarioId: scenario.id,
@@ -592,9 +592,9 @@ const runProtectedPathGovernanceBlock = (harness: ScenarioHarness, scenario: Gol
   });
 };
 
-const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): GoldenTrace => {
+const runRecoveryResume = async (harness: ScenarioHarness, scenario: GoldenScenarioFixture, lanePlan: ReturnType<typeof planWorkUnitLanes>, laneInputs: readonly SupervisorDispatchLaneInput[]): Promise<GoldenTrace> => {
   const runId = `run-${scenario.id}`;
-  const first = harness.workflow.advanceRun({
+  const first = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:41:00.000Z",
@@ -603,7 +603,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  const second = harness.workflow.advanceRun({
+  const second = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:42:00.000Z",
@@ -612,7 +612,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  harness.sessions.detectStalledSession({
+  await harness.sessions.detectStalledSession({
     runId,
     laneId: "lane-1",
     actor: "supervisor",
@@ -621,7 +621,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     stallTimeoutMs: 5 * 60 * 1000,
     failureReason: "Scenario fixture stalled the delegated session."
   });
-  const third = harness.workflow.advanceRun({
+  const third = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:50:00.000Z",
@@ -636,7 +636,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     summary: "Pause the recovered lane at the merge checkpoint.",
     rationale: "Recovery should still require explicit resume approval."
   };
-  harness.workflow.advanceRun({
+  await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:51:00.000Z",
@@ -651,7 +651,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
   }), {
     approvalStatus: "approved"
   });
-  const fifth = harness.workflow.advanceRun({
+  const fifth = await harness.workflow.advanceRun({
     runId,
     actor: "supervisor",
     occurredAt: "2026-03-13T20:52:00.000Z",
@@ -671,7 +671,7 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
     sessionOwners: ["developer-a"],
     baseRef: "origin/main"
   });
-  const state = harness.store.getRunState(runId)!;
+  const state = (await harness.store.getRunState(runId))!;
 
   return buildTrace({
     scenarioId: scenario.id,
@@ -684,22 +684,22 @@ const runRecoveryResume = (harness: ScenarioHarness, scenario: GoldenScenarioFix
   });
 };
 
-const runScenario = (scenario: GoldenScenarioFixture): GoldenTrace => {
+const runScenario = async (scenario: GoldenScenarioFixture): Promise<GoldenTrace> => {
   const harness = createScenarioHarness();
   const { workUnits, lanePlan, laneInputs } = createLaneInputs(scenario);
-  bootstrapScenario(harness, scenario, workUnits, laneInputs);
+  await bootstrapScenario(harness, scenario, workUnits, laneInputs);
 
   switch (scenario.id) {
     case "single-lane-happy-path":
-      return runSingleLaneHappyPath(harness, scenario, lanePlan, laneInputs);
+      return await runSingleLaneHappyPath(harness, scenario, lanePlan, laneInputs);
     case "multi-lane-dependency-path":
-      return runMultiLaneDependencyPath(harness, scenario, lanePlan, laneInputs);
+      return await runMultiLaneDependencyPath(harness, scenario, lanePlan, laneInputs);
     case "failed-handoff":
-      return runFailedHandoff(harness, scenario, lanePlan, laneInputs);
+      return await runFailedHandoff(harness, scenario, lanePlan, laneInputs);
     case "protected-path-governance-block":
-      return runProtectedPathGovernanceBlock(harness, scenario, lanePlan, laneInputs);
+      return await runProtectedPathGovernanceBlock(harness, scenario, lanePlan, laneInputs);
     case "recovery-resume":
-      return runRecoveryResume(harness, scenario, lanePlan, laneInputs);
+      return await runRecoveryResume(harness, scenario, lanePlan, laneInputs);
     default:
       throw new Error(`Unhandled golden trace scenario '${scenario.id}'.`);
   }
@@ -713,19 +713,19 @@ afterEach(() => {
 
 describe("supervisor-golden-traces", () => {
   for (const scenario of supervisorGoldenTracesFixture.scenarios) {
-    it(`keeps the ${scenario.name} trace stable`, () => {
+    it(`keeps the ${scenario.name} trace stable`, async () => {
       // Arrange + Act
-      const trace = runScenario(scenario);
+      const trace = await runScenario(scenario);
 
       // Assert
       expect(trace).toEqual(scenario.expectedTrace);
     });
   }
 
-  it("produces a compact release-readiness proof from the scenario outcomes", () => {
+  it("produces a compact release-readiness proof from the scenario outcomes", async () => {
     // Arrange + Act
-    const proof = supervisorGoldenTracesFixture.scenarios.map((scenario) => {
-      const trace = runScenario(scenario);
+    const proof = await Promise.all(supervisorGoldenTracesFixture.scenarios.map(async (scenario) => {
+      const trace = await runScenario(scenario);
 
       return {
         scenario: scenario.name,
@@ -733,7 +733,7 @@ describe("supervisor-golden-traces", () => {
         finalRunStatus: trace.final.runStatus,
         finalLaneStates: trace.final.laneStates.map((lane) => `${lane.laneId}:${lane.state}`)
       };
-    });
+    }));
 
     // Assert
     expect(proof).toEqual(supervisorGoldenTracesFixture.releaseReadinessProof);
