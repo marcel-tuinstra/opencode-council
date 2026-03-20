@@ -1,6 +1,10 @@
 import type { Intent } from "./types";
 import { debugLog } from "./debug";
-import { getSupervisorPolicy } from "./supervisor-config";
+import {
+  DEFAULT_SUPERVISOR_BUDGET,
+  getSupervisorPolicy
+} from "./supervisor-config";
+import type { SupervisorReasonCode } from "./reason-codes";
 
 export type WorkflowStep = "plan" | "execute" | "summarize";
 type BudgetAction = "allow" | "compact" | "truncate" | "halt";
@@ -15,8 +19,16 @@ type BudgetConfig = {
   stepExecutionTokenCost: number;
 };
 
+export type BudgetConfigSource = "default" | "policy" | "env";
+
+export type BudgetRuntimeConfigDiagnostics = {
+  values: BudgetConfig;
+  provenance: Record<keyof BudgetConfig, BudgetConfigSource>;
+};
+
 type BudgetState = {
   intent: Intent;
+  config: BudgetRuntimeConfigDiagnostics;
   runTokens: number;
   runCostUsd: number;
   stepTokens: Record<WorkflowStep, number>;
@@ -27,6 +39,9 @@ type BudgetState = {
 type BudgetDecision = {
   action: BudgetAction;
   reason: string;
+  reasonCode: SupervisorReasonCode | null;
+  remediation: string[];
+  usagePercent: number;
   session: BudgetState;
 };
 
@@ -54,15 +69,88 @@ const readNumber = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const getConfig = (): BudgetConfig => ({
-  softRunTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_RUN_TOKENS, getSupervisorPolicy().budget.runtime.softRunTokens),
-  hardRunTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_RUN_TOKENS, getSupervisorPolicy().budget.runtime.hardRunTokens),
-  softStepTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_STEP_TOKENS, getSupervisorPolicy().budget.runtime.softStepTokens),
-  hardStepTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS, getSupervisorPolicy().budget.runtime.hardStepTokens),
-  truncateAtTokens: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_TRUNCATE_TOKENS, getSupervisorPolicy().budget.runtime.truncateAtTokens),
-  costPer1kTokensUsd: readNumber(process.env.ORCHESTRATION_WORKFLOWS_BUDGET_COST_PER_1K_USD, getSupervisorPolicy().budget.runtime.costPer1kTokensUsd),
-  stepExecutionTokenCost: readNumber(process.env.ORCHESTRATION_WORKFLOWS_EXECUTE_STEP_TOKEN_COST, getSupervisorPolicy().budget.runtime.stepExecutionTokenCost)
-});
+const resolveBudgetValue = (
+  envValue: string | undefined,
+  policyValue: number,
+  defaultValue: number
+): { value: number; source: BudgetConfigSource } => {
+  if (envValue !== undefined) {
+    const parsed = Number(envValue);
+    const envValid = Number.isFinite(parsed) && parsed > 0;
+    return {
+      value: envValid ? parsed : policyValue,
+      source: envValid ? "env" : "policy"
+    };
+  }
+
+  if (policyValue !== defaultValue) {
+    return { value: policyValue, source: "policy" };
+  }
+
+  return { value: defaultValue, source: "default" };
+};
+
+export const getBudgetRuntimeConfigDiagnostics = (): BudgetRuntimeConfigDiagnostics => {
+  const runtimePolicy = getSupervisorPolicy().budget.runtime;
+  const defaults = DEFAULT_SUPERVISOR_BUDGET.runtime;
+
+  const softRunTokens = resolveBudgetValue(
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_RUN_TOKENS,
+    runtimePolicy.softRunTokens,
+    defaults.softRunTokens
+  );
+  const hardRunTokens = resolveBudgetValue(
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_RUN_TOKENS,
+    runtimePolicy.hardRunTokens,
+    defaults.hardRunTokens
+  );
+  const softStepTokens = resolveBudgetValue(
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_STEP_TOKENS,
+    runtimePolicy.softStepTokens,
+    defaults.softStepTokens
+  );
+  const hardStepTokens = resolveBudgetValue(
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS,
+    runtimePolicy.hardStepTokens,
+    defaults.hardStepTokens
+  );
+  const truncateAtTokens = resolveBudgetValue(
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_TRUNCATE_TOKENS,
+    runtimePolicy.truncateAtTokens,
+    defaults.truncateAtTokens
+  );
+  const costPer1kTokensUsd = resolveBudgetValue(
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_COST_PER_1K_USD,
+    runtimePolicy.costPer1kTokensUsd,
+    defaults.costPer1kTokensUsd
+  );
+  const stepExecutionTokenCost = resolveBudgetValue(
+    process.env.ORCHESTRATION_WORKFLOWS_EXECUTE_STEP_TOKEN_COST,
+    runtimePolicy.stepExecutionTokenCost,
+    defaults.stepExecutionTokenCost
+  );
+
+  return {
+    values: {
+      softRunTokens: softRunTokens.value,
+      hardRunTokens: hardRunTokens.value,
+      softStepTokens: softStepTokens.value,
+      hardStepTokens: hardStepTokens.value,
+      truncateAtTokens: truncateAtTokens.value,
+      costPer1kTokensUsd: costPer1kTokensUsd.value,
+      stepExecutionTokenCost: stepExecutionTokenCost.value
+    },
+    provenance: {
+      softRunTokens: softRunTokens.source,
+      hardRunTokens: hardRunTokens.source,
+      softStepTokens: softStepTokens.source,
+      hardStepTokens: hardStepTokens.source,
+      truncateAtTokens: truncateAtTokens.source,
+      costPer1kTokensUsd: costPer1kTokensUsd.source,
+      stepExecutionTokenCost: stepExecutionTokenCost.source
+    }
+  };
+};
 
 const percentile = (values: number[], p: number): number => {
   if (values.length === 0) {
@@ -79,8 +167,9 @@ const stepThreshold = (threshold: number, intent: Intent): number => {
   return Math.max(1, Math.floor(threshold * (WORKFLOW_MULTIPLIERS[intent] ?? 1)));
 };
 
-const buildInitialState = (intent: Intent): BudgetState => ({
+const buildInitialState = (intent: Intent, config: BudgetRuntimeConfigDiagnostics): BudgetState => ({
   intent,
+  config,
   runTokens: 0,
   runCostUsd: 0,
   stepTokens: { plan: 0, execute: 0, summarize: 0 },
@@ -102,8 +191,9 @@ export const recordBudgetUsage = (
   step: WorkflowStep,
   tokens: number
 ): BudgetDecision => {
-  const config = getConfig();
-  const state = budgetBySession.get(sessionID) ?? buildInitialState(intent);
+  const configDiagnostics = getBudgetRuntimeConfigDiagnostics();
+  const config = configDiagnostics.values;
+  const state = budgetBySession.get(sessionID) ?? buildInitialState(intent, configDiagnostics);
 
   const positiveTokens = Math.max(0, Math.floor(tokens));
   const cost = (positiveTokens / 1000) * config.costPer1kTokensUsd;
@@ -118,13 +208,25 @@ export const recordBudgetUsage = (
   const softRun = stepThreshold(config.softRunTokens, intent);
   const hardStep = stepThreshold(config.hardStepTokens, intent);
   const softStep = stepThreshold(config.softStepTokens, intent);
+  const usagePercent = Number((Math.max(
+    hardRun > 0 ? (state.runTokens / hardRun) * 100 : 0,
+    hardStep > 0 ? (state.stepTokens[step] / hardStep) * 100 : 0
+  )).toFixed(2));
 
   let action: BudgetAction = "allow";
   let reason = "within budget";
+  let reasonCode: SupervisorReasonCode | null = null;
+  let remediation: string[] = [];
 
   if (state.runTokens >= hardRun || state.stepTokens[step] >= hardStep) {
     action = "halt";
     reason = `hard budget exceeded on ${step}`;
+    reasonCode = "budget.hard-stop";
+    remediation = [
+      `Reduce ${step} scope before retrying this session.`,
+      "Trim active roles or request a smaller checkpoint response.",
+      "Use an explicit human budget exception only if the extra spend is intentional."
+    ];
   } else if (state.runTokens >= softRun || state.stepTokens[step] >= softStep) {
     const overBy = Math.max(
       state.runTokens - softRun,
@@ -133,23 +235,39 @@ export const recordBudgetUsage = (
     );
     action = overBy > Math.floor(softStep * 0.25) ? "truncate" : "compact";
     reason = `${action} triggered at soft budget on ${step}`;
+    reasonCode = action === "truncate" ? "budget.escalation-required" : "budget.warning-threshold";
+    remediation = action === "truncate"
+      ? [
+          `Checkpoint review is recommended before extending ${step}.`,
+          "Narrow the requested output or split the work into another lane.",
+          "Use deeper investigation only when the extra spend is worth the delay."
+        ]
+      : [
+          `Keep ${step} output compact while the session stays near the soft budget.`,
+          "Prefer summarizing deltas instead of replaying the full context."
+        ];
   }
 
   state.events.push({ step, action, reason });
   budgetBySession.set(sessionID, state);
 
   debugLog("budget.recorded", {
-    sessionID,
+    sessionId: sessionID,
     intent,
     step,
     tokens: positiveTokens,
     runTokens: state.runTokens,
     runCostUsd: Number(state.runCostUsd.toFixed(6)),
+    usagePercent,
     action,
-    reason
+    reason,
+    reasonCode,
+    remediation,
+    budgetConfig: state.config.values,
+    budgetConfigProvenance: state.config.provenance
   });
 
-  return { action, reason, session: state };
+  return { action, reason, reasonCode, remediation, usagePercent, session: state };
 };
 
 export const getSessionBudgetState = (sessionID: string): BudgetState | null => {
@@ -161,7 +279,7 @@ export const clearSessionBudgetState = (sessionID: string): void => {
 };
 
 export const getTruncateTokenLimit = (): number => {
-  return getConfig().truncateAtTokens;
+  return getBudgetRuntimeConfigDiagnostics().values.truncateAtTokens;
 };
 
 export const finalizeBudgetRun = (sessionID: string): BaselineStats | null => {
@@ -181,11 +299,13 @@ export const finalizeBudgetRun = (sessionID: string): BaselineStats | null => {
   };
 
   debugLog("budget.baseline", {
-    sessionID,
+    sessionId: sessionID,
     intent: state.intent,
     p50Tokens: stats.p50Tokens,
     p95Tokens: stats.p95Tokens,
-    runs: stats.runs
+    runs: stats.runs,
+    budgetConfig: state.config.values,
+    budgetConfigProvenance: state.config.provenance
   });
 
   return stats;

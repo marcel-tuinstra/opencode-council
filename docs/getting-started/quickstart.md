@@ -6,6 +6,8 @@ Follow [`install.md`](./install.md).
 
 ## Verify
 
+Compatibility for `v0.5.x` is covered in the canonical policy doc: [`../guides/compatibility-and-deprecations.md`](../guides/compatibility-and-deprecations.md).
+
 Use a prompt like:
 
 ```text
@@ -32,10 +34,12 @@ cp agents/*.md ~/.opencode/agents/
 
 Then restart OpenCode and re-run the verify prompts above.
 
+If you script local installs or refresh flows, use the canonical policy doc for command compatibility details: [`../guides/compatibility-and-deprecations.md`](../guides/compatibility-and-deprecations.md).
+
 ## Next steps
 
 - Customize roles and providers: [`../guides/customization.md`](../guides/customization.md)
 - Run the specialist role sanity script: [`../testing/role-sanity-script.md`](../testing/role-sanity-script.md)
 - Review local sync troubleshooting: [`../guides/local-sync-and-agents.md`](../guides/local-sync-and-agents.md)
 - Review policy defaults: [`../guides/policy-profiles.md`](../guides/policy-profiles.md)
-- Explore the supervisor foundation: [`../supervisor/work-units.md`](../supervisor/work-units.md)
+- Explore the supervisor foundation: [`../overview/architecture.md`](../overview/architecture.md)

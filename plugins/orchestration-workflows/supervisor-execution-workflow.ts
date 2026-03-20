@@ -3,6 +3,7 @@ import {
   type CreateSupervisorDataLifecycleReportInput,
   type SupervisorDataLifecycleReport
 } from "./data-lifecycle";
+import { debugLog } from "./debug";
 import type { SupervisorObservedThresholdEvent } from "./observability-dashboard";
 import {
   createSupervisorObservabilityDashboard,
@@ -25,6 +26,7 @@ import {
   type RunSupervisorDispatchLoopInput,
   type RunSupervisorDispatchLoopResult
 } from "./supervisor-scheduler";
+import { createSupervisorReasonDetail, formatSupervisorReason } from "./reason-codes";
 
 export type SupervisorWorkflowStage = "intake" | "dispatch" | "approval" | "recovery" | "review" | "completion";
 export type SupervisorWorkflowStageStatus = "ready" | "blocked" | "completed";
@@ -317,6 +319,13 @@ const summarizeAdvanceOutcome = (
   return `Supervisor workflow ${stage} is ${status}${laneSummary}; next action: ${nextAction}.`;
 };
 
+const createUnknownRunError = (runId: string, action: string): Error => {
+  const detail = createSupervisorReasonDetail("blocked.unknown-run", {
+    actionReason: `${action} for '${runId}'`
+  });
+  return new Error(`${formatSupervisorReason(detail)} Remediation: verify the run id was bootstrapped and persisted before retrying.`);
+};
+
 export const createSupervisorExecutionWorkflow = (
   options: CreateSupervisorExecutionWorkflowOptions
 ): {
@@ -399,13 +408,31 @@ export const createSupervisorExecutionWorkflow = (
   const advanceRun = (input: AdvanceSupervisorRunInput): AdvanceSupervisorRunResult => {
     const beforeState = store.getRunState(input.runId);
     if (!beforeState) {
-      throw new Error(`Cannot advance unknown supervisor run '${input.runId}'.`);
+      debugLog("supervisor.execution.unknown_run", {
+        runId: input.runId,
+        action: "advance-run",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Verify the run id was bootstrapped before advancing it.",
+          "Reload the durable state store if the run should already exist."
+        ]
+      });
+      throw createUnknownRunError(input.runId, "advance run");
     }
 
     const dispatch = dispatchLoop.run(input);
     const afterDispatchState = store.getRunState(input.runId);
     if (!afterDispatchState) {
-      throw new Error(`Supervisor run '${input.runId}' disappeared after dispatch.`);
+      debugLog("supervisor.execution.unknown_run", {
+        runId: input.runId,
+        action: "post-dispatch-state-check",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Check whether the durable state store dropped the run unexpectedly.",
+          "Reconstruct the run from state before retrying dispatch."
+        ]
+      });
+      throw createUnknownRunError(input.runId, "load post-dispatch run state");
     }
 
     const classified = classifyAdvanceOutcome({
@@ -440,7 +467,16 @@ export const createSupervisorExecutionWorkflow = (
   const prepareReviewBundles = (input: PrepareSupervisorReviewBundlesInput): readonly ReviewCoordinationBundle[] => {
     const state = store.getRunState(input.runId);
     if (!state) {
-      throw new Error(`Cannot prepare review bundles for unknown supervisor run '${input.runId}'.`);
+      debugLog("supervisor.execution.unknown_run", {
+        runId: input.runId,
+        action: "prepare-review-bundles",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Verify the run id was bootstrapped before preparing review bundles.",
+          "Reload the durable state store if the run should already exist."
+        ]
+      });
+      throw createUnknownRunError(input.runId, "prepare review bundles");
     }
 
     return freezeList(input.bundles.map((bundle) => createReviewCoordinationBundle({
@@ -454,10 +490,20 @@ export const createSupervisorExecutionWorkflow = (
   const buildRunSummary = (input: BuildSupervisorRunSummaryInput): SupervisorRunSummary => {
     const state = store.getRunState(input.runId);
     if (!state) {
-      throw new Error(`Cannot summarize unknown supervisor run '${input.runId}'.`);
+      debugLog("supervisor.execution.unknown_run", {
+        runId: input.runId,
+        action: "build-run-summary",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Verify the run id was bootstrapped before building a run summary.",
+          "Reload the durable state store if the run should already exist."
+        ]
+      });
+      throw createUnknownRunError(input.runId, "build run summary");
     }
 
     const dashboard = createSupervisorObservabilityDashboard({
+      runId: input.runId,
       generatedAt: input.generatedAt,
       lanes: state.lanes.map((lane) => {
         const session = lane.sessionId
@@ -508,16 +554,26 @@ export const createSupervisorExecutionWorkflow = (
   const reconstructRun = (runId: string): ReconstructSupervisorRunResult => {
     const state = store.getRunState(runId);
     if (!state) {
-      throw new Error(`Cannot reconstruct unknown supervisor run '${runId}'.`);
+      debugLog("supervisor.execution.unknown_run", {
+        runId,
+        action: "reconstruct-run",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Verify the run id was bootstrapped before reconstructing run state.",
+          "Reload the durable state store if the run should already exist."
+        ]
+      });
+      throw createUnknownRunError(runId, "reconstruct run");
     }
 
     const workflowEvents = buildWorkflowEvent(state);
+    const currentWorkflowEvent = workflowEvents.length > 0 ? workflowEvents[workflowEvents.length - 1] : undefined;
 
     return {
       state,
       workflowEvents,
       laneTransitions: buildLaneTransitions(state),
-      currentNextAction: workflowEvents.at(-1)?.nextAction
+      currentNextAction: currentWorkflowEvent?.nextAction
     };
   };
 

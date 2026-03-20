@@ -1,10 +1,18 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   clearSessionBudgetState,
   estimateTokens,
   finalizeBudgetRun,
+  getBudgetRuntimeConfigDiagnostics,
   recordBudgetUsage
 } from "../plugins/orchestration-workflows/budget";
+import {
+  DEFAULT_SUPERVISOR_POLICY_PATH,
+  resetSupervisorPolicyCache
+} from "../plugins/orchestration-workflows/supervisor-config";
 
 describe("budget governor", () => {
   it("estimates tokens from text length", () => {
@@ -31,6 +39,8 @@ describe("budget governor", () => {
     // Assert
     expect(decision.action).toBe("halt");
     expect(decision.reason).toContain("hard budget exceeded");
+    expect(decision.reasonCode).toBe("budget.hard-stop");
+    expect(decision.remediation.length).toBeGreaterThan(0);
 
     clearSessionBudgetState("session-hard");
     delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS;
@@ -57,5 +67,74 @@ describe("budget governor", () => {
     clearSessionBudgetState("session-a");
     clearSessionBudgetState("session-b");
     clearSessionBudgetState("session-c");
+  });
+
+  it("reports budget config provenance for defaults, policy, and env overrides", () => {
+    const originalCwd = process.cwd();
+    const tempRoot = mkdtempSync(join(tmpdir(), "budget-policy-"));
+    try {
+      mkdirSync(join(tempRoot, ".opencode"));
+      writeFileSync(join(tempRoot, DEFAULT_SUPERVISOR_POLICY_PATH), JSON.stringify({
+        budget: {
+          runtime: {
+            softRunTokens: 7000,
+            hardRunTokens: 9100,
+            truncateAtTokens: 1500
+          }
+        }
+      }));
+      process.chdir(tempRoot);
+      resetSupervisorPolicyCache();
+
+      process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS = "4100";
+
+      const diagnostics = getBudgetRuntimeConfigDiagnostics();
+
+      expect(diagnostics.values.hardStepTokens).toBe(4100);
+      expect(diagnostics.provenance.hardStepTokens).toBe("env");
+      expect(diagnostics.values.softRunTokens).toBe(7000);
+      expect(diagnostics.provenance.softRunTokens).toBe("policy");
+      expect(diagnostics.values.hardRunTokens).toBe(9100);
+      expect(diagnostics.provenance.hardRunTokens).toBe("policy");
+      expect(diagnostics.values.softStepTokens).toBe(2800);
+      expect(diagnostics.provenance.softStepTokens).toBe("default");
+      expect(diagnostics.values.truncateAtTokens).toBe(1500);
+      expect(diagnostics.provenance.truncateAtTokens).toBe("policy");
+    } finally {
+      delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS;
+      process.chdir(originalCwd);
+      resetSupervisorPolicyCache();
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the repo policy value when an env override is invalid", () => {
+    const originalCwd = process.cwd();
+    const tempRoot = mkdtempSync(join(tmpdir(), "budget-policy-invalid-env-"));
+
+    try {
+      mkdirSync(join(tempRoot, ".opencode"));
+      writeFileSync(join(tempRoot, DEFAULT_SUPERVISOR_POLICY_PATH), JSON.stringify({
+        budget: {
+          runtime: {
+            softRunTokens: 7100
+          }
+        }
+      }));
+      process.chdir(tempRoot);
+      resetSupervisorPolicyCache();
+
+      process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_RUN_TOKENS = "not-a-number";
+
+      const diagnostics = getBudgetRuntimeConfigDiagnostics();
+
+      expect(diagnostics.values.softRunTokens).toBe(7100);
+      expect(diagnostics.provenance.softRunTokens).toBe("policy");
+    } finally {
+      delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_RUN_TOKENS;
+      process.chdir(originalCwd);
+      resetSupervisorPolicyCache();
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });

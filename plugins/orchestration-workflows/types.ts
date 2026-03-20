@@ -61,10 +61,16 @@ export type SessionPolicy = {
   allowDeepMcp: boolean;
   mcpCallCount: number;
   mcpTouched: Record<string, number>;
-  mcpWarnings: string[];
+  mcpWarnings: Array<{
+    message: string;
+    reasonCode?: "blocked.mcp-access";
+    remediation?: readonly string[];
+  }>;
 };
 
 export type McpBlockResult = {
   blocked: boolean;
   warning?: string;
+  reasonCode?: "blocked.mcp-access";
+  remediation?: string[];
 };

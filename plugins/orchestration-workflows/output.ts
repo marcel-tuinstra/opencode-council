@@ -2,6 +2,12 @@ import type { Role } from "./types";
 import { createSupervisorReasonDetail, formatSupervisorReason } from "./reason-codes";
 import { normalizeRole } from "./roles";
 
+type OperatorDiagnosticNotice = {
+  message: string;
+  reasonCode?: "blocked.mcp-access";
+  remediation?: readonly string[];
+};
+
 type DelegationExtractionResult = {
   roles: Role[];
   text: string;
@@ -270,13 +276,27 @@ export const appendMissingProviderNotice = (
   return `${text}\n\n[${nextTurn}] ${leadRole}: ${notice}`;
 };
 
-export const appendMcpWarnings = (text: string, warnings: string[]): string => {
+export const appendMcpWarnings = (text: string, warnings: Array<string | OperatorDiagnosticNotice>): string => {
   if (warnings.length === 0) {
     return text;
   }
 
   const warningBlock = warnings
-    .map((warning) => formatSupervisorReason(createSupervisorReasonDetail("blocked.mcp-access", { actionReason: warning }), "[MCP]"))
+    .map((warning) => {
+      const diagnostic = typeof warning === "string"
+        ? { message: warning }
+        : warning;
+      const formatted = formatSupervisorReason(createSupervisorReasonDetail(
+        diagnostic.reasonCode ?? "blocked.mcp-access",
+        { actionReason: diagnostic.message }
+      ), "[MCP]");
+
+      if (!diagnostic.remediation || diagnostic.remediation.length === 0) {
+        return formatted;
+      }
+
+      return `${formatted} Remediation: ${diagnostic.remediation.join(" ")}`;
+    })
     .join("\n");
   return `${text}\n\n---\n${warningBlock}`;
 };
@@ -289,7 +309,7 @@ export const applyBudgetAction = (
 ): string => {
   if (action === "halt") {
     const detail = createSupervisorReasonDetail("budget.output-halt", { actionReason: reason });
-    return `${formatSupervisorReason(detail)} Retry with fewer roles, a narrower scope, or a deeper-investigation instruction with explicit budget override.`;
+    return `${formatSupervisorReason(detail)} Remediation: retry with fewer roles, a narrower scope, or a deeper-investigation instruction with explicit budget override.`;
   }
 
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);

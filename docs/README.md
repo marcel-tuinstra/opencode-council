@@ -2,13 +2,14 @@
 
 ## Getting Started
 
-- [Install](./getting-started/install.md) -- copy plugin and agents into OpenCode
+- [Install](./getting-started/install.md) -- copy plugin and agents into OpenCode, enable debug logs, troubleshoot runtime issues
 - [Quick start](./getting-started/quickstart.md) -- verify prompts and post-merge refresh
 
 ## Guides
 
+- [Compatibility and deprecations](./guides/compatibility-and-deprecations.md) -- canonical `0.5.x` compatibility, deprecation, and removal policy
 - [Customization](./guides/customization.md) -- roles, MCP providers, agent personas
-- [Policy profiles](./guides/policy-profiles.md) -- supervisor policy config and overrides
+- [Policy profiles](./guides/policy-profiles.md) -- supervisor policy defaults, repo config, and budget override precedence
 - [Local sync and agents](./guides/local-sync-and-agents.md) -- troubleshooting agent loading
 
 ## Overview

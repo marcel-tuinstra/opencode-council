@@ -148,6 +148,32 @@ describe("supervisor-config", () => {
     expect(result.config.budget.governance.hardStopThresholdPercent).toBe(131.25);
   });
 
+  it("accepts additive unknown keys while applying valid documented overrides", () => {
+    const result = resolveSupervisorPolicy({
+      profile: "v1-safe",
+      execution: {
+        mode: "delegate-with-manual-override",
+        allowSupervisorDirectEdits: true
+      },
+      budget: {
+        runtime: {
+          softRunTokens: 7001
+        }
+      },
+      futureCompatibilitySection: {
+        enabled: true,
+        notes: ["ignored by 0.5.x runtimes"]
+      }
+    }, "inline-additive-test");
+
+    expect(result.valid).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.config.execution.mode).toBe("delegate-with-manual-override");
+    expect(result.config.execution.allowSupervisorDirectEdits).toBe(true);
+    expect(result.config.budget.runtime.softRunTokens).toBe(7001);
+    expect(result.config.protectedPaths.defaultOutcome).toBe("deny");
+  });
+
   it("loads a repo-local policy file from the standard path", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "supervisor-policy-"));
     const policyPath = join(tempRoot, DEFAULT_SUPERVISOR_POLICY_PATH);
@@ -167,6 +193,23 @@ describe("supervisor-config", () => {
     expect(result.config.execution.mode).toBe("delegate-with-manual-override");
     expect(result.config.execution.allowSupervisorDirectEdits).toBe(true);
     expect(result.config.execution.integrationAgentLabel).toBe("MERGE");
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("fails safe when the repo-local policy file is unreadable JSON", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "supervisor-policy-invalid-json-"));
+    const policyPath = join(tempRoot, DEFAULT_SUPERVISOR_POLICY_PATH);
+    mkdirSync(join(tempRoot, ".opencode"));
+    writeFileSync(policyPath, "{\n  \"profile\": \"v1-safe\",\n");
+
+    const result = loadSupervisorPolicy({ cwd: tempRoot });
+
+    expect(result.valid).toBe(false);
+    expect(result.config.profile).toBe("v1-safe");
+    expect(result.config.execution.mode).toBe("delegate-only");
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]?.path).toBe(policyPath);
+    expect(result.diagnostics[0]?.message).toContain("Failed to read or parse supervisor policy");
     rmSync(tempRoot, { recursive: true, force: true });
   });
 });

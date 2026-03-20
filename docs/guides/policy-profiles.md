@@ -75,10 +75,38 @@ Override points are intentionally minimal.
 
 1. Runtime default: `v1-safe` from this document.
 2. Repository policy file: the runtime now reads a committed repo-local policy from `.opencode/supervisor-policy.json`.
-3. Environment overrides: runtime budget thresholds may still be adjusted with the existing `ORCHESTRATION_WORKFLOWS_BUDGET_*` variables in `plugins/orchestration-workflows/budget.ts`; those values win over the repo policy file for the live budget governor.
+3. Environment overrides: runtime budget thresholds may still be adjusted with the existing `ORCHESTRATION_WORKFLOWS_BUDGET_*` variables and `ORCHESTRATION_WORKFLOWS_EXECUTE_STEP_TOKEN_COST`; those values win over the repo policy file for the live budget governor.
 4. Per-run human instruction: a user may narrow the policy for a specific run; widening the policy beyond `v1-safe` requires explicit opt-in.
 
-Precedence should be: direct human instruction for the active run, then committed repository policy, then runtime defaults.
+Precedence depends on the surface being evaluated:
+
+- For repo policy behavior, use direct human instruction for the active run, then committed repository policy, then runtime defaults.
+- For live runtime budget numbers, use environment variables first, then committed repository policy, then runtime defaults.
+
+No general-purpose environment override exists for routing, approval, protected-path, or execution policy fields.
+
+## Operator expectations for override provenance
+
+Operators should be able to answer two questions for any surprising policy behavior: which source won, and whether the runtime failed safe.
+
+- The repo policy file source is `.opencode/supervisor-policy.json` when present; otherwise the runtime uses built-in defaults.
+- Invalid or partial repo policy config falls back field-by-field to safe defaults and records diagnostics with a `path` and `message`.
+- If the policy file cannot be read or parsed, the runtime falls back to defaults and records a load failure diagnostic.
+- Budget environment variables are live shell overrides. They change runtime thresholds even when the repo policy file is valid.
+- Budget env overrides do not currently add separate provenance lines to chat output, so operators should treat the shell environment as the source of truth when live thresholds look unexpected.
+
+## Reason codes and diagnostics
+
+Two different operator signals exist:
+
+- Reason codes are runtime-facing notes such as `route.*`, `assignment.*`, `budget.*`, `approval.*`, and `blocked.*`. They explain why the runtime routed, compacted, paused, or blocked work.
+- Diagnostics are config-load warnings from supervisor policy resolution. They explain why a repo policy value was ignored or why the runtime fell back to defaults.
+
+Expected behavior:
+
+- Reason codes are concise audit labels with human-readable explanations.
+- Diagnostics are not feature output; they are operator support signals for invalid config.
+- Invalid config should fail safe, keep `v1-safe` behavior for the affected field, and surface diagnostics for review.
 
 ## Implementation notes
 

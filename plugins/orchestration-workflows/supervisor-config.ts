@@ -118,6 +118,8 @@ export type SupervisorProtectedPathPolicy = {
 export type SupervisorPolicyDiagnostics = {
   path: string;
   message: string;
+  severity?: "warning" | "error";
+  remediation?: string;
 };
 
 export type SupervisorPolicyInput = {
@@ -765,9 +767,11 @@ const compileProviderPattern = (pattern: SupervisorProviderPatternInput): Superv
 const pushDiagnostic = (
   diagnostics: SupervisorPolicyDiagnostics[],
   path: string,
-  message: string
+  message: string,
+  severity: "warning" | "error" = "error",
+  remediation?: string
 ) => {
-  diagnostics.push({ path, message });
+  diagnostics.push({ path, message, severity, remediation });
 };
 
 const normalizeStringList = (values: readonly string[]): string[] => Array.from(new Set(
@@ -829,7 +833,13 @@ export const resolveSupervisorPolicy = (
   }
 
   if (input.profile !== undefined && input.profile !== DEFAULT_SUPERVISOR_PROFILE) {
-    pushDiagnostic(diagnostics, "profile", `Unsupported profile '${String(input.profile)}'; falling back to '${DEFAULT_SUPERVISOR_PROFILE}'.`);
+    pushDiagnostic(
+      diagnostics,
+      "profile",
+      `Unsupported profile '${String(input.profile)}'; falling back to '${DEFAULT_SUPERVISOR_PROFILE}'.`,
+      "error",
+      `Set profile to '${DEFAULT_SUPERVISOR_PROFILE}'.`
+    );
   }
 
   if (input.roleAliases !== undefined) {
@@ -1436,18 +1446,30 @@ export const loadSupervisorPolicy = (options?: {
     if (!result.valid) {
       debugLog("supervisor.policy.invalid", {
         source: resolvedPath,
-        diagnostics: result.diagnostics
+        diagnostics: result.diagnostics,
+        reasonCode: "governance.policy-invalid",
+        remediation: [
+          "Fix the invalid fields in the supervisor policy file.",
+          `Remove ${resolvedPath} to fall back fully to defaults if needed.`
+        ]
       });
     }
     return result;
   } catch (error) {
     const diagnostics = [{
       path: resolvedPath,
-      message: `Failed to read or parse supervisor policy; using defaults. ${String(error)}`
+      message: `Failed to read or parse supervisor policy; using defaults. ${String(error)}`,
+      severity: "error" as const,
+      remediation: "Fix the JSON syntax or remove the invalid policy file."
     }];
     debugLog("supervisor.policy.load_failed", {
       source: resolvedPath,
-      diagnostics
+      diagnostics,
+      reasonCode: "governance.policy-invalid",
+      remediation: [
+        "Fix the supervisor policy JSON syntax.",
+        `Or remove ${resolvedPath} to use safe defaults.`
+      ]
     });
     return {
       config: cloneDefaultPolicy(),

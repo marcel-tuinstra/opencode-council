@@ -10,7 +10,7 @@ Most multi-agent approaches use a **delegation model**: an orchestrator decides 
 
 This plugin uses a **deliberation model**. When you mention multiple roles, they engage in structured discussion through heartbeat phases (Frame, Challenge, Synthesize). The output is not just a task completed -- it's a recommendation with visible reasoning from multiple expert perspectives.
 
-## Available now (v0.4.0)
+## Available now (v0.5.0)
 
 - One-command install: `npx opencode-council init`
 - Mention-driven role orchestration: `@cto @dev @pm [prompt]` activates exactly the agents you need
@@ -19,6 +19,7 @@ This plugin uses a **deliberation model**. When you mention multiple roles, they
 - Delegation mode: `@cto delegate [prompt]` for lead-first wave-based coordination
 - MCP gating: tools only activate when explicitly mentioned
 - Budget governance with reason codes and policy profiles
+- Stable runtime compatibility and deprecation policy for the `v0.5.x` line
 - 10 specialized agents: CTO, CEO, PO, PM, DEV, FE, BE, UX, Research, Marketing
 - 197 passing tests with CI on every PR
 
@@ -26,7 +27,7 @@ This plugin uses a **deliberation model**. When you mention multiple roles, they
 
 - Governed parallel execution with audit trails (supervisor mode)
 - Async delegation with governance-aware background agents
-- Contract freeze and backward-compatibility guarantees
+- Continued iteration on the experimental supervisor surface before it is stabilized in a later release
 
 ## Target user
 

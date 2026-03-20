@@ -41,7 +41,8 @@ import {
   detectRolesFromMentions,
   detectRolesFromText
 } from "./roles";
-import { getSupervisorPolicy } from "./supervisor-config";
+import { getSupervisorPolicy, getSupervisorPolicyDiagnostics } from "./supervisor-config";
+import { createSupervisorReasonDetail, formatSupervisorReason } from "./reason-codes";
 import {
   resetSessionState,
   sessionPolicy,
@@ -51,6 +52,17 @@ import type { Role } from "./types";
 
 export const AgentConversations: Plugin = async () => {
   await initializeProviderPatterns();
+  const policyDiagnostics = getSupervisorPolicyDiagnostics();
+  if (policyDiagnostics.length > 0) {
+    debugLog("supervisor.policy.diagnostics", {
+      reasonCode: "governance.policy-invalid",
+      remediation: [
+        "Review the reported supervisor policy diagnostics.",
+        "Fix the policy file or remove it to keep the default safe policy."
+      ],
+      diagnostics: policyDiagnostics
+    });
+  }
 
   return {
     "tui.prompt.append": async ({ input }) => {
@@ -69,7 +81,7 @@ export const AgentConversations: Plugin = async () => {
     },
 
     "experimental.chat.messages.transform": async (_input, output) => {
-      const userMessages = output.messages.filter((message) => message.info.role === "user");
+      const userMessages = output.messages.filter((message: { info: { role: string } }) => message.info.role === "user");
       const message = userMessages[userMessages.length - 1];
       if (!message) {
         debugLog("messages.transform.no_user_message");
@@ -104,18 +116,18 @@ export const AgentConversations: Plugin = async () => {
         part.text = part.text.replace(MARKER_REMOVAL_REGEX, "");
       }
 
-      debugLog("messages.transform.parts_processed", {
-        sessionID: message.info.sessionID,
-        nonTextParts,
-        textPartsWithRoles,
-        textPartsWithoutRoles
+        debugLog("messages.transform.parts_processed", {
+          sessionId: message.info.sessionID,
+          nonTextParts,
+          textPartsWithRoles,
+          textPartsWithoutRoles
       });
 
       if (!roles || roles.length === 0) {
         resetSessionState(message.info.sessionID);
         clearSessionBudgetState(message.info.sessionID);
         debugLog("messages.transform.policy_cleared", {
-          sessionID: message.info.sessionID,
+          sessionId: message.info.sessionID,
           reason: "no_roles_detected"
         });
         return;
@@ -163,7 +175,7 @@ export const AgentConversations: Plugin = async () => {
       });
 
       debugLog("messages.transform.policy_set", {
-        sessionID: message.info.sessionID,
+        sessionId: message.info.sessionID,
         roles: activeRoles,
         delegation,
         heartbeat,
@@ -177,7 +189,7 @@ export const AgentConversations: Plugin = async () => {
     "experimental.chat.system.transform": async (input, output) => {
       if (!input.sessionID || systemInjectedForSession.has(input.sessionID)) {
         debugLog("system.transform.skipped", {
-          sessionID: input.sessionID ?? null,
+          sessionId: input.sessionID ?? null,
           reason: input.sessionID ? "already_injected" : "missing_session_id"
         });
         return;
@@ -186,7 +198,7 @@ export const AgentConversations: Plugin = async () => {
       const policy = sessionPolicy.get(input.sessionID);
       const roles = policy?.roles;
       if (!roles || roles.length === 0) {
-        debugLog("system.transform.no_roles", { sessionID: input.sessionID });
+        debugLog("system.transform.no_roles", { sessionId: input.sessionID });
         return;
       }
 
@@ -199,7 +211,7 @@ export const AgentConversations: Plugin = async () => {
       systemInjectedForSession.add(input.sessionID);
 
       debugLog("system.transform.injected", {
-        sessionID: input.sessionID,
+        sessionId: input.sessionID,
         roles,
         mcpProviders
       });
@@ -209,7 +221,7 @@ export const AgentConversations: Plugin = async () => {
       const provider = providerFromToolName(input.tool);
       if (!provider) {
         debugLog("tool.execute.before.skip_non_mcp", {
-          sessionID: input.sessionID,
+          sessionId: input.sessionID,
           tool: input.tool
         });
         return;
@@ -218,7 +230,7 @@ export const AgentConversations: Plugin = async () => {
       const policy = sessionPolicy.get(input.sessionID);
       if (!policy) {
         debugLog("tool.execute.before.skip_no_policy", {
-          sessionID: input.sessionID,
+          sessionId: input.sessionID,
           tool: input.tool,
           provider
         });
@@ -233,27 +245,44 @@ export const AgentConversations: Plugin = async () => {
       );
       if (executeBudget.action === "halt") {
         debugLog("tool.execute.before.budget_halt", {
-          sessionID: input.sessionID,
+          sessionId: input.sessionID,
           tool: input.tool,
-          reason: executeBudget.reason
+          reason: executeBudget.reason,
+          reasonCode: executeBudget.reasonCode,
+          remediation: executeBudget.remediation,
+          usagePercent: executeBudget.usagePercent
         });
-        throw new Error(`Budget governor halted execution: ${executeBudget.reason}.`);
+        const message = formatSupervisorReason(createSupervisorReasonDetail(
+          executeBudget.reasonCode ?? "budget.hard-stop",
+          { usagePercent: executeBudget.usagePercent, actionReason: executeBudget.reason }
+        ));
+        throw new Error(`${message} Remediation: ${executeBudget.remediation.join(" ")}`);
       }
 
       const result = checkMcpAccess(input.tool, policy);
       if (result.blocked) {
         if (result.warning) {
-          policy.mcpWarnings.push(result.warning);
+          policy.mcpWarnings.push({
+            message: result.warning,
+            reasonCode: result.reasonCode,
+            remediation: result.remediation
+          });
           sessionPolicy.set(input.sessionID, policy);
         }
 
         debugLog("tool.execute.before.blocked", {
-          sessionID: input.sessionID,
+          sessionId: input.sessionID,
           provider,
           tool: input.tool,
-          warning: result.warning
+          warning: result.warning,
+          reasonCode: result.reasonCode,
+          remediation: result.remediation
         });
-        throw new Error(result.warning ?? "MCP call blocked.");
+        const message = formatSupervisorReason(createSupervisorReasonDetail(
+          result.reasonCode ?? "blocked.mcp-access",
+          { actionReason: result.warning }
+        ));
+        throw new Error(`${message}${result.remediation?.length ? ` Remediation: ${result.remediation.join(" ")}` : ""}`);
       }
 
       policy.mcpCallCount += 1;
@@ -261,7 +290,7 @@ export const AgentConversations: Plugin = async () => {
       sessionPolicy.set(input.sessionID, policy);
 
       debugLog("tool.execute.before.allowed", {
-        sessionID: input.sessionID,
+        sessionId: input.sessionID,
         provider,
         tool: input.tool,
         mcpCallCount: policy.mcpCallCount,
@@ -274,7 +303,7 @@ export const AgentConversations: Plugin = async () => {
     "experimental.text.complete": async (input, output) => {
       const policy = sessionPolicy.get(input.sessionID);
       if (!policy) {
-        debugLog("text.complete.skip_no_policy", { sessionID: input.sessionID });
+        debugLog("text.complete.skip_no_policy", { sessionId: input.sessionID });
         return;
       }
 
@@ -306,7 +335,7 @@ export const AgentConversations: Plugin = async () => {
             maxParallelAgents: policy.delegationPlan?.maxParallelAgents
           });
           debugLog("text.complete.delegation_upgraded", {
-            sessionID: input.sessionID,
+            sessionId: input.sessionID,
             leadRole: policy.roles[0],
             delegatedRoles: delegated.roles.slice(1)
           });
@@ -348,7 +377,7 @@ export const AgentConversations: Plugin = async () => {
       const baseline = finalizeBudgetRun(input.sessionID);
       if (baseline) {
         debugLog("text.complete.baseline_report", {
-          sessionID: input.sessionID,
+          sessionId: input.sessionID,
           intent: policy.intent,
           p50Tokens: baseline.p50Tokens,
           p95Tokens: baseline.p95Tokens,
@@ -357,7 +386,7 @@ export const AgentConversations: Plugin = async () => {
       }
 
       debugLog("text.complete.processed", {
-        sessionID: input.sessionID,
+        sessionId: input.sessionID,
         roles: activeRoles,
         mcpProviders: policy.mcpProviders,
         staleSensitive: policy.staleSensitive,
