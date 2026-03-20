@@ -1,10 +1,18 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   clearSessionBudgetState,
   estimateTokens,
   finalizeBudgetRun,
+  getBudgetRuntimeConfigDiagnostics,
   recordBudgetUsage
 } from "../plugins/orchestration-workflows/budget";
+import {
+  DEFAULT_SUPERVISOR_POLICY_PATH,
+  resetSupervisorPolicyCache
+} from "../plugins/orchestration-workflows/supervisor-config";
 
 describe("budget governor", () => {
   it("estimates tokens from text length", () => {
@@ -31,6 +39,8 @@ describe("budget governor", () => {
     // Assert
     expect(decision.action).toBe("halt");
     expect(decision.reason).toContain("hard budget exceeded");
+    expect(decision.reasonCode).toBe("budget.hard-stop");
+    expect(decision.remediation.length).toBeGreaterThan(0);
 
     clearSessionBudgetState("session-hard");
     delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS;
@@ -57,5 +67,35 @@ describe("budget governor", () => {
     clearSessionBudgetState("session-a");
     clearSessionBudgetState("session-b");
     clearSessionBudgetState("session-c");
+  });
+
+  it("reports budget config provenance for defaults, policy, and env overrides", () => {
+    // Arrange
+    const originalCwd = process.cwd();
+    const tempRoot = mkdtempSync(join(tmpdir(), "budget-policy-"));
+    mkdirSync(join(tempRoot, ".opencode"));
+    writeFileSync(join(tempRoot, DEFAULT_SUPERVISOR_POLICY_PATH), JSON.stringify({
+      budget: {
+        runtime: {
+          softRunTokens: 7000
+        }
+      }
+    }));
+    process.chdir(tempRoot);
+    resetSupervisorPolicyCache();
+
+    // Act
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS = "4100";
+    const diagnostics = getBudgetRuntimeConfigDiagnostics();
+
+    // Assert
+    expect(diagnostics.values.softRunTokens).toBe(7000);
+    expect(diagnostics.provenance.softRunTokens).toBe("policy");
+    expect(diagnostics.provenance.hardStepTokens).toBe("env");
+
+    delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_HARD_STEP_TOKENS;
+    process.chdir(originalCwd);
+    resetSupervisorPolicyCache();
+    rmSync(tempRoot, { recursive: true, force: true });
   });
 });

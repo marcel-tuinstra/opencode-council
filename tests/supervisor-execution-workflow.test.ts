@@ -542,6 +542,7 @@ describe("supervisor-execution-workflow", () => {
     expect(reconstructed.laneTransitions.some((transition) => transition.state === "review_ready")).toBe(true);
     expect(reconstructed.currentNextAction).toBe("complete-run");
     expect(summary.dashboard.totals.lanes).toBe(1);
+    expect(summary.dashboard.lanes[0]?.runId).toBe("run-sc-328");
     expect(summary.lifecycle.totals.durableRuns).toBe(1);
     expect(summary.lifecycle.durableRuns[0]?.recordId).toBe("run-sc-328");
     expect(eventFiles.length).toBe(reconstructed.state.auditLog.length);
@@ -625,5 +626,22 @@ describe("supervisor-execution-workflow", () => {
         laneIds: []
       }
     ]);
+  });
+
+  it("emits stable unknown-run operator errors", () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
+    const workflow = createSupervisorExecutionWorkflow({
+      store,
+      dispatchLoop: { run: () => ({ policy: { maxActiveLanes: 1 }, decisions: [] }) as never }
+    });
+
+    // Act / Assert
+    expect(() => workflow.reconstructRun("missing-run")).toThrow("blocked.unknown-run");
+    expect(() => workflow.buildRunSummary({
+      runId: "missing-run",
+      generatedAt: "2026-03-13T22:00:00.000Z"
+    })).toThrow("Remediation: verify the run id was bootstrapped and persisted before retrying.");
   });
 });

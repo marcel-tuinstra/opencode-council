@@ -89,6 +89,7 @@ describe("observability-dashboard", () => {
 
     // Act
     const snapshot = createSupervisorObservabilityDashboard({
+      runId: "run-obs-1",
       generatedAt: "2026-03-12T12:00:00.000Z",
       lanes: [
         {
@@ -207,6 +208,7 @@ describe("observability-dashboard", () => {
     });
     expect(snapshot.escalationEvents).toEqual([
       {
+        runId: "run-obs-1",
         laneId: "lane-2",
         sessionId: "session-2",
         status: "escalation-required",
@@ -215,6 +217,12 @@ describe("observability-dashboard", () => {
         summary: "step budget reached 121.43% and is escalation-required; next actions: reduce-scope, reduce-active-lanes, request-checkpoint-review, enable-hard-stop-for-runaway-risk."
       }
     ]);
+    expect(snapshot.recentPolicyDecisions.map((decision) => decision.runId)).toEqual([
+      "run-obs-1",
+      "run-obs-1",
+      "run-obs-1",
+      "run-obs-1"
+    ]);
     expect(snapshot.recentPolicyDecisions.map((decision) => decision.category)).toEqual([
       "budget-governance",
       "turn-ownership",
@@ -222,36 +230,42 @@ describe("observability-dashboard", () => {
       "lane-lifecycle"
     ]);
     expect(snapshot.recentThresholdEvents.map((event) => ({
+      runId: event.runId,
       laneId: event.laneId,
       thresholdKey: event.thresholdKey,
       reasonCode: event.reasonCode,
       occurredAt: event.occurredAt
     }))).toEqual([
       {
+        runId: "run-obs-1",
         laneId: "lane-2",
         thresholdKey: "step-warning-percent",
         reasonCode: "budget.warning-threshold",
         occurredAt: "2026-03-12T11:59:55.000Z"
       },
       {
+        runId: "run-obs-1",
         laneId: "lane-2",
         thresholdKey: "step-warning-percent",
         reasonCode: "budget.warning-threshold",
         occurredAt: "2026-03-12T11:59:55.000Z"
       },
       {
+        runId: "run-obs-1",
         laneId: "lane-2",
         thresholdKey: "step-escalation-percent",
         reasonCode: "budget.escalation-required",
         occurredAt: "2026-03-12T11:59:55.000Z"
       },
       {
+        runId: "run-obs-1",
         laneId: "lane-2",
         thresholdKey: "budget-exception-boundary",
         reasonCode: "approval.governance-boundary",
         occurredAt: "2026-03-12T11:59:35.000Z"
       },
       {
+        runId: "run-obs-1",
         laneId: "lane-2",
         thresholdKey: "minimum-signal-score",
         reasonCode: "fallback.low-confidence",

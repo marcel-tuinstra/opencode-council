@@ -71,7 +71,14 @@ export const loadInstalledProviders = async (): Promise<string[]> => {
     debugLog("providers.loaded", { providers: mcpKeys, source: configPath });
     return mcpKeys;
   } catch (error) {
-    debugLog("providers.load_failed", { error: String(error) });
+    debugLog("providers.load_failed", {
+      error: String(error),
+      reasonCode: "blocked.mcp-access",
+      remediation: [
+        "Ensure ~/.config/opencode/config.json exists and is valid JSON.",
+        "Restart the runtime session after adding or fixing MCP providers."
+      ]
+    });
     return [];
   }
 };
@@ -195,21 +202,36 @@ export const checkMcpAccess = (
   if (!providerInstalled(provider)) {
     return {
       blocked: true,
-      warning: `MCP provider '${provider}' is unavailable in this runtime session. Add it to ~/.config/opencode/config.json, then restart or start a new session before retrying.`
+      warning: `MCP provider '${provider}' is unavailable in this runtime session. Add it to ~/.config/opencode/config.json, then restart or start a new session before retrying.`,
+      reasonCode: "blocked.mcp-access",
+      remediation: [
+        `Add '${provider}' to ~/.config/opencode/config.json.`,
+        "Restart or open a new session before retrying the tool call."
+      ]
     };
   }
 
   if (allowedProviders.length === 0) {
     return {
       blocked: true,
-      warning: `MCP blocked: mention '${provider}' explicitly in the prompt to enable its tools for this session.`
+      warning: `MCP blocked: mention '${provider}' explicitly in the prompt to enable its tools for this session.`,
+      reasonCode: "blocked.mcp-access",
+      remediation: [
+        `Mention '${provider}' explicitly in the prompt.`,
+        "Retry the MCP action in the same session after the prompt updates the policy."
+      ]
     };
   }
 
   if (!allowedProviders.includes(provider)) {
     return {
       blocked: true,
-      warning: `MCP provider '${provider}' was not approved in the prompt. Allowed providers for this session: ${allowedProviders.join(", ")}.`
+      warning: `MCP provider '${provider}' was not approved in the prompt. Allowed providers for this session: ${allowedProviders.join(", ")}.`,
+      reasonCode: "blocked.mcp-access",
+      remediation: [
+        `Use one of the approved providers: ${allowedProviders.join(", ")}.`,
+        `Or update the prompt to approve '${provider}' before retrying.`
+      ]
     };
   }
 
@@ -218,7 +240,12 @@ export const checkMcpAccess = (
     if (missing.length > 0 && !missing.includes(provider)) {
       return {
         blocked: true,
-        warning: `MCP provider '${provider}' is temporarily blocked until these provider checks run first: ${missing.join(", ")}. Retry '${provider}' after that coverage lands.`
+        warning: `MCP provider '${provider}' is temporarily blocked until these provider checks run first: ${missing.join(", ")}. Retry '${provider}' after that coverage lands.`,
+        reasonCode: "blocked.mcp-access",
+        remediation: [
+          `Run the missing provider checks first: ${missing.join(", ")}.`,
+          `Retry '${provider}' after that coverage lands.`
+        ]
       };
     }
   }
@@ -228,7 +255,12 @@ export const checkMcpAccess = (
   if (policy.mcpCallCount >= cap) {
     return {
       blocked: true,
-      warning: `MCP call limit (${cap}) reached. Ask for "deeper investigation" to increase limit.`
+      warning: `MCP call limit (${cap}) reached. Ask for "deeper investigation" to increase limit.`,
+      reasonCode: "blocked.mcp-access",
+      remediation: [
+        "Reduce the number of MCP calls in this session.",
+        "Ask for deeper investigation only when the extra MCP budget is justified."
+      ]
     };
   }
 

@@ -82,12 +82,20 @@ describe("output", () => {
     // Arrange
 
     // Act
-    const updated = appendMcpWarnings("done", ["blocked one", "blocked two"]);
+    const updated = appendMcpWarnings("done", [
+      "blocked one",
+      {
+        message: "blocked two",
+        reasonCode: "blocked.mcp-access",
+        remediation: ["Retry after approving the provider."]
+      }
+    ]);
 
     // Assert
     expect(updated).toContain("[MCP] blocked.mcp-access");
     expect(updated).toContain("blocked one");
     expect(updated).toContain("blocked two");
+    expect(updated).toContain("Remediation: Retry after approving the provider.");
   });
 
   it("appends compact supervisor decision notes for threaded routes", () => {
@@ -213,5 +221,6 @@ describe("output", () => {
     expect(compacted).toContain("budget.output-compact");
     expect(halted).toContain("budget.output-halt");
     expect(halted).toContain("hard budget exceeded");
+    expect(halted).toContain("Remediation:");
   });
 });
