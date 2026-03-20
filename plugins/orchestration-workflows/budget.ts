@@ -75,9 +75,11 @@ const resolveBudgetValue = (
   defaultValue: number
 ): { value: number; source: BudgetConfigSource } => {
   if (envValue !== undefined) {
+    const parsed = Number(envValue);
+    const envValid = Number.isFinite(parsed) && parsed > 0;
     return {
-      value: readNumber(envValue, policyValue),
-      source: "env"
+      value: envValid ? parsed : policyValue,
+      source: envValid ? "env" : "policy"
     };
   }
 

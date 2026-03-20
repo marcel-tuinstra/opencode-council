@@ -30,15 +30,15 @@ const normalizeCorrelation = (details?: Record<string, unknown>): DiagnosticsCor
   const correlation: DiagnosticsCorrelation = {};
 
   if (typeof sessionValue === "string" && sessionValue.trim()) {
-    correlation.sessionId = sessionValue;
+    correlation.sessionId = sessionValue.trim();
   }
 
   if (typeof details.runId === "string" && details.runId.trim()) {
-    correlation.runId = details.runId;
+    correlation.runId = details.runId.trim();
   }
 
   if (typeof details.laneId === "string" && details.laneId.trim()) {
-    correlation.laneId = details.laneId;
+    correlation.laneId = details.laneId.trim();
   }
 
   return Object.keys(correlation).length > 0 ? correlation : undefined;
@@ -49,7 +49,9 @@ const normalizeRemediation = (value: unknown): readonly string[] | undefined => 
     return undefined;
   }
 
-  const remediation = value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+  const remediation = value
+    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    .map((entry) => entry.trim());
   return remediation.length > 0 ? remediation : undefined;
 };
 
@@ -70,7 +72,7 @@ export const buildDiagnosticsEnvelope = (
   }
 
   const reasonCode = typeof details?.reasonCode === "string" && details.reasonCode.trim()
-    ? details.reasonCode
+    ? details.reasonCode.trim()
     : undefined;
   const remediation = normalizeRemediation(details?.remediation);
 

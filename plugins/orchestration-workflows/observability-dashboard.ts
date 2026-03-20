@@ -138,6 +138,14 @@ export type SupervisorObservabilityDashboardSnapshot = {
 
 const DEFAULT_RECENT_EVENT_LIMIT = 10;
 
+const normalizeOptionalRunId = (value: string | undefined): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
 const assertNonEmptyValue = (value: string, field: string): string => {
   const normalized = value.trim();
 
@@ -296,7 +304,7 @@ export const createSupervisorObservabilityDashboard = (
   const ownershipTransitions: LaneTurnHandoffContract[] = [];
 
   const lanes = input.lanes.map((lane) => {
-    const runId = lane.runId ?? input.runId;
+    const runId = normalizeOptionalRunId(lane.runId) ?? normalizeOptionalRunId(input.runId);
     const laneId = assertNonEmptyValue(lane.laneId, "lane id");
     const session = resolveHeartbeatHealth(generatedAt, lane.session);
     const blocker = normalizeBlocker(lane.blocker);

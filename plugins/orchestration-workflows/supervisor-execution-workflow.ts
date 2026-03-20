@@ -467,6 +467,15 @@ export const createSupervisorExecutionWorkflow = (
   const prepareReviewBundles = (input: PrepareSupervisorReviewBundlesInput): readonly ReviewCoordinationBundle[] => {
     const state = store.getRunState(input.runId);
     if (!state) {
+      debugLog("supervisor.execution.unknown_run", {
+        runId: input.runId,
+        action: "prepare-review-bundles",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Verify the run id was bootstrapped before preparing review bundles.",
+          "Reload the durable state store if the run should already exist."
+        ]
+      });
       throw createUnknownRunError(input.runId, "prepare review bundles");
     }
 
@@ -481,6 +490,15 @@ export const createSupervisorExecutionWorkflow = (
   const buildRunSummary = (input: BuildSupervisorRunSummaryInput): SupervisorRunSummary => {
     const state = store.getRunState(input.runId);
     if (!state) {
+      debugLog("supervisor.execution.unknown_run", {
+        runId: input.runId,
+        action: "build-run-summary",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Verify the run id was bootstrapped before building a run summary.",
+          "Reload the durable state store if the run should already exist."
+        ]
+      });
       throw createUnknownRunError(input.runId, "build run summary");
     }
 
@@ -536,6 +554,15 @@ export const createSupervisorExecutionWorkflow = (
   const reconstructRun = (runId: string): ReconstructSupervisorRunResult => {
     const state = store.getRunState(runId);
     if (!state) {
+      debugLog("supervisor.execution.unknown_run", {
+        runId,
+        action: "reconstruct-run",
+        reasonCode: "blocked.unknown-run",
+        remediation: [
+          "Verify the run id was bootstrapped before reconstructing run state.",
+          "Reload the durable state store if the run should already exist."
+        ]
+      });
       throw createUnknownRunError(runId, "reconstruct run");
     }
 

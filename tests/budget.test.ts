@@ -129,7 +129,7 @@ describe("budget governor", () => {
       const diagnostics = getBudgetRuntimeConfigDiagnostics();
 
       expect(diagnostics.values.softRunTokens).toBe(7100);
-      expect(diagnostics.provenance.softRunTokens).toBe("env");
+      expect(diagnostics.provenance.softRunTokens).toBe("policy");
     } finally {
       delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_SOFT_RUN_TOKENS;
       process.chdir(originalCwd);
