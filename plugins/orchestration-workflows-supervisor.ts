@@ -312,7 +312,11 @@ export {
   createSupervisorDispatchLoop,
   createSupervisorLaneDefinitions
 } from "./orchestration-workflows/supervisor-scheduler.ts";
-export { buildSupervisorManagedWorktreePath, createSupervisorLaneWorktreeProvisioner, DEFAULT_SUPERVISOR_WORKTREE_ROOT } from "./orchestration-workflows/lane-worktree-provisioner.ts";
+export {
+  buildSupervisorManagedWorktreePath,
+  createSupervisorLaneWorktreeProvisioner,
+  DEFAULT_SUPERVISOR_WORKTREE_ROOT
+} from "./orchestration-workflows/lane-worktree-provisioner.ts";
 export {
   assertMergePolicyAllowsAutoMerge,
   DEFAULT_MERGE_POLICY_MODE,
