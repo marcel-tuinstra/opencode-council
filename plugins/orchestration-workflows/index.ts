@@ -69,7 +69,7 @@ export const AgentConversations: Plugin = async () => {
     },
 
     "experimental.chat.messages.transform": async (_input, output) => {
-      const userMessages = output.messages.filter((message: any) => message.info.role === "user");
+      const userMessages = output.messages.filter((message) => message.info.role === "user");
       const message = userMessages[userMessages.length - 1];
       if (!message) {
         debugLog("messages.transform.no_user_message");

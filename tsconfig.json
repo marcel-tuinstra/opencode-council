@@ -3,11 +3,10 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "allowImportingTsExtensions": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["plugins/**/*.ts", "tests/**/*.ts", "types/**/*.d.ts"]
+  "include": ["plugins/**/*.ts", "tests/**/*.ts"]
 }

@@ -38,22 +38,6 @@ Restart OpenCode, then try:
 | Governance | Budget limits, reason codes, and [policy profiles](./docs/guides/policy-profiles.md) |
 | 10 agents | CTO, CEO, PO, PM, DEV, FE, BE, UX, Research, Marketing ([personas](./agents/)) |
 
-## Stable Contract
-
-Starting in `v0.5.0`, the package root intentionally exposes a small stable runtime contract for consumers that build on the live orchestration plugin:
-
-- `AgentConversations`
-- `SUPPORTED_ROLES`
-- `Role`
-- `Intent`
-- `DelegationMode`
-- `DelegationRequest`
-- `DelegationWave`
-- `DelegationPlan`
-- `SessionPolicy`
-
-Supervisor helpers and other pre-`v0.6.0` orchestration internals remain available under an experimental supervisor entry point instead of the root barrel. This keeps the runtime contract stable while supervisor APIs continue to evolve.
-
 ## Example
 
 ```
@@ -92,7 +76,6 @@ npx opencode-council uninstall   # Clean removal
 | | |
 |---|---|
 | Getting started | [Install](./docs/getting-started/install.md) / [Quick start](./docs/getting-started/quickstart.md) |
-| Upgrading | [Upgrade to v0.5.0](./docs/guides/upgrading-to-0.5.0.md) |
 | Configuration | [Customization](./docs/guides/customization.md) / [Policy profiles](./docs/guides/policy-profiles.md) |
 | Architecture | [Overview](./docs/overview/architecture.md) / [Positioning](./docs/overview/product-positioning.md) |
 | Troubleshooting | [Local sync and agents](./docs/guides/local-sync-and-agents.md) |
