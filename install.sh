@@ -1,11 +1,11 @@
 #!/bin/sh
-# opencode-council installer v0.4.0
+# opencode-council installer v0.5.0
 # Install orchestration-workflows plugin + agent files for OpenCode.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.4.0/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.5.0/install.sh | bash
 #   # — or —
-#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.4.0/install.sh -o install.sh
+#   curl -fsSL https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/v0.5.0/install.sh -o install.sh
 #   bash install.sh
 #
 # Environment variables:
@@ -16,7 +16,7 @@ set -e
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 
-VERSION="0.4.0"
+VERSION="0.5.0"
 REF="v${VERSION}"
 REPO_URL="https://github.com/marcel-tuinstra/opencode-council.git"
 RAW_BASE="https://raw.githubusercontent.com/marcel-tuinstra/opencode-council/${REF}"
