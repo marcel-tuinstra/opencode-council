@@ -6,6 +6,7 @@ import { createFileBackedSupervisorStateStore } from "../plugins/orchestration-w
 import {
   createSupervisorExecutionWorkflow
 } from "../plugins/orchestration-workflows/supervisor-execution-workflow";
+import type { SupervisorEvent } from "../plugins/orchestration-workflows/supervisor-event-catalog";
 import {
   createSupervisorLaneWorktreeProvisioner,
   type GitWorktreeEntry,
@@ -643,5 +644,180 @@ describe("supervisor-execution-workflow", () => {
       runId: "missing-run",
       generatedAt: "2026-03-13T22:00:00.000Z"
     })).rejects.toThrow("Remediation: verify the run id was bootstrapped and persisted before retrying.");
+  });
+
+  it("emits a delegation.started event on successful bootstrapRun", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
+    const emitted: SupervisorEvent[] = [];
+    const dispatchLoop = {
+      run: async () => ({
+        policy: { maxActiveLanes: 1 },
+        decisions: []
+      })
+    };
+    const workflow = createSupervisorExecutionWorkflow({
+      store,
+      dispatchLoop: dispatchLoop as never,
+      emitEvent: (event) => emitted.push(event)
+    });
+    const workUnits = [
+      {
+        id: "workflow-core",
+        workUnit: normalizeWorkUnit({
+          objective: "Ship the supervisor execution workflow core.",
+          source: {
+            kind: "ad-hoc",
+            title: "Workflow core"
+          }
+        }),
+        dependsOn: [],
+        signals: {
+          fileOverlap: "low" as const,
+          coupling: "low" as const,
+          blastRadius: "contained" as const,
+          unknownCount: 0,
+          testIsolation: "isolated" as const
+        }
+      }
+    ];
+
+    // Act
+    const bootstrap = await workflow.bootstrapRun({
+      runId: "run-event-test",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T20:00:00.000Z",
+      objective: "Test delegation.started event emission.",
+      goal: "Implement the supervisor execution workflow, keep checkpoints explicit, and prepare review evidence.",
+      workUnits,
+      readyDependencyReferences: []
+    });
+
+    // Assert
+    expect(bootstrap.status).toBe("supported");
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.kind).toBe("delegation.started");
+    expect(emitted[0]?.context.parentRunId).toBe("run-event-test");
+    expect(emitted[0]?.level).toBe("info");
+    expect(emitted[0]?.correlationId).toMatch(/^sv-run-event-test:/);
+  });
+
+  it("does not emit delegation.started when bootstrapRun is blocked", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
+    const emitted: SupervisorEvent[] = [];
+    const dispatchLoop = {
+      run: async () => ({
+        policy: { maxActiveLanes: 1 },
+        decisions: []
+      })
+    };
+    const workflow = createSupervisorExecutionWorkflow({
+      store,
+      dispatchLoop: dispatchLoop as never,
+      emitEvent: (event) => emitted.push(event)
+    });
+    const workUnits = [
+      {
+        id: "workflow-core",
+        workUnit: normalizeWorkUnit({
+          objective: "Ship the supervisor execution workflow core.",
+          source: {
+            kind: "ad-hoc",
+            title: "Workflow core"
+          }
+        }),
+        dependsOn: [],
+        signals: {
+          fileOverlap: "low" as const,
+          coupling: "low" as const,
+          blastRadius: "contained" as const,
+          unknownCount: 0,
+          testIsolation: "isolated" as const
+        }
+      }
+    ];
+
+    // Act
+    const bootstrap = await workflow.bootstrapRun({
+      runId: "run-blocked-event-test",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T21:00:00.000Z",
+      objective: "Block unsafe delegation before execution starts.",
+      goal: "Implement the workflow core.",
+      workUnits,
+      readyDependencyReferences: [],
+      delegation: {
+        directEditsRequested: true,
+        assignments: [
+          {
+            role: "DEV",
+            agentLabel: "shared-agent",
+            responsibilities: ["implementation"]
+          }
+        ],
+        integration: {
+          agentLabel: "shared-agent",
+          responsibilities: ["integration"]
+        }
+      }
+    });
+
+    // Assert
+    expect(bootstrap.status).toBe("blocked");
+    expect(emitted).toHaveLength(0);
+  });
+
+  it("does not emit events when emitEvent is not provided", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
+    const dispatchLoop = {
+      run: async () => ({
+        policy: { maxActiveLanes: 1 },
+        decisions: []
+      })
+    };
+    const workflow = createSupervisorExecutionWorkflow({
+      store,
+      dispatchLoop: dispatchLoop as never
+      // No emitEvent provided
+    });
+    const workUnits = [
+      {
+        id: "workflow-core",
+        workUnit: normalizeWorkUnit({
+          objective: "Ship the supervisor execution workflow core.",
+          source: {
+            kind: "ad-hoc",
+            title: "Workflow core"
+          }
+        }),
+        dependsOn: [],
+        signals: {
+          fileOverlap: "low" as const,
+          coupling: "low" as const,
+          blastRadius: "contained" as const,
+          unknownCount: 0,
+          testIsolation: "isolated" as const
+        }
+      }
+    ];
+
+    // Act – should not throw even without emitEvent
+    const bootstrap = await workflow.bootstrapRun({
+      runId: "run-no-emit-test",
+      actor: "supervisor",
+      occurredAt: "2026-03-13T20:00:00.000Z",
+      objective: "Test backward compat without emitEvent.",
+      goal: "Implement the supervisor execution workflow, keep checkpoints explicit, and prepare review evidence.",
+      workUnits,
+      readyDependencyReferences: []
+    });
+
+    // Assert
+    expect(bootstrap.status).toBe("supported");
   });
 });

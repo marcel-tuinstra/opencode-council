@@ -9,6 +9,7 @@ import {
   type LaunchSupervisorRuntimeSessionInput,
   type SupervisorSessionRuntimeAdapter
 } from "../plugins/orchestration-workflows/session-runtime-adapter";
+import type { SupervisorEvent } from "../plugins/orchestration-workflows/supervisor-event-catalog";
 
 const tempDirs: string[] = [];
 
@@ -479,5 +480,228 @@ describe("session-runtime-adapter", () => {
     expect(() => assertChildSessionTransition("cancelled", "active")).toThrow(
       "Invalid child-session transition: cancelled -> active"
     );
+  });
+
+  it("emits a session.launched event on successful launchSession", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const emitted: SupervisorEvent[] = [];
+    const lifecycle = createSupervisorSessionLifecycle({
+      store,
+      runtime,
+      emitEvent: (event) => emitted.push(event)
+    });
+
+    // Act
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-event",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Assert
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.kind).toBe("session.launched");
+    expect(emitted[0]?.context.parentRunId).toBe("run-session");
+    expect(emitted[0]?.context.laneId).toBe("lane-1");
+    expect(emitted[0]?.context.sessionId).toBe("run-session:lane-1:session-01");
+    expect(emitted[0]?.level).toBe("info");
+    expect(emitted[0]?.correlationId).toMatch(/^sv-run-session:lane-1:run-session:lane-1:session-01:/);
+  });
+
+  it("emits a session.stalled event when detectStalledSession detects stall", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const emitted: SupervisorEvent[] = [];
+    const lifecycle = createSupervisorSessionLifecycle({
+      store,
+      runtime,
+      emitEvent: (event) => emitted.push(event)
+    });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-stall",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+    emitted.length = 0; // Reset to capture only the stall event
+
+    // Act
+    await lifecycle.detectStalledSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-stalled-event",
+      observedAt: "2026-03-13T14:08:00.000Z",
+      stallTimeoutMs: 60_000
+    });
+
+    // Assert
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.kind).toBe("session.stalled");
+    expect(emitted[0]?.level).toBe("warn");
+    expect(emitted[0]?.context.parentRunId).toBe("run-session");
+    expect(emitted[0]?.context.laneId).toBe("lane-1");
+    expect(emitted[0]?.context.sessionId).toBe("run-session:lane-1:session-01");
+    expect(emitted[0]?.payload).toHaveProperty("lastHeartbeatAt");
+    expect(emitted[0]?.payload).toHaveProperty("elapsed");
+  });
+
+  it("emits a session.cancelled event on successful cancelSession", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const emitted: SupervisorEvent[] = [];
+    const lifecycle = createSupervisorSessionLifecycle({
+      store,
+      runtime,
+      emitEvent: (event) => emitted.push(event)
+    });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-cancel-event",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-hb-cancel-event",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      lastHeartbeatAt: "2026-03-13T14:02:00.000Z"
+    });
+    emitted.length = 0;
+
+    // Act
+    await lifecycle.cancelSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-cancel-event",
+      occurredAt: "2026-03-13T14:03:00.000Z",
+      cancelledReason: "User requested stop."
+    });
+
+    // Assert
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.kind).toBe("session.cancelled");
+    expect(emitted[0]?.level).toBe("info");
+    expect(emitted[0]?.context.parentRunId).toBe("run-session");
+    expect(emitted[0]?.context.laneId).toBe("lane-1");
+    expect(emitted[0]?.context.sessionId).toBe("run-session:lane-1:session-01");
+    expect(emitted[0]?.payload).toEqual({ reason: "User requested stop." });
+  });
+
+  it("does not emit events when emitEvent is not provided (backward compat)", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    // Act – should not throw even without emitEvent
+    const result = await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-no-emit",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Assert
+    expect(result.action).toBe("launched");
+    expect(result.session.sessionId).toBe("run-session:lane-1:session-01");
+  });
+
+  it("populates correct correlation fields on emitted events", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const emitted: SupervisorEvent[] = [];
+    const lifecycle = createSupervisorSessionLifecycle({
+      store,
+      runtime,
+      emitEvent: (event) => emitted.push(event)
+    });
+
+    // Act – launch, pause, resume, replace, cancel – collect all events
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-corr",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+    await lifecycle.pauseSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-pause-corr",
+      occurredAt: "2026-03-13T14:02:00.000Z"
+    });
+    await lifecycle.resumeSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-b",
+      actor: "supervisor",
+      mutationId: "lane-1-resume-corr",
+      occurredAt: "2026-03-13T14:03:00.000Z"
+    });
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-hb-corr",
+      occurredAt: "2026-03-13T14:04:00.000Z",
+      status: "failed",
+      failureReason: "Test failure."
+    });
+    await lifecycle.replaceSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-c",
+      actor: "supervisor",
+      mutationId: "lane-1-replace-corr",
+      occurredAt: "2026-03-13T14:05:00.000Z"
+    });
+
+    // Assert – all emitted events share the same parentRunId and laneId
+    expect(emitted).toHaveLength(5);
+    const kinds = emitted.map((e) => e.kind);
+    expect(kinds).toEqual([
+      "session.launched",
+      "session.paused",
+      "session.resumed",
+      "session.heartbeat",
+      "session.retrying"
+    ]);
+    for (const event of emitted) {
+      expect(event.context.parentRunId).toBe("run-session");
+      expect(event.context.laneId).toBe("lane-1");
+      expect(event.correlationId).toMatch(/^sv-/);
+      expect(event.occurredAt).toBeTruthy();
+    }
+    // The retrying event should carry the replaced session id
+    const retryEvent = emitted.find((e) => e.kind === "session.retrying");
+    expect(retryEvent?.payload).toHaveProperty("replacedSessionId", "run-session:lane-1:session-01");
+    expect(retryEvent?.context.sessionId).toBe("run-session:lane-1:session-02");
   });
 });

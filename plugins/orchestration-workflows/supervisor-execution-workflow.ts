@@ -4,6 +4,7 @@ import {
   type SupervisorDataLifecycleReport
 } from "./data-lifecycle";
 import { debugLog } from "./debug";
+import { createSupervisorEvent, type SupervisorEvent } from "./supervisor-event-catalog";
 import type { SupervisorObservedThresholdEvent } from "./observability-dashboard";
 import {
   createSupervisorObservabilityDashboard,
@@ -82,8 +83,15 @@ export type BootstrapSupervisorRunResult = {
   state: SupervisorRunState;
 };
 
+export type SupervisorBudgetSnapshot = {
+  laneId: string;
+  usagePercent: number;
+  exceeded: boolean;
+};
+
 export type AdvanceSupervisorRunInput = RunSupervisorDispatchLoopInput & {
   workflowMutationId?: string;
+  budgetSnapshots?: readonly SupervisorBudgetSnapshot[];
 };
 
 export type AdvanceSupervisorRunResult = {
@@ -125,6 +133,7 @@ export type ReconstructSupervisorRunResult = {
 export type CreateSupervisorExecutionWorkflowOptions = {
   store: SupervisorStateStore;
   dispatchLoop: { run(input: RunSupervisorDispatchLoopInput): Promise<RunSupervisorDispatchLoopResult> };
+  emitEvent?: (event: SupervisorEvent) => void;
 };
 
 const WORKFLOW_STAGE_PREFIX = "workflow-stage:";
@@ -394,6 +403,12 @@ export const createSupervisorExecutionWorkflow = (
       ]
     });
 
+    if (status === "supported") {
+      options.emitEvent?.(createSupervisorEvent("delegation.started", {
+        parentRunId: runId
+      }));
+    }
+
     return {
       status,
       nextAction,
@@ -453,6 +468,28 @@ export const createSupervisorExecutionWorkflow = (
       nextAction: classified.nextAction,
       laneIds
     });
+
+    if (classified.stage === "completion" && classified.status === "completed") {
+      options.emitEvent?.(createSupervisorEvent("delegation.completed", {
+        parentRunId: input.runId
+      }));
+    }
+
+    if (input.budgetSnapshots) {
+      for (const snapshot of input.budgetSnapshots) {
+        if (snapshot.exceeded) {
+          options.emitEvent?.(createSupervisorEvent("run.budget-exceeded", {
+            parentRunId: input.runId,
+            laneId: snapshot.laneId
+          }, { usagePercent: snapshot.usagePercent }));
+        } else if (snapshot.usagePercent > 0) {
+          options.emitEvent?.(createSupervisorEvent("run.budget-warning", {
+            parentRunId: input.runId,
+            laneId: snapshot.laneId
+          }, { usagePercent: snapshot.usagePercent }));
+        }
+      }
+    }
 
     return {
       dispatch,

@@ -8,6 +8,7 @@ import type {
 } from "./durable-state-store";
 import type { ChildSessionRecord, ChildSessionState } from "./child-session-lifecycle";
 import { assertChildSessionTransition, canTransitionChildSession } from "./child-session-lifecycle";
+import { createSupervisorEvent, type SupervisorCorrelationContext, type SupervisorEvent } from "./supervisor-event-catalog";
 
 export const DEFAULT_SUPERVISOR_SESSION_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -169,6 +170,7 @@ export type SupervisorSessionLifecycle = {
 export type CreateSupervisorSessionLifecycleOptions = {
   store: SupervisorStateStore;
   runtime: SupervisorSessionRuntimeAdapter;
+  emitEvent?: (event: SupervisorEvent) => void;
 };
 
 const freezeRecord = <T extends Record<string, unknown>>(value: T): Readonly<T> => Object.freeze({ ...value });
@@ -439,6 +441,12 @@ export const createSupervisorSessionLifecycle = (
       sideEffects: ["launched-session"]
     });
 
+    options.emitEvent?.(createSupervisorEvent("session.launched", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: sessionId
+    }));
+
     return {
       action: "launched",
       lane,
@@ -491,6 +499,12 @@ export const createSupervisorSessionLifecycle = (
       sideEffects: ["attached-session"]
     });
 
+    options.emitEvent?.(createSupervisorEvent("session.resumed", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: existingSession.sessionId
+    }));
+
     return {
       action: "resumed",
       lane,
@@ -535,6 +549,12 @@ export const createSupervisorSessionLifecycle = (
       childSessionUpserts,
       sideEffects: ["paused-session"]
     });
+
+    options.emitEvent?.(createSupervisorEvent("session.paused", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: existingSession.sessionId
+    }));
 
     return {
       action: "paused",
@@ -598,6 +618,12 @@ export const createSupervisorSessionLifecycle = (
       sideEffects: ["replaced-session"]
     });
 
+    options.emitEvent?.(createSupervisorEvent("session.retrying", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: sessionId
+    }, { replacedSessionId: previousSession.sessionId }));
+
     return {
       action: "replaced",
       lane,
@@ -648,6 +674,10 @@ export const createSupervisorSessionLifecycle = (
       }
     }
 
+    const stateChanged = nextStatus !== session.status
+      || nextOwner !== session.owner
+      || nextHeartbeatAt !== session.lastHeartbeatAt;
+
     await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
@@ -657,6 +687,14 @@ export const createSupervisorSessionLifecycle = (
       childSessionUpserts,
       sideEffects: ["recorded-session-heartbeat"]
     });
+
+    if (stateChanged) {
+      options.emitEvent?.(createSupervisorEvent("session.heartbeat", {
+        parentRunId: input.runId,
+        laneId: binding.lane.laneId,
+        sessionId: session.sessionId
+      }));
+    }
 
     return {
       action: "heartbeat-recorded",
@@ -718,6 +756,12 @@ export const createSupervisorSessionLifecycle = (
       sideEffects: ["stalled-session"]
     });
 
+    options.emitEvent?.(createSupervisorEvent("session.stalled", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: session.sessionId
+    }, { lastHeartbeatAt, elapsed: elapsedMs }));
+
     return {
       action: "stalled",
       lane: binding.lane,
@@ -764,6 +808,12 @@ export const createSupervisorSessionLifecycle = (
       childSessionUpserts,
       sideEffects: ["cancelled-session"]
     });
+
+    options.emitEvent?.(createSupervisorEvent("session.cancelled", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: existingSession.sessionId
+    }, { reason: cancelledReason }));
 
     return {
       action: "cancelled",

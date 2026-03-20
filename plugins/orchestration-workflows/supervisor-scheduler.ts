@@ -5,6 +5,12 @@ import {
   type SupervisorApprovalSignal,
   type SupervisorApprovalNextAction
 } from "./approval-gates";
+import {
+  classifyChildSessionFailure,
+  resolveRetryEligibility,
+  DEFAULT_CHILD_SESSION_RETRY_POLICY,
+  type ChildSessionRecord
+} from "./child-session-lifecycle";
 import { evaluateGovernancePolicy } from "./governance-policy";
 import type { LaneCompletionContract, LaneContractViolation } from "./lane-contract";
 import type {
@@ -331,6 +337,73 @@ const evaluateReviewRoutingPolicy = (
     reasons: governanceDecision.reasons,
     evaluator: `governance-policy:${governanceDecision.source}`
   };
+};
+
+const findChildSessionForLane = (
+  state: SupervisorRunState,
+  laneId: string,
+  sessionId?: string
+): ChildSessionRecord | undefined => {
+  if (sessionId) {
+    return state.childSessions.find((cs) => cs.sessionId === sessionId);
+  }
+
+  return state.childSessions
+    .filter((cs) => cs.laneId === laneId)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+};
+
+export type EvaluateRetryDecisionResult = {
+  action: "retry" | "exhausted" | "skip";
+  reason: string;
+};
+
+export const evaluateRetryDecision = async (
+  state: SupervisorRunState,
+  laneId: string,
+  sessionRecord: SupervisorSessionRecord,
+  childRecord: ChildSessionRecord | undefined,
+  sessions: SupervisorSessionLifecycle,
+  runId: string,
+  occurredAt: string
+): Promise<EvaluateRetryDecisionResult> => {
+  if (!childRecord) {
+    return { action: "skip", reason: "No child session record found; falling back to existing behavior." };
+  }
+
+  const isStalled = sessionRecord.status === "stalled";
+  const isFailed = sessionRecord.status === "failed";
+
+  if (!isStalled && !isFailed) {
+    return { action: "skip", reason: `Session status '${sessionRecord.status}' is not eligible for retry evaluation.` };
+  }
+
+  const failureClassification = classifyChildSessionFailure({
+    heartbeatMissing: isStalled,
+    runtimeError: isFailed ? (sessionRecord.failureReason ?? "Runtime session failed.") : undefined
+  });
+
+  const childRecordWithFailure: ChildSessionRecord = childRecord.failureCode
+    ? childRecord
+    : { ...childRecord, failureCode: failureClassification.code };
+
+  const retryEligibility = resolveRetryEligibility(childRecordWithFailure, DEFAULT_CHILD_SESSION_RETRY_POLICY);
+
+  if (!retryEligibility.eligible) {
+    return { action: "exhausted", reason: retryEligibility.reason };
+  }
+
+  const lastFailureAt = childRecord.updatedAt;
+  const elapsedSinceFailureMs = Date.parse(occurredAt) - Date.parse(lastFailureAt);
+
+  if (elapsedSinceFailureMs < retryEligibility.nextRetryDelayMs) {
+    return {
+      action: "skip",
+      reason: `Backoff delay not elapsed: ${elapsedSinceFailureMs}ms of ${retryEligibility.nextRetryDelayMs}ms.`
+    };
+  }
+
+  return { action: "retry", reason: retryEligibility.reason };
 };
 
 const summarizeDependencyStates = (
@@ -935,6 +1008,53 @@ export const createSupervisorDispatchLoop = (
       }
 
       if (session.status === "paused" || session.status === "stalled" || session.status === "failed" || session.status === "replaced") {
+        if (session.status === "stalled" || session.status === "failed") {
+          const childRecord = findChildSessionForLane(state, lane.laneId, session.sessionId);
+          const retryDecision = await evaluateRetryDecision(
+            state,
+            lane.laneId,
+            session,
+            childRecord,
+            sessions,
+            runId,
+            occurredAt
+          );
+
+          if (retryDecision.action === "exhausted") {
+            reasons.push(`Retry exhausted: ${retryDecision.reason}`);
+            decisions.push({
+              laneId: lane.laneId,
+              status: session.status === "stalled" ? "active" : "active",
+              targetState: lane.state,
+              action: "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+
+          if (retryDecision.action === "skip" && childRecord) {
+            reasons.push(retryDecision.reason);
+            decisions.push({
+              laneId: lane.laneId,
+              status: "active",
+              targetState: lane.state,
+              action: "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+        }
+
         const sessionResult = session.status === "paused"
           ? await sessions.resumeSession({
               runId,
