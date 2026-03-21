@@ -1,5 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  type BudgetProfileName,
+  resolveBudgetProfile,
+  getDefaultBudgetProfileName,
+  getBudgetProfileFromEnv
+} from "./budget-profiles";
 import { debugLog } from "./debug";
 import type { Intent, Role } from "./types";
 
@@ -124,6 +130,7 @@ export type SupervisorPolicyDiagnostics = {
 
 export type SupervisorPolicyInput = {
   profile?: string;
+  budgetProfile?: BudgetProfileName;
   roleAliases?: Record<string, string>;
   providers?: {
     patterns?: SupervisorProviderPatternInput[];
@@ -193,6 +200,7 @@ export type SupervisorPolicyInput = {
 
 export type ResolvedSupervisorPolicy = {
   profile: "v1-safe";
+  budgetProfile: BudgetProfileName;
   roleAliases: Record<string, Role>;
   providers: {
     patterns: SupervisorProviderPattern[];
@@ -288,6 +296,7 @@ const DEFAULT_PROVIDER_PATTERNS: SupervisorProviderPatternInput[] = [
 
 const DEFAULT_POLICY_INPUT: SupervisorPolicyInput = {
   profile: "v1-safe",
+  budgetProfile: "standard",
   roleAliases: {
     cto: "CTO",
     dev: "DEV",
@@ -620,118 +629,124 @@ export const DEFAULT_SUPERVISOR_COMPACTION = Object.freeze({
 
 let cachedPolicyResult: SupervisorPolicyLoadResult | null = null;
 
-const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => ({
-  profile: DEFAULT_SUPERVISOR_PROFILE,
-  roleAliases: { ...DEFAULT_SUPERVISOR_ROLE_ALIASES },
-  providers: {
-    patterns: DEFAULT_PROVIDER_PATTERNS.map(compileProviderPattern)
-  },
-  limits: {
-    lanes: {
-      activeCapsByTier: {
-        "small-high-risk": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["small-high-risk"],
-        "medium-moderate-risk": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["medium-moderate-risk"],
-        "large-mature": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["large-mature"]
+const cloneDefaultPolicy = (): ResolvedSupervisorPolicy => {
+  const defaultProfileName = getDefaultBudgetProfileName();
+  const defaultProfile = resolveBudgetProfile(defaultProfileName)!;
+
+  return {
+    profile: DEFAULT_SUPERVISOR_PROFILE,
+    budgetProfile: defaultProfileName,
+    roleAliases: { ...DEFAULT_SUPERVISOR_ROLE_ALIASES },
+    providers: {
+      patterns: DEFAULT_PROVIDER_PATTERNS.map(compileProviderPattern)
+    },
+    limits: {
+      lanes: {
+        activeCapsByTier: {
+          "small-high-risk": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["small-high-risk"],
+          "medium-moderate-risk": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["medium-moderate-risk"],
+          "large-mature": DEFAULT_SUPERVISOR_LIMITS.lanes.activeCapsByTier["large-mature"]
+        },
+        maxConcurrentCodeChanges: DEFAULT_SUPERVISOR_LIMITS.lanes.maxConcurrentCodeChanges,
+        maxOpenPullRequests: DEFAULT_SUPERVISOR_LIMITS.lanes.maxOpenPullRequests
       },
-      maxConcurrentCodeChanges: DEFAULT_SUPERVISOR_LIMITS.lanes.maxConcurrentCodeChanges,
-      maxOpenPullRequests: DEFAULT_SUPERVISOR_LIMITS.lanes.maxOpenPullRequests
+      worktrees: {
+        maxActive: DEFAULT_SUPERVISOR_LIMITS.worktrees.maxActive
+      },
+      sessions: {
+        maxPerWorktree: DEFAULT_SUPERVISOR_LIMITS.sessions.maxPerWorktree
+      },
+      mcp: {
+        defaultCallCap: DEFAULT_SUPERVISOR_LIMITS.mcp.defaultCallCap,
+        deepCallCap: DEFAULT_SUPERVISOR_LIMITS.mcp.deepCallCap
+      }
     },
-    worktrees: {
-      maxActive: DEFAULT_SUPERVISOR_LIMITS.worktrees.maxActive
+    approvalGates: {
+      escalationMode: DEFAULT_SUPERVISOR_APPROVAL_GATES.escalationMode,
+      mergeMode: DEFAULT_SUPERVISOR_APPROVAL_GATES.mergeMode,
+      allowServiceCriticalAutoMerge: DEFAULT_SUPERVISOR_APPROVAL_GATES.allowServiceCriticalAutoMerge,
+      boundaries: {
+        merge: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.merge,
+        release: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.release,
+        destructive: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.destructive,
+        securitySensitive: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.securitySensitive,
+        budgetExceptions: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.budgetExceptions,
+        automationWidening: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.automationWidening
+      }
     },
-    sessions: {
-      maxPerWorktree: DEFAULT_SUPERVISOR_LIMITS.sessions.maxPerWorktree
+    budget: {
+      runtime: {
+        softRunTokens: defaultProfile.budget.runtime.softRunTokens,
+        hardRunTokens: defaultProfile.budget.runtime.hardRunTokens,
+        softStepTokens: defaultProfile.budget.runtime.softStepTokens,
+        hardStepTokens: defaultProfile.budget.runtime.hardStepTokens,
+        truncateAtTokens: defaultProfile.budget.runtime.truncateAtTokens,
+        costPer1kTokensUsd: defaultProfile.budget.runtime.costPer1kTokensUsd,
+        stepExecutionTokenCost: defaultProfile.budget.runtime.stepExecutionTokenCost
+      },
+      governance: {
+        escalationThresholdPercent: defaultProfile.budget.governance.escalationThresholdPercent,
+        hardStopEnabled: defaultProfile.budget.governance.hardStopEnabled,
+        hardStopThresholdPercent: defaultProfile.budget.governance.hardStopThresholdPercent,
+        warningThresholdPercents: [...defaultProfile.budget.governance.warningThresholdPercents]
+      }
     },
-    mcp: {
-      defaultCallCap: DEFAULT_SUPERVISOR_LIMITS.mcp.defaultCallCap,
-      deepCallCap: DEFAULT_SUPERVISOR_LIMITS.mcp.deepCallCap
-    }
-  },
-  approvalGates: {
-    escalationMode: DEFAULT_SUPERVISOR_APPROVAL_GATES.escalationMode,
-    mergeMode: DEFAULT_SUPERVISOR_APPROVAL_GATES.mergeMode,
-    allowServiceCriticalAutoMerge: DEFAULT_SUPERVISOR_APPROVAL_GATES.allowServiceCriticalAutoMerge,
-    boundaries: {
-      merge: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.merge,
-      release: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.release,
-      destructive: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.destructive,
-      securitySensitive: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.securitySensitive,
-      budgetExceptions: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.budgetExceptions,
-      automationWidening: DEFAULT_SUPERVISOR_APPROVAL_GATES.boundaries.automationWidening
-    }
-  },
-  budget: {
-    runtime: {
-      softRunTokens: DEFAULT_SUPERVISOR_BUDGET.runtime.softRunTokens,
-      hardRunTokens: DEFAULT_SUPERVISOR_BUDGET.runtime.hardRunTokens,
-      softStepTokens: DEFAULT_SUPERVISOR_BUDGET.runtime.softStepTokens,
-      hardStepTokens: DEFAULT_SUPERVISOR_BUDGET.runtime.hardStepTokens,
-      truncateAtTokens: DEFAULT_SUPERVISOR_BUDGET.runtime.truncateAtTokens,
-      costPer1kTokensUsd: DEFAULT_SUPERVISOR_BUDGET.runtime.costPer1kTokensUsd,
-      stepExecutionTokenCost: DEFAULT_SUPERVISOR_BUDGET.runtime.stepExecutionTokenCost
+    routing: {
+      minimumSignalScore: DEFAULT_SUPERVISOR_ROUTING.minimumSignalScore,
+      intentProfiles: {
+        frontend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.frontend },
+        backend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.backend },
+        design: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.design },
+        marketing: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.marketing },
+        roadmap: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.roadmap },
+        research: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.research },
+        mixed: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.mixed }
+      }
     },
-    governance: {
-      escalationThresholdPercent: DEFAULT_SUPERVISOR_BUDGET.governance.escalationThresholdPercent,
-      hardStopEnabled: DEFAULT_SUPERVISOR_BUDGET.governance.hardStopEnabled,
-      hardStopThresholdPercent: DEFAULT_SUPERVISOR_BUDGET.governance.hardStopThresholdPercent,
-      warningThresholdPercents: [...DEFAULT_SUPERVISOR_BUDGET.governance.warningThresholdPercents]
-    }
-  },
-  routing: {
-    minimumSignalScore: DEFAULT_SUPERVISOR_ROUTING.minimumSignalScore,
-    intentProfiles: {
-      frontend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.frontend },
-      backend: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.backend },
-      design: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.design },
-      marketing: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.marketing },
-      roadmap: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.roadmap },
-      research: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.research },
-      mixed: { ...DEFAULT_SUPERVISOR_ROUTING.intentProfiles.mixed }
-    }
-  },
-  execution: {
-    mode: DEFAULT_SUPERVISOR_EXECUTION.mode,
-    allowSupervisorDirectEdits: DEFAULT_SUPERVISOR_EXECUTION.allowSupervisorDirectEdits,
-    requireDelegationLog: DEFAULT_SUPERVISOR_EXECUTION.requireDelegationLog,
-    requireAgentWorktreeBinding: DEFAULT_SUPERVISOR_EXECUTION.requireAgentWorktreeBinding,
-    requireDedicatedIntegrationAgent: DEFAULT_SUPERVISOR_EXECUTION.requireDedicatedIntegrationAgent,
-    integrationAgentLabel: DEFAULT_SUPERVISOR_EXECUTION.integrationAgentLabel
-  },
-  protectedPaths: {
-    defaultOutcome: DEFAULT_SUPERVISOR_PROTECTED_PATHS.defaultOutcome,
-    rules: DEFAULT_SUPERVISOR_PROTECTED_PATHS.rules.map((rule) => ({
-      ruleId: rule.ruleId,
-      description: rule.description,
-      pathPrefixes: [...rule.pathPrefixes],
-      outcome: rule.outcome,
-      auditExpectation: rule.auditExpectation
-    }))
-  },
-  governance: {
-    checkpoints: DEFAULT_SUPERVISOR_GOVERNANCE.checkpoints.map((checkpoint) => ({
-      checkpoint: checkpoint.checkpoint,
-      defaultOutcome: checkpoint.defaultOutcome,
-      rules: checkpoint.rules.map((rule) => ({
+    execution: {
+      mode: DEFAULT_SUPERVISOR_EXECUTION.mode,
+      allowSupervisorDirectEdits: DEFAULT_SUPERVISOR_EXECUTION.allowSupervisorDirectEdits,
+      requireDelegationLog: DEFAULT_SUPERVISOR_EXECUTION.requireDelegationLog,
+      requireAgentWorktreeBinding: DEFAULT_SUPERVISOR_EXECUTION.requireAgentWorktreeBinding,
+      requireDedicatedIntegrationAgent: DEFAULT_SUPERVISOR_EXECUTION.requireDedicatedIntegrationAgent,
+      integrationAgentLabel: DEFAULT_SUPERVISOR_EXECUTION.integrationAgentLabel
+    },
+    protectedPaths: {
+      defaultOutcome: DEFAULT_SUPERVISOR_PROTECTED_PATHS.defaultOutcome,
+      rules: DEFAULT_SUPERVISOR_PROTECTED_PATHS.rules.map((rule) => ({
         ruleId: rule.ruleId,
         description: rule.description,
-        match: {
-          violationCodes: [...rule.match.violationCodes],
-          violationFields: [...rule.match.violationFields]
-        },
-        outcome: rule.outcome
+        pathPrefixes: [...rule.pathPrefixes],
+        outcome: rule.outcome,
+        auditExpectation: rule.auditExpectation
       }))
-    }))
-  },
-  compaction: {
-    frontend: { ...DEFAULT_SUPERVISOR_COMPACTION.frontend },
-    backend: { ...DEFAULT_SUPERVISOR_COMPACTION.backend },
-    design: { ...DEFAULT_SUPERVISOR_COMPACTION.design },
-    marketing: { ...DEFAULT_SUPERVISOR_COMPACTION.marketing },
-    roadmap: { ...DEFAULT_SUPERVISOR_COMPACTION.roadmap },
-    research: { ...DEFAULT_SUPERVISOR_COMPACTION.research },
-    mixed: { ...DEFAULT_SUPERVISOR_COMPACTION.mixed }
-  }
-});
+    },
+    governance: {
+      checkpoints: DEFAULT_SUPERVISOR_GOVERNANCE.checkpoints.map((checkpoint) => ({
+        checkpoint: checkpoint.checkpoint,
+        defaultOutcome: checkpoint.defaultOutcome,
+        rules: checkpoint.rules.map((rule) => ({
+          ruleId: rule.ruleId,
+          description: rule.description,
+          match: {
+            violationCodes: [...rule.match.violationCodes],
+            violationFields: [...rule.match.violationFields]
+          },
+          outcome: rule.outcome
+        }))
+      }))
+    },
+    compaction: {
+      frontend: { ...(defaultProfile.compaction.frontend ?? DEFAULT_SUPERVISOR_COMPACTION.frontend) },
+      backend: { ...(defaultProfile.compaction.backend ?? DEFAULT_SUPERVISOR_COMPACTION.backend) },
+      design: { ...(defaultProfile.compaction.design ?? DEFAULT_SUPERVISOR_COMPACTION.design) },
+      marketing: { ...(defaultProfile.compaction.marketing ?? DEFAULT_SUPERVISOR_COMPACTION.marketing) },
+      roadmap: { ...(defaultProfile.compaction.roadmap ?? DEFAULT_SUPERVISOR_COMPACTION.roadmap) },
+      research: { ...(defaultProfile.compaction.research ?? DEFAULT_SUPERVISOR_COMPACTION.research) },
+      mixed: { ...(defaultProfile.compaction.mixed ?? DEFAULT_SUPERVISOR_COMPACTION.mixed) }
+    }
+  };
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -840,6 +855,55 @@ export const resolveSupervisorPolicy = (
       "error",
       `Set profile to '${DEFAULT_SUPERVISOR_PROFILE}'.`
     );
+  }
+
+  // --- Budget profile resolution ---
+  // Priority: env var > input field > default ("standard")
+  const inputBudgetProfile = typeof input.budgetProfile === "string"
+    ? input.budgetProfile as string
+    : undefined;
+  let resolvedProfileName = getBudgetProfileFromEnv() ?? inputBudgetProfile ?? getDefaultBudgetProfileName();
+  let resolvedProfile = resolveBudgetProfile(resolvedProfileName);
+
+  if (resolvedProfile === null) {
+    const fallbackName = getDefaultBudgetProfileName();
+    pushDiagnostic(
+      diagnostics,
+      "budgetProfile",
+      `Invalid budget profile '${resolvedProfileName}'; falling back to '${fallbackName}'.`,
+      "warning",
+      `Set budgetProfile to one of: conservative, standard, extended, unlimited.`
+    );
+    resolvedProfileName = fallbackName;
+    resolvedProfile = resolveBudgetProfile(fallbackName)!;
+  }
+
+  config.budgetProfile = resolvedProfileName as BudgetProfileName;
+
+  // Apply profile values as defaults BEFORE explicit field overrides.
+  // Budget runtime defaults from profile:
+  config.budget.runtime.softRunTokens = resolvedProfile.budget.runtime.softRunTokens;
+  config.budget.runtime.hardRunTokens = resolvedProfile.budget.runtime.hardRunTokens;
+  config.budget.runtime.softStepTokens = resolvedProfile.budget.runtime.softStepTokens;
+  config.budget.runtime.hardStepTokens = resolvedProfile.budget.runtime.hardStepTokens;
+  config.budget.runtime.truncateAtTokens = resolvedProfile.budget.runtime.truncateAtTokens;
+  config.budget.runtime.costPer1kTokensUsd = resolvedProfile.budget.runtime.costPer1kTokensUsd;
+  config.budget.runtime.stepExecutionTokenCost = resolvedProfile.budget.runtime.stepExecutionTokenCost;
+
+  // Budget governance defaults from profile:
+  config.budget.governance.warningThresholdPercents = [...resolvedProfile.budget.governance.warningThresholdPercents];
+  config.budget.governance.escalationThresholdPercent = resolvedProfile.budget.governance.escalationThresholdPercent;
+  config.budget.governance.hardStopEnabled = resolvedProfile.budget.governance.hardStopEnabled;
+  config.budget.governance.hardStopThresholdPercent = resolvedProfile.budget.governance.hardStopThresholdPercent;
+
+  // Compaction defaults from profile:
+  for (const intent of Object.keys(config.compaction) as Intent[]) {
+    const profileCompaction = resolvedProfile.compaction[intent];
+    if (profileCompaction) {
+      config.compaction[intent].triggerTokens = profileCompaction.triggerTokens;
+      config.compaction[intent].targetTokens = profileCompaction.targetTokens;
+      config.compaction[intent].retainRecentLines = profileCompaction.retainRecentLines;
+    }
   }
 
   if (input.roleAliases !== undefined) {

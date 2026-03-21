@@ -20,14 +20,14 @@ describe("budget-governance", () => {
     // Assert
     expect(policy.hardStopEnabled).toBe(false);
     expect(policy.defaultHardStopEnabled).toBe(false);
-    expect(policy.warningThresholdPercents).toEqual([80, 100, 120]);
-    expect(policy.hardStopThresholdPercent).toBe(DEFAULT_HARD_STOP_THRESHOLD_PERCENT);
+    expect(policy.warningThresholdPercents).toEqual([75, 90, 110]);
+    expect(policy.hardStopThresholdPercent).toBe(130);
     expect(policy.overrideSource).toBe("default");
     expect(decision.status).toBe("warning");
     expect(decision.triggeredThresholds).toEqual([
       {
         kind: "warning",
-        usagePercent: 80,
+        usagePercent: 75,
         reason: "run usage crossed the early warning threshold and should stay under watch."
       }
     ]);
@@ -42,20 +42,20 @@ describe("budget-governance", () => {
     expect(decision.decisionEvidence).toEqual({
       overrideSource: "default",
       hardStopEnabled: false,
-      warningThresholdPercents: [80, 100, 120],
-      escalationThresholdPercent: 120,
-      hardStopThresholdPercent: DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
+      warningThresholdPercents: [75, 90, 110],
+      escalationThresholdPercent: 110,
+      hardStopThresholdPercent: 130,
       usedTokens: 5120,
       budgetTokens: 6400,
       usagePercent: 80
     });
     expect(decision.thresholdEvents).toEqual([
       {
-        eventId: "budget-governance:run:warning:80:80",
+        eventId: "budget-governance:run:warning:75:80",
         guardrail: "budget-governance",
         thresholdKey: "run-warning-percent",
         status: "triggered",
-        thresholdValue: 80,
+        thresholdValue: 75,
         observedValue: 80,
         reasonCode: "budget.warning-threshold",
         summary: "run usage crossed the early warning threshold and should stay under watch.",
@@ -122,7 +122,7 @@ describe("budget-governance", () => {
     expect(decision.status).toBe("hard-stop");
     expect(decision.triggeredThresholds.at(-1)).toEqual({
       kind: "hard-stop",
-      usagePercent: DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
+      usagePercent: 130,
       reason: "run usage reached the explicit hard-stop runaway threshold."
     });
     expect(decision.reasonDetails).toEqual([
@@ -134,11 +134,11 @@ describe("budget-governance", () => {
       }
     ]);
     expect(decision.thresholdEvents.at(-1)).toEqual({
-      eventId: "budget-governance:run:hard-stop:131-25:131-25",
+      eventId: "budget-governance:run:hard-stop:130:131-25",
       guardrail: "budget-governance",
       thresholdKey: "run-hard-stop-percent",
       status: "triggered",
-      thresholdValue: DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
+      thresholdValue: 130,
       observedValue: 131.25,
       reasonCode: "budget.hard-stop",
       summary: "run usage reached the explicit hard-stop runaway threshold.",

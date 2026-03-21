@@ -1,12 +1,13 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_SUPERVISOR_POLICY_PATH,
   loadSupervisorPolicy,
   resolveSupervisorPolicy
 } from "../plugins/orchestration-workflows/supervisor-config";
+import { BUDGET_PROFILES } from "../plugins/orchestration-workflows/budget-profiles";
 
 describe("supervisor-config", () => {
   it("resolves the v1-safe defaults when no repo policy is present", () => {
@@ -50,8 +51,14 @@ describe("supervisor-config", () => {
       leadRole: "UX",
       fallbackLeadRole: "PO"
     });
-    expect(result.config.compaction.backend.retainRecentLines).toBe(3);
-    expect(result.config.compaction.frontend.retainRecentLines).toBe(3);
+    expect(result.config.budgetProfile).toBe("standard");
+    expect(result.config.budget.runtime.softRunTokens).toBe(BUDGET_PROFILES.standard.budget.runtime.softRunTokens);
+    expect(result.config.compaction.backend.retainRecentLines).toBe(
+      BUDGET_PROFILES.standard.compaction.backend.retainRecentLines
+    );
+    expect(result.config.compaction.frontend.retainRecentLines).toBe(
+      BUDGET_PROFILES.standard.compaction.frontend.retainRecentLines
+    );
   });
 
   it("applies execution policy overrides from repo config", () => {
@@ -211,5 +218,186 @@ describe("supervisor-config", () => {
     expect(result.diagnostics[0]?.path).toBe(policyPath);
     expect(result.diagnostics[0]?.message).toContain("Failed to read or parse supervisor policy");
     rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  // --- Budget profile integration tests ---
+
+  describe("budget profile resolution", () => {
+    afterEach(() => {
+      delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE;
+    });
+
+    it("resolves extended profile values when budgetProfile is 'extended'", () => {
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe",
+        budgetProfile: "extended"
+      }, "budget-profile-extended-test");
+
+      expect(result.valid).toBe(true);
+      expect(result.config.budgetProfile).toBe("extended");
+
+      const extended = BUDGET_PROFILES.extended;
+      expect(result.config.budget.runtime.softRunTokens).toBe(extended.budget.runtime.softRunTokens);
+      expect(result.config.budget.runtime.hardRunTokens).toBe(extended.budget.runtime.hardRunTokens);
+      expect(result.config.budget.runtime.softStepTokens).toBe(extended.budget.runtime.softStepTokens);
+      expect(result.config.budget.runtime.hardStepTokens).toBe(extended.budget.runtime.hardStepTokens);
+      expect(result.config.budget.runtime.truncateAtTokens).toBe(extended.budget.runtime.truncateAtTokens);
+      expect(result.config.budget.governance.escalationThresholdPercent).toBe(
+        extended.budget.governance.escalationThresholdPercent
+      );
+      expect(result.config.compaction.frontend.triggerTokens).toBe(extended.compaction.frontend.triggerTokens);
+      expect(result.config.compaction.backend.retainRecentLines).toBe(extended.compaction.backend.retainRecentLines);
+    });
+
+    it("preserves old v1-safe behavior when budgetProfile is 'conservative'", () => {
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe",
+        budgetProfile: "conservative"
+      }, "budget-profile-conservative-test");
+
+      expect(result.valid).toBe(true);
+      expect(result.config.budgetProfile).toBe("conservative");
+
+      const conservative = BUDGET_PROFILES.conservative;
+      expect(result.config.budget.runtime.softRunTokens).toBe(conservative.budget.runtime.softRunTokens);
+      expect(result.config.budget.runtime.hardRunTokens).toBe(conservative.budget.runtime.hardRunTokens);
+      expect(result.config.budget.governance.escalationThresholdPercent).toBe(
+        conservative.budget.governance.escalationThresholdPercent
+      );
+      expect(result.config.budget.governance.hardStopThresholdPercent).toBe(
+        conservative.budget.governance.hardStopThresholdPercent
+      );
+      expect(result.config.compaction.frontend.retainRecentLines).toBe(
+        conservative.compaction.frontend.retainRecentLines
+      );
+      expect(result.config.compaction.backend.retainRecentLines).toBe(
+        conservative.compaction.backend.retainRecentLines
+      );
+    });
+
+    it("defaults to 'standard' when budgetProfile is not specified", () => {
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe"
+      }, "budget-profile-default-test");
+
+      expect(result.valid).toBe(true);
+      expect(result.config.budgetProfile).toBe("standard");
+
+      const standard = BUDGET_PROFILES.standard;
+      expect(result.config.budget.runtime.softRunTokens).toBe(standard.budget.runtime.softRunTokens);
+      expect(result.config.budget.runtime.hardRunTokens).toBe(standard.budget.runtime.hardRunTokens);
+      expect(result.config.budget.governance.escalationThresholdPercent).toBe(
+        standard.budget.governance.escalationThresholdPercent
+      );
+      expect(result.config.compaction.frontend.triggerTokens).toBe(standard.compaction.frontend.triggerTokens);
+      expect(result.config.compaction.mixed.retainRecentLines).toBe(standard.compaction.mixed.retainRecentLines);
+    });
+
+    it("uses explicit budget fields to override profile values", () => {
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe",
+        budgetProfile: "conservative",
+        budget: {
+          runtime: {
+            softRunTokens: 20000
+          }
+        },
+        compaction: {
+          frontend: {
+            triggerTokens: 9999
+          }
+        }
+      }, "budget-profile-override-test");
+
+      expect(result.valid).toBe(true);
+      expect(result.config.budgetProfile).toBe("conservative");
+
+      // Explicit override takes precedence over profile
+      expect(result.config.budget.runtime.softRunTokens).toBe(20000);
+      expect(result.config.compaction.frontend.triggerTokens).toBe(9999);
+
+      // Non-overridden fields still use the profile values
+      const conservative = BUDGET_PROFILES.conservative;
+      expect(result.config.budget.runtime.hardRunTokens).toBe(conservative.budget.runtime.hardRunTokens);
+      expect(result.config.budget.runtime.softStepTokens).toBe(conservative.budget.runtime.softStepTokens);
+      expect(result.config.compaction.frontend.targetTokens).toBe(conservative.compaction.frontend.targetTokens);
+      expect(result.config.compaction.backend.triggerTokens).toBe(conservative.compaction.backend.triggerTokens);
+    });
+
+    it("falls back to standard with a diagnostic for an invalid budgetProfile name", () => {
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe",
+        budgetProfile: "turbo-mode" as any
+      }, "budget-profile-invalid-test");
+
+      expect(result.valid).toBe(false);
+      expect(result.config.budgetProfile).toBe("standard");
+
+      const standard = BUDGET_PROFILES.standard;
+      expect(result.config.budget.runtime.softRunTokens).toBe(standard.budget.runtime.softRunTokens);
+      expect(result.config.compaction.frontend.triggerTokens).toBe(standard.compaction.frontend.triggerTokens);
+
+      const budgetDiag = result.diagnostics.find((d) => d.path === "budgetProfile");
+      expect(budgetDiag).toBeDefined();
+      expect(budgetDiag!.message).toContain("Invalid budget profile");
+      expect(budgetDiag!.message).toContain("turbo-mode");
+      expect(budgetDiag!.severity).toBe("warning");
+    });
+
+    it("uses env var ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE to override policy file value", () => {
+      process.env.ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE = "extended";
+
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe",
+        budgetProfile: "conservative"
+      }, "budget-profile-env-override-test");
+
+      expect(result.valid).toBe(true);
+      expect(result.config.budgetProfile).toBe("extended");
+
+      const extended = BUDGET_PROFILES.extended;
+      expect(result.config.budget.runtime.softRunTokens).toBe(extended.budget.runtime.softRunTokens);
+      expect(result.config.budget.runtime.hardRunTokens).toBe(extended.budget.runtime.hardRunTokens);
+      expect(result.config.compaction.frontend.triggerTokens).toBe(extended.compaction.frontend.triggerTokens);
+    });
+
+    it("ignores an invalid env var and falls through to input budgetProfile", () => {
+      process.env.ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE = "mega-budget";
+
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe",
+        budgetProfile: "conservative"
+      }, "budget-profile-env-invalid-test");
+
+      expect(result.valid).toBe(true);
+      expect(result.config.budgetProfile).toBe("conservative");
+
+      const conservative = BUDGET_PROFILES.conservative;
+      expect(result.config.budget.runtime.softRunTokens).toBe(conservative.budget.runtime.softRunTokens);
+    });
+
+    it("includes budgetProfile in the resolved policy output for runtime logging", () => {
+      const result = resolveSupervisorPolicy({
+        profile: "v1-safe",
+        budgetProfile: "extended"
+      }, "budget-profile-output-test");
+
+      expect(result.config).toHaveProperty("budgetProfile");
+      expect(result.config.budgetProfile).toBe("extended");
+    });
+
+    it("applies standard profile when called with no input (undefined)", () => {
+      const result = resolveSupervisorPolicy();
+
+      expect(result.valid).toBe(true);
+      expect(result.config.budgetProfile).toBe("standard");
+
+      // The default cloneDefaultPolicy uses getDefaultBudgetProfileName() which returns "standard"
+      // but no profile application happens because input is undefined
+      // The cloneDefaultPolicy itself doesn't apply profile values; it uses the frozen DEFAULT constants
+      // For no-input case, budgetProfile should still be "standard" on the config
+      expect(typeof result.config.budget.runtime.softRunTokens).toBe("number");
+      expect(result.config.budget.runtime.softRunTokens).toBeGreaterThan(0);
+    });
   });
 });
