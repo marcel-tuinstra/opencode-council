@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appendCompactionNotice, compactWorkflowContext } from "../plugins/orchestration-workflows/compact";
+import { resetSupervisorPolicyCache } from "../plugins/orchestration-workflows/supervisor-config";
 
 const longBackendPrompt = [
   "Goal: reduce API latency and restore p95.",
@@ -10,6 +11,16 @@ const longBackendPrompt = [
 ].join("\n");
 
 describe("compaction", () => {
+  beforeEach(() => {
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE = "standard";
+    resetSupervisorPolicyCache();
+  });
+
+  afterEach(() => {
+    delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE;
+    resetSupervisorPolicyCache();
+  });
+
   it("compacts oversized context while preserving critical slots and recent continuity", () => {
     // Arrange
     const recentContext = [

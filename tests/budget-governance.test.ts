@@ -1,11 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_HARD_STOP_THRESHOLD_PERCENT,
   evaluateBudgetGovernance,
   resolveBudgetGovernancePolicy
 } from "../plugins/orchestration-workflows/budget-governance";
+import { resetSupervisorPolicyCache } from "../plugins/orchestration-workflows/supervisor-config";
 
 describe("budget-governance", () => {
+  beforeEach(() => {
+    process.env.ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE = "standard";
+    resetSupervisorPolicyCache();
+  });
+
+  afterEach(() => {
+    delete process.env.ORCHESTRATION_WORKFLOWS_BUDGET_PROFILE;
+    resetSupervisorPolicyCache();
+  });
+
   it("defaults to soft governance with warning thresholds and no hard stop", () => {
     // Arrange
 
