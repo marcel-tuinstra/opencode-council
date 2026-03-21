@@ -49,14 +49,20 @@ import {
   systemInjectedForSession
 } from "./session";
 import type { Role } from "./types";
-import {
-  detectSupervisorTrigger,
-  buildSupervisorPlan,
-  formatSupervisorPreview,
-  type SupervisorPlanResult
-} from "./supervisor-trigger";
-import { buildSupervisorSystemInstruction } from "./supervisor-system-instructions";
-import { createOpencodeClientRuntimeAdapter } from "./opencode-client-adapter";
+import type { SupervisorPlanResult } from "./supervisor-trigger";
+
+// ---------------------------------------------------------------------------
+// Lightweight inline supervisor trigger detection.
+// This avoids eagerly importing the full supervisor planning chain (~35 modules)
+// when supervisor mode is never used.
+// ---------------------------------------------------------------------------
+const SUPERVISOR_TRIGGER_REGEX = /^@supervisor\s+/i;
+
+function detectSupervisorTriggerInline(text: string): { detected: boolean; goal: string } {
+  const match = text.match(SUPERVISOR_TRIGGER_REGEX);
+  if (!match) return { detected: false, goal: "" };
+  return { detected: true, goal: text.slice(match[0].length).trim() };
+}
 
 export const AgentConversations: Plugin = async (input: PluginInput) => {
   const opencodeClient: OpencodeClient | undefined = input?.client;
@@ -115,8 +121,10 @@ export const AgentConversations: Plugin = async (input: PluginInput) => {
         }
       }
 
-      const supervisorCheck = detectSupervisorTrigger(supervisorSourceText);
+      const supervisorCheck = detectSupervisorTriggerInline(supervisorSourceText);
       if (supervisorCheck.detected && supervisorCheck.goal.length > 0) {
+        // Lazy-load the supervisor planning modules
+        const { buildSupervisorPlan } = await import("./supervisor-trigger");
         const plan = buildSupervisorPlan(supervisorCheck.goal);
         const sessionId = message.info.sessionID;
         if (sessionId) {
@@ -275,6 +283,7 @@ export const AgentConversations: Plugin = async (input: PluginInput) => {
       // --- Supervisor system instructions ---
       const supervisorPlan = supervisorPlans.get(input.sessionID);
       if (supervisorPlan && supervisorPlan.status === "supported") {
+        const { buildSupervisorSystemInstruction } = await import("./supervisor-system-instructions");
         const supervisorInstruction = buildSupervisorSystemInstruction(supervisorPlan);
         output.system.push(supervisorInstruction);
         debugLog("system.transform.supervisor_injected", {
@@ -394,6 +403,7 @@ export const AgentConversations: Plugin = async (input: PluginInput) => {
       // --- Supervisor plan preview ---
       const supervisorPlanForComplete = supervisorPlans.get(input.sessionID);
       if (supervisorPlanForComplete) {
+        const { formatSupervisorPreview } = await import("./supervisor-trigger");
         const preview = formatSupervisorPreview(supervisorPlanForComplete);
         output.text = `${preview}\n\n${output.text}`;
         debugLog("text.complete.supervisor_preview", {
@@ -517,6 +527,7 @@ export const AgentConversations: Plugin = async (input: PluginInput) => {
           }
 
           try {
+            const { createOpencodeClientRuntimeAdapter } = await import("./opencode-client-adapter");
             const adapter = createOpencodeClientRuntimeAdapter({
               client: opencodeClient,
               directory: input.directory,

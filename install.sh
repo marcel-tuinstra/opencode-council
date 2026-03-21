@@ -33,6 +33,7 @@ ad-hoc-run-history.ts
 approval-gates.ts
 budget.ts
 budget-governance.ts
+budget-profiles.ts
 child-session-lifecycle.ts
 compact.ts
 constants.ts
@@ -52,6 +53,7 @@ lane-worktree-provisioner.ts
 mcp.ts
 merge-policy.ts
 observability-dashboard.ts
+opencode-client-adapter.ts
 output.ts
 path-policy.ts
 protected-path-policy.ts
@@ -71,6 +73,8 @@ supervisor-execution-workflow.ts
 supervisor-goal-plan.ts
 supervisor-routing.ts
 supervisor-scheduler.ts
+supervisor-system-instructions.ts
+supervisor-trigger.ts
 turn-ownership.ts
 types.ts
 work-unit.ts
@@ -350,8 +354,8 @@ download_with_git() {
 # ─── Success message ─────────────────────────────────────────────────────────
 
 print_success() {
-  # Count: 1 barrel + 46 modules + 10 agents = 57
-  _total=57
+  # Count: 1 barrel + 50 modules + 10 agents = 61
+  _total=61
 
   echo ""
   success "${BOLD}Done!${RESET}${GREEN} ${_total} files installed to ${INSTALL_DIR}/${RESET}"
