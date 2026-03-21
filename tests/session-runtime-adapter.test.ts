@@ -704,4 +704,196 @@ describe("session-runtime-adapter", () => {
     expect(retryEvent?.payload).toHaveProperty("replacedSessionId", "run-session:lane-1:session-01");
     expect(retryEvent?.context.sessionId).toBe("run-session:lane-1:session-02");
   });
+
+  it("carries over retryCount incremented by one when replacing a child session", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-retry",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Fail the session so it can be replaced
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-fail-1",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      status: "failed",
+      failureReason: "Crash #1."
+    });
+
+    // First replacement
+    await lifecycle.replaceSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-replace-1",
+      occurredAt: "2026-03-13T14:03:00.000Z"
+    });
+
+    const stateAfterFirst = await store.getRunState("run-session");
+    const firstReplacement = stateAfterFirst?.childSessions.find(
+      (cs) => cs.sessionId === "run-session:lane-1:session-02"
+    );
+    expect(firstReplacement?.retryCount).toBe(1);
+    expect(firstReplacement?.maxRetries).toBe(2);
+
+    // Fail the replacement too
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-fail-2",
+      occurredAt: "2026-03-13T14:04:00.000Z",
+      status: "failed",
+      failureReason: "Crash #2."
+    });
+
+    // Second replacement
+    await lifecycle.replaceSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-replace-2",
+      occurredAt: "2026-03-13T14:05:00.000Z"
+    });
+
+    const stateAfterSecond = await store.getRunState("run-session");
+    const secondReplacement = stateAfterSecond?.childSessions.find(
+      (cs) => cs.sessionId === "run-session:lane-1:session-03"
+    );
+
+    // Assert – retryCount accumulates across replacements
+    expect(secondReplacement?.retryCount).toBe(2);
+    expect(secondReplacement?.maxRetries).toBe(2);
+  });
+
+  it("returns unchanged when cancelSession is called on a completed session", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-cancel-guard",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Mark session as completed via heartbeat
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-complete",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      status: "completed"
+    });
+
+    // Act – attempt to cancel an already-completed session
+    const result = await lifecycle.cancelSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-cancel-completed",
+      occurredAt: "2026-03-13T14:03:00.000Z",
+      cancelledReason: "Too late."
+    });
+
+    // Assert
+    expect(result.action).toBe("unchanged");
+    expect(result.session.status).toBe("completed");
+  });
+
+  it("transitions child session to completed when heartbeat reports completed status", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-terminal-hb",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Promote to active first
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-hb-activate",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      lastHeartbeatAt: "2026-03-13T14:02:00.000Z"
+    });
+
+    // Act – heartbeat with completed status
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-hb-completed",
+      occurredAt: "2026-03-13T14:03:00.000Z",
+      status: "completed"
+    });
+    const state = await store.getRunState("run-session");
+
+    // Assert
+    expect(state?.childSessions[0]?.state).toBe("completed");
+    expect(state?.childSessions[0]?.previousState).toBe("active");
+    expect(state?.childSessions[0]?.completedAt).toBe("2026-03-13T14:03:00.000Z");
+  });
+
+  it("transitions child session to failed when heartbeat reports failed status", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const store = await seedRunWithLaneWorktree(rootDir);
+    const runtime = createFakeRuntime();
+    const lifecycle = createSupervisorSessionLifecycle({ store, runtime });
+
+    await lifecycle.launchSession({
+      runId: "run-session",
+      laneId: "lane-1",
+      owner: "developer-a",
+      actor: "supervisor",
+      mutationId: "lane-1-launch-fail-hb",
+      occurredAt: "2026-03-13T14:01:00.000Z"
+    });
+
+    // Act – heartbeat with failed status directly from launching state
+    await lifecycle.recordHeartbeat({
+      runId: "run-session",
+      laneId: "lane-1",
+      actor: "supervisor",
+      mutationId: "lane-1-hb-failed",
+      occurredAt: "2026-03-13T14:02:00.000Z",
+      status: "failed",
+      failureReason: "Runtime crashed on startup."
+    });
+    const state = await store.getRunState("run-session");
+
+    // Assert – launching → failed is a valid transition
+    expect(state?.childSessions[0]?.state).toBe("failed");
+    expect(state?.childSessions[0]?.previousState).toBe("launching");
+  });
 });

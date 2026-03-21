@@ -147,6 +147,17 @@ describe("createOpencodeClientRuntimeAdapter", () => {
 
       await expect(adapter.launchSession(makeLaunchInput())).rejects.toThrow("Prompt rejected");
     });
+
+    it("aborts the created session when promptAsync fails", async () => {
+      const client = createMockClient();
+      vi.mocked(client.session.promptAsync).mockRejectedValue(new Error("Prompt rejected"));
+      const adapter = createOpencodeClientRuntimeAdapter({ client, directory: DIRECTORY });
+
+      await expect(adapter.launchSession(makeLaunchInput())).rejects.toThrow("Prompt rejected");
+
+      expect(client.session.abort).toHaveBeenCalledOnce();
+      expect(client.session.abort).toHaveBeenCalledWith({ path: { id: "child-session-1" } });
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -184,6 +195,24 @@ describe("createOpencodeClientRuntimeAdapter", () => {
     it("maps 'completed' status to 'completed'", async () => {
       const client = createMockClient();
       vi.mocked(client.session.get).mockResolvedValue({ data: { id: "child-session-1", status: "completed" } });
+      const adapter = createOpencodeClientRuntimeAdapter({ client, directory: DIRECTORY });
+
+      const snapshot = await adapter.attachSession(makeAttachInput());
+      expect(snapshot.status).toBe("completed");
+    });
+
+    it("maps 'aborted' status to 'completed'", async () => {
+      const client = createMockClient();
+      vi.mocked(client.session.get).mockResolvedValue({ data: { id: "child-session-1", status: "aborted" } });
+      const adapter = createOpencodeClientRuntimeAdapter({ client, directory: DIRECTORY });
+
+      const snapshot = await adapter.attachSession(makeAttachInput());
+      expect(snapshot.status).toBe("completed");
+    });
+
+    it("maps 'cancelled' status to 'completed'", async () => {
+      const client = createMockClient();
+      vi.mocked(client.session.get).mockResolvedValue({ data: { id: "child-session-1", status: "cancelled" } });
       const adapter = createOpencodeClientRuntimeAdapter({ client, directory: DIRECTORY });
 
       const snapshot = await adapter.attachSession(makeAttachInput());
@@ -284,6 +313,22 @@ describe("getChildSessionMessages", () => {
   it("returns an empty array when no messages exist", async () => {
     const client = createMockClient();
     vi.mocked(client.session.messages).mockResolvedValue({ data: [] });
+
+    const messages = await getChildSessionMessages(client, "child-session-1");
+    expect(messages).toEqual([]);
+  });
+
+  it("returns an empty array when response.data is null", async () => {
+    const client = createMockClient();
+    vi.mocked(client.session.messages).mockResolvedValue({ data: null as any });
+
+    const messages = await getChildSessionMessages(client, "child-session-1");
+    expect(messages).toEqual([]);
+  });
+
+  it("returns an empty array when response.data is undefined", async () => {
+    const client = createMockClient();
+    vi.mocked(client.session.messages).mockResolvedValue({ data: undefined as any });
 
     const messages = await getChildSessionMessages(client, "child-session-1");
     expect(messages).toEqual([]);

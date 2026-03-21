@@ -32,11 +32,11 @@ const mapSessionStatus = (raw: string | undefined | null): SupervisorRuntimeSess
       return "paused";
     case "completed":
     case "done":
+    case "aborted":
+    case "cancelled":
       return "completed";
     case "error":
     case "failed":
-    case "aborted":
-    case "cancelled":
       return "failed";
     default:
       return "active";
@@ -84,14 +84,19 @@ export const createOpencodeClientRuntimeAdapter = (
       ? `Resume work from previous session ${input.resumeSessionId}.`
       : "Begin work on your assigned lane.";
 
-    await client.session.promptAsync({
-      path: { id: sessionId },
-      body: {
-        system: systemPrompt,
-        agent: input.owner,
-        parts: [{ type: "text", text: promptText }]
-      }
-    });
+    try {
+      await client.session.promptAsync({
+        path: { id: sessionId },
+        body: {
+          system: systemPrompt,
+          agent: input.owner,
+          parts: [{ type: "text", text: promptText }]
+        }
+      });
+    } catch (error) {
+      await abortChildSession(client, sessionId);
+      throw error;
+    }
 
     return {
       runtimeSessionId: sessionId,
@@ -150,5 +155,5 @@ export const getChildSessionMessages = async (
   sessionId: string
 ): Promise<any[]> => {
   const response = await client.session.messages({ path: { id: sessionId } });
-  return response.data;
+  return Array.isArray(response.data) ? response.data : [];
 };

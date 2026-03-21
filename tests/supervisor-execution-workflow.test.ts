@@ -820,4 +820,164 @@ describe("supervisor-execution-workflow", () => {
     // Assert
     expect(bootstrap.status).toBe("supported");
   });
+
+  it("advanceRun succeeds even when emitEvent throws", async () => {
+    // Arrange
+    const rootDir = createTempRoot();
+    const repoRoot = path.join(rootDir, "repo");
+    const worktreeRootDir = path.join(rootDir, "worktrees");
+    mkdirSync(repoRoot, { recursive: true });
+
+    const store = createFileBackedSupervisorStateStore({ rootDir: path.join(rootDir, "state") });
+    const system = createFakeSystem();
+    const runtime = createFakeRuntime();
+    const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
+    const sessions = createSupervisorSessionLifecycle({ store, runtime });
+    const dispatchLoop = createSupervisorDispatchLoop({ store, provisioner, sessions });
+    const emitCallCount = { value: 0 };
+    const workflow = createSupervisorExecutionWorkflow({
+      store,
+      dispatchLoop,
+      emitEvent: () => {
+        emitCallCount.value += 1;
+        throw new Error("event sink unavailable");
+      }
+    });
+    const workUnits = [
+      {
+        id: "emit-throw-lane",
+        workUnit: normalizeWorkUnit({
+          objective: "Test that emitEvent errors are swallowed.",
+          acceptanceCriteria: ["advanceRun returns without throwing"],
+          source: {
+            kind: "ad-hoc",
+            title: "Emit-throw test"
+          }
+        }),
+        dependsOn: [],
+        signals: {
+          fileOverlap: "low" as const,
+          coupling: "low" as const,
+          blastRadius: "contained" as const,
+          unknownCount: 0,
+          testIsolation: "isolated" as const
+        }
+      }
+    ];
+
+    // Act — bootstrap emits delegation.started; should not throw
+    const bootstrap = await workflow.bootstrapRun({
+      runId: "run-emit-throw",
+      actor: "supervisor",
+      occurredAt: "2026-03-14T10:00:00.000Z",
+      objective: "Verify emitEvent throw is swallowed.",
+      goal: "Ship a thin feature.",
+      workUnits,
+      readyDependencyReferences: []
+    });
+    expect(bootstrap.status).toBe("supported");
+    expect(emitCallCount.value).toBe(1);
+
+    // Provision + launch a lane so we can drive to completion
+    const firstAdvance = await workflow.advanceRun({
+      runId: "run-emit-throw",
+      actor: "supervisor",
+      occurredAt: "2026-03-14T10:01:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: bootstrap.dispatchPlan.laneInputs,
+      sessionOwners: ["DEV"],
+      baseRef: "origin/main"
+    });
+    expect(firstAdvance.stage).toBe("dispatch");
+
+    const secondAdvance = await workflow.advanceRun({
+      runId: "run-emit-throw",
+      actor: "supervisor",
+      occurredAt: "2026-03-14T10:02:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: bootstrap.dispatchPlan.laneInputs,
+      sessionOwners: ["DEV"],
+      baseRef: "origin/main"
+    });
+    expect(secondAdvance.stage).toBe("dispatch");
+
+    // Transition lane to review_ready before completing
+    const laneId = bootstrap.dispatchPlan.laneInputs[0]!.definition.laneId;
+    const reviewReady = await workflow.advanceRun({
+      runId: "run-emit-throw",
+      actor: "supervisor",
+      occurredAt: "2026-03-14T10:03:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: bootstrap.dispatchPlan.laneInputs.map((lane) => ({
+        ...lane,
+        reviewReadyPacket: {
+          acceptanceCriteriaTrace: [{ requirement: "emit swallowed", evidence: "test", status: "done" }],
+          scopedDiffSummary: ["Test change"],
+          verificationResults: [{ check: "test", result: "pass", notes: "ok" }],
+          riskRollbackNotes: ["revert"],
+          handoff: {
+            laneId,
+            currentOwner: "DEV",
+            nextOwner: "REVIEWER",
+            transferScope: "review",
+            transferTrigger: "done",
+            deltaSummary: "test",
+            risks: ["potential regression"],
+            nextRequiredEvidence: ["review bundle"],
+            evidenceAttached: ["test"]
+          },
+          laneOutput: {
+            runId: "run-emit-throw",
+            laneId,
+            status: "ready",
+            handoff: {
+              laneId,
+              currentOwner: "DEV",
+              nextOwner: "REVIEWER",
+              transferScope: "review",
+              transferTrigger: "done",
+              deltaSummary: "test",
+              risks: ["potential regression"],
+              nextRequiredEvidence: ["review bundle"],
+              evidenceAttached: ["test"]
+            },
+            artifacts: [
+              { laneId, kind: "branch", uri: "branch:emit-throw-test", label: "Lane branch" },
+              { laneId, kind: "review-packet", uri: "tests/emit-throw.test.ts", label: "Review packet" }
+            ],
+            evidence: ["test"],
+            producedAt: "2026-03-14T10:03:00.000Z"
+          },
+          ownership: { reviewerOwner: "REVIEWER", mergeOwner: "supervisor", followUpOwner: "DEV" }
+        }
+      })),
+      sessionOwners: ["DEV"],
+      baseRef: "origin/main"
+    });
+    expect(reviewReady.stage).toBe("review");
+
+    // Complete the lane — this triggers delegation.completed emit which throws
+    const completed = await workflow.advanceRun({
+      runId: "run-emit-throw",
+      actor: "supervisor",
+      occurredAt: "2026-03-14T10:04:00.000Z",
+      repoRiskTier: "medium-moderate-risk",
+      lanes: bootstrap.dispatchPlan.laneInputs.map((lane) => ({
+        ...lane,
+        complete: true
+      })),
+      sessionOwners: ["DEV"],
+      baseRef: "origin/main",
+      budgetSnapshots: [
+        { laneId: bootstrap.dispatchPlan.laneInputs[0]!.definition.laneId, usagePercent: 95, exceeded: true }
+      ]
+    });
+
+    // Assert — advanceRun returned successfully despite emitEvent throwing
+    expect(completed.stage).toBe("completion");
+    expect(completed.status).toBe("completed");
+    expect(completed.state.run.status).toBe("completed");
+    // delegation.started (1) + delegation.completed (1) + budget-exceeded (1) = 3
+    expect(emitCallCount.value).toBe(3);
+  });
 });

@@ -339,7 +339,9 @@ const buildChildSessionRecord = (
   worktreeId: string,
   state: ChildSessionState,
   occurredAt: string,
-  owner?: string
+  owner?: string,
+  retryCount: number = 0,
+  maxRetries: number = DEFAULT_CHILD_SESSION_MAX_RETRIES
 ): ChildSessionRecord => ({
   sessionId,
   parentRunId,
@@ -350,8 +352,8 @@ const buildChildSessionRecord = (
   owner,
   heartbeatIntervalMs: DEFAULT_CHILD_SESSION_HEARTBEAT_INTERVAL_MS,
   heartbeatCount: 0,
-  retryCount: 0,
-  maxRetries: DEFAULT_CHILD_SESSION_MAX_RETRIES,
+  retryCount,
+  maxRetries,
   startedAt: occurredAt,
   updatedAt: occurredAt
 });
@@ -596,6 +598,8 @@ export const createSupervisorSessionLifecycle = (
         cancelledReason: "Replaced by a newer runtime session."
       }));
     }
+    const accumulatedRetryCount = (existingChildSession?.retryCount ?? 0) + 1;
+    const inheritedMaxRetries = existingChildSession?.maxRetries ?? DEFAULT_CHILD_SESSION_MAX_RETRIES;
     const newChildSession = buildChildSessionRecord(
       sessionId,
       state.run.runId,
@@ -603,7 +607,9 @@ export const createSupervisorSessionLifecycle = (
       binding.worktree.worktreeId,
       "launching",
       occurredAt,
-      owner
+      owner,
+      accumulatedRetryCount,
+      inheritedMaxRetries
     );
     childSessionUpserts.push(newChildSession);
 
@@ -657,20 +663,31 @@ export const createSupervisorSessionLifecycle = (
     const childSessionUpserts: ChildSessionRecord[] = [];
     const existingChildSession = findChildSession(state, session.sessionId);
     if (existingChildSession) {
-      const nextChildState: ChildSessionState = existingChildSession.state === "launching" ? "active" : existingChildSession.state;
-      const shouldTransition = nextChildState !== existingChildSession.state;
-      if (shouldTransition) {
-        childSessionUpserts.push(transitionChildSession(existingChildSession, nextChildState, occurredAt, {
-          lastHeartbeatAt: occurredAt,
-          heartbeatCount: existingChildSession.heartbeatCount + 1
-        }));
-      } else {
-        childSessionUpserts.push({
-          ...existingChildSession,
+      const terminalChildState: ChildSessionState | undefined =
+        (input.status === "completed" || input.status === "failed") ? input.status : undefined;
+
+      if (terminalChildState && canTransitionChildSession(existingChildSession.state, terminalChildState)) {
+        childSessionUpserts.push(transitionChildSession(existingChildSession, terminalChildState, occurredAt, {
           lastHeartbeatAt: occurredAt,
           heartbeatCount: existingChildSession.heartbeatCount + 1,
-          updatedAt: occurredAt
-        });
+          completedAt: terminalChildState === "completed" ? occurredAt : undefined
+        }));
+      } else {
+        const nextChildState: ChildSessionState = existingChildSession.state === "launching" ? "active" : existingChildSession.state;
+        const shouldTransition = nextChildState !== existingChildSession.state;
+        if (shouldTransition) {
+          childSessionUpserts.push(transitionChildSession(existingChildSession, nextChildState, occurredAt, {
+            lastHeartbeatAt: occurredAt,
+            heartbeatCount: existingChildSession.heartbeatCount + 1
+          }));
+        } else {
+          childSessionUpserts.push({
+            ...existingChildSession,
+            lastHeartbeatAt: occurredAt,
+            heartbeatCount: existingChildSession.heartbeatCount + 1,
+            updatedAt: occurredAt
+          });
+        }
       }
     }
 
@@ -775,6 +792,16 @@ export const createSupervisorSessionLifecycle = (
     const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const existingSession = resolveExistingSession(binding, state, input.sessionId);
+
+    if (existingSession.status === "completed" || existingSession.status === "failed" || existingSession.status === "replaced") {
+      return {
+        action: "unchanged",
+        lane: binding.lane,
+        worktree: binding.worktree,
+        session: existingSession
+      };
+    }
+
     const cancelledReason = input.cancelledReason ?? "Cancelled by supervisor.";
 
     const cancelledSupervisorSession = replaceSessionRecord(existingSession, "failed", occurredAt, {

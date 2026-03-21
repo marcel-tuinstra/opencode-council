@@ -40,7 +40,7 @@ export const detectSupervisorTrigger = (
   return { detected: false, goal: "" };
 };
 
-const SEGMENT_SPLIT_REGEX = /[,;]\s+|\n+/;
+const SEGMENT_SPLIT_REGEX = /[;,]\s*|\n+/;
 
 const buildWorkUnitsFromGoal = (goalText: string): LanePlanningWorkUnit[] => {
   const segments = goalText
@@ -118,15 +118,23 @@ export const buildSupervisorPlan = (goalText: string): SupervisorPlanResult => {
   return result;
 };
 
-const formatUnsupportedPreview = (goalPlan: PlanSupervisorGoalResult): string => {
+const formatUnsupportedPreview = (
+  goalPlan: PlanSupervisorGoalResult,
+  reasons?: readonly string[]
+): string => {
+  const effectiveReasons = reasons ?? goalPlan.reasons;
   const lines: string[] = [];
   lines.push("[Supervisor] Plan — Unsupported");
   lines.push("");
   lines.push(`Goal: ${goalPlan.goal}`);
   lines.push("");
   lines.push("Reasons:");
-  for (const reason of goalPlan.reasons) {
-    lines.push(`  - ${reason}`);
+  if (effectiveReasons.length === 0) {
+    lines.push("  - No reason provided");
+  } else {
+    for (const reason of effectiveReasons) {
+      lines.push(`  - ${reason}`);
+    }
   }
   if (goalPlan.remediation.length > 0) {
     lines.push("");
@@ -143,7 +151,7 @@ const padRight = (value: string, width: number): string =>
 
 export const formatSupervisorPreview = (plan: SupervisorPlanResult): string => {
   if (plan.status === "unsupported") {
-    return formatUnsupportedPreview(plan.goalPlan);
+    return formatUnsupportedPreview(plan.goalPlan, plan.warnings);
   }
 
   const policy = getSupervisorPolicy();

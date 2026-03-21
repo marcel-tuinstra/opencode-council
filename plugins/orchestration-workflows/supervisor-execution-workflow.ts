@@ -404,9 +404,16 @@ export const createSupervisorExecutionWorkflow = (
     });
 
     if (status === "supported") {
-      options.emitEvent?.(createSupervisorEvent("delegation.started", {
-        parentRunId: runId
-      }));
+      try {
+        options.emitEvent?.(createSupervisorEvent("delegation.started", {
+          parentRunId: runId
+        }));
+      } catch (emitError) {
+        debugLog("supervisor.event.emit_failed", {
+          error: String(emitError),
+          eventKind: "delegation.started",
+        });
+      }
     }
 
     return {
@@ -470,23 +477,44 @@ export const createSupervisorExecutionWorkflow = (
     });
 
     if (classified.stage === "completion" && classified.status === "completed") {
-      options.emitEvent?.(createSupervisorEvent("delegation.completed", {
-        parentRunId: input.runId
-      }));
+      try {
+        options.emitEvent?.(createSupervisorEvent("delegation.completed", {
+          parentRunId: input.runId
+        }));
+      } catch (emitError) {
+        debugLog("supervisor.event.emit_failed", {
+          error: String(emitError),
+          eventKind: "delegation.completed",
+        });
+      }
     }
 
     if (input.budgetSnapshots) {
       for (const snapshot of input.budgetSnapshots) {
         if (snapshot.exceeded) {
-          options.emitEvent?.(createSupervisorEvent("run.budget-exceeded", {
-            parentRunId: input.runId,
-            laneId: snapshot.laneId
-          }, { usagePercent: snapshot.usagePercent }));
+          try {
+            options.emitEvent?.(createSupervisorEvent("run.budget-exceeded", {
+              parentRunId: input.runId,
+              laneId: snapshot.laneId
+            }, { usagePercent: snapshot.usagePercent }));
+          } catch (emitError) {
+            debugLog("supervisor.event.emit_failed", {
+              error: String(emitError),
+              eventKind: "run.budget-exceeded",
+            });
+          }
         } else if (snapshot.usagePercent > 0) {
-          options.emitEvent?.(createSupervisorEvent("run.budget-warning", {
-            parentRunId: input.runId,
-            laneId: snapshot.laneId
-          }, { usagePercent: snapshot.usagePercent }));
+          try {
+            options.emitEvent?.(createSupervisorEvent("run.budget-warning", {
+              parentRunId: input.runId,
+              laneId: snapshot.laneId
+            }, { usagePercent: snapshot.usagePercent }));
+          } catch (emitError) {
+            debugLog("supervisor.event.emit_failed", {
+              error: String(emitError),
+              eventKind: "run.budget-warning",
+            });
+          }
         }
       }
     }

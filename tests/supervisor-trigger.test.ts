@@ -105,6 +105,16 @@ describe("supervisor-trigger", () => {
       expect(result.workUnits[0]!.workUnit.objective).toBe("build the auth module");
       expect(result.workUnits[1]!.workUnit.objective).toBe("refactor the API layer");
     });
+
+    it("splits comma-separated segments without space after comma", () => {
+      const result = buildSupervisorPlan(
+        "build the user authentication API,add integration tests for the auth module"
+      );
+
+      expect(result.workUnits.length).toBe(2);
+      expect(result.workUnits[0]!.workUnit.objective).toBe("build the user authentication API");
+      expect(result.workUnits[1]!.workUnit.objective).toBe("add integration tests for the auth module");
+    });
   });
 
   describe("formatSupervisorPreview", () => {
@@ -134,6 +144,37 @@ describe("supervisor-trigger", () => {
 
       expect(preview).toContain("Unsupported");
       expect(preview).toContain("Reasons:");
+    });
+
+    it("shows warnings from lane decomposition in unsupported preview", () => {
+      const plan = buildSupervisorPlan(
+        "build user auth module, refactor API layer, update documentation"
+      );
+
+      // Simulate lane decomposition marking the plan unsupported with warnings
+      plan.status = "unsupported";
+      plan.warnings = ["Lane coupling too high", "Circular dependency detected"];
+
+      const preview = formatSupervisorPreview(plan);
+
+      expect(preview).toContain("Unsupported");
+      expect(preview).toContain("Lane coupling too high");
+      expect(preview).toContain("Circular dependency detected");
+    });
+
+    it("shows fallback when no reasons are available in unsupported preview", () => {
+      const plan = buildSupervisorPlan(
+        "build user auth module, refactor API layer"
+      );
+
+      // Simulate unsupported status with empty warnings
+      plan.status = "unsupported";
+      plan.warnings = [];
+
+      const preview = formatSupervisorPreview(plan);
+
+      expect(preview).toContain("Unsupported");
+      expect(preview).toContain("No reason provided");
     });
   });
 
