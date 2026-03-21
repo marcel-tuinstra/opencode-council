@@ -23,7 +23,7 @@ describe("public contract guardrails", () => {
       "./supervisor": "./plugins/orchestration-workflows-supervisor.ts"
     });
     expect(packageJson.bin).toEqual({
-      "opencode-council": "./bin/cli.mjs"
+      "opencode-council": "bin/cli.mjs"
     });
   });
 

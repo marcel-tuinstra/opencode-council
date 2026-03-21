@@ -1,6 +1,6 @@
 {
   "name": "opencode-council",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "AI agents that debate before they act. Multi-agent orchestration for OpenCode with governance, heartbeat deliberation, and delegation.",
   "type": "module",
   "exports": {
@@ -8,7 +8,7 @@
     "./supervisor": "./plugins/orchestration-workflows-supervisor.ts"
   },
   "bin": {
-    "opencode-council": "./bin/cli.mjs"
+    "opencode-council": "bin/cli.mjs"
   },
   "files": [
     "bin/",
