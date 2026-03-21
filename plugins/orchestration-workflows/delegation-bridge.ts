@@ -179,11 +179,18 @@ export const detectDelegationPlanSource = (
 
   const record = plan as Record<string, unknown>;
 
-  if (Array.isArray(record.waves)) {
+  const hasWaves = Array.isArray(record.waves);
+  const hasAssignments = Array.isArray(record.assignments);
+
+  if (hasWaves && hasAssignments) {
+    throw new Error("Cannot detect delegation plan source: input includes both 'waves' and 'assignments'.");
+  }
+
+  if (hasWaves) {
     return "user-delegation";
   }
 
-  if (Array.isArray(record.assignments)) {
+  if (hasAssignments) {
     return "supervisor-delegation";
   }
 

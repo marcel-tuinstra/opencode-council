@@ -5,6 +5,17 @@ import { getSupervisorPolicy } from "./supervisor-config";
 export const buildSupervisorSystemInstruction = (
   plan: SupervisorPlanResult
 ): string => {
+  if (plan.status === "unsupported") {
+    return [
+      "You are operating in Supervisor mode.",
+      "",
+      "Supervisor planning is currently unsupported for this goal.",
+      `Warnings: ${plan.warnings.join("; ") || "none provided"}`,
+      "",
+      "Do not launch child sessions. Request clarification or remediation from the user."
+    ].join("\n");
+  }
+
   const policy = getSupervisorPolicy();
   const lines: string[] = [];
 

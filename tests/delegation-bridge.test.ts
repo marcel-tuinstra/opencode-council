@@ -256,6 +256,15 @@ describe("detectDelegationPlanSource", () => {
   it("throws when input is a primitive", () => {
     expect(() => detectDelegationPlanSource("not-a-plan")).toThrow("not an object");
   });
+
+  it("throws when input has both waves and assignments", () => {
+    expect(() =>
+      detectDelegationPlanSource({
+        waves: [{ wave: 1, roles: ["DEV"], goal: "Test", dependsOn: [] }],
+        assignments: [{ role: "DEV", agentLabel: "DEV-A", responsibilities: ["Test"] }]
+      })
+    ).toThrow("input includes both 'waves' and 'assignments'");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -82,7 +82,7 @@ describe("child-session-lifecycle", () => {
       ["launching", "paused"],
       ["launching", "stalled"],
       ["paused", "stalled"],
-      ["paused", "completing"],
+      ["paused", "completed"],
       ["stalled", "active"],
       ["stalled", "paused"],
       ["recovering", "paused"],
@@ -91,7 +91,7 @@ describe("child-session-lifecycle", () => {
       ["cancelled", "active"],
       ["completed", "active"],
       ["failed", "active"]
-    ].filter(([_from, to]) => ALL_STATES.includes(to as ChildSessionState)) as [ChildSessionState, ChildSessionState][];
+    ];
 
     it.each(invalidPairs)("%s -> %s is rejected", (from, to) => {
       expect(canTransitionChildSession(from, to)).toBe(false);
@@ -180,6 +180,36 @@ describe("child-session-lifecycle", () => {
       });
       expect(result.code).toBe("budget-exceeded");
       expect(result.retryEligible).toBe(false);
+    });
+
+    it("returns tool-outage (retry-eligible) when toolOutage is set", () => {
+      const result = classifyChildSessionFailure({ toolOutage: true });
+      expect(result.code).toBe("tool-outage");
+      expect(result.retryEligible).toBe(true);
+    });
+
+    it("returns partial-completion (retry-eligible) when partialCompletion is set", () => {
+      const result = classifyChildSessionFailure({ partialCompletion: true });
+      expect(result.code).toBe("partial-completion");
+      expect(result.retryEligible).toBe(true);
+    });
+
+    it("prioritises toolOutage over mergeConflict", () => {
+      const result = classifyChildSessionFailure({
+        toolOutage: true,
+        mergeConflict: true
+      });
+      expect(result.code).toBe("tool-outage");
+      expect(result.retryEligible).toBe(true);
+    });
+
+    it("prioritises partialCompletion over mergeConflict but not toolOutage", () => {
+      const result = classifyChildSessionFailure({
+        partialCompletion: true,
+        mergeConflict: true
+      });
+      expect(result.code).toBe("partial-completion");
+      expect(result.retryEligible).toBe(true);
     });
   });
 

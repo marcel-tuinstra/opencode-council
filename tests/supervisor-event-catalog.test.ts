@@ -192,4 +192,20 @@ describe("supervisor-event-catalog", () => {
 
     expect(Object.isFrozen(event)).toBe(true);
   });
+
+  it("uses caller-provided occurredAt instead of wall-clock time", () => {
+    const fixedTimestamp = "2025-06-15T12:00:00.000Z";
+    const event = createSupervisorEvent("session.launched", fullContext, {}, fixedTimestamp);
+
+    expect(event.occurredAt).toBe(fixedTimestamp);
+    // The correlation ID must embed the same timestamp
+    const idTimestamp = Number(event.correlationId.split(":").pop());
+    expect(idTimestamp).toBe(new Date(fixedTimestamp).getTime());
+  });
+
+  it("throws when caller-provided occurredAt is not a valid ISO-8601 string", () => {
+    expect(() =>
+      createSupervisorEvent("session.launched", fullContext, {}, "not-a-date")
+    ).toThrow('Invalid occurredAt timestamp');
+  });
 });

@@ -234,5 +234,16 @@ describe("supervisor-trigger", () => {
       expect(instruction).toContain("Merge mode:");
       expect(instruction).toContain("Escalation mode:");
     });
+
+    it("returns early with unsupported instruction for unsupported plans", () => {
+      const plan = buildSupervisorPlan("fix it");
+
+      expect(plan.status).toBe("unsupported");
+
+      const instruction = buildSupervisorSystemInstruction(plan);
+
+      expect(instruction).toContain("unsupported");
+      expect(instruction).toContain("Do not launch");
+    });
   });
 });

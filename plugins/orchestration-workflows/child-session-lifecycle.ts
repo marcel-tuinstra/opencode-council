@@ -132,6 +132,8 @@ export const classifyChildSessionFailure = (signal: {
   heartbeatMissing?: boolean;
   runtimeError?: string;
   budgetExceeded?: boolean;
+  toolOutage?: boolean;
+  partialCompletion?: boolean;
   mergeConflict?: boolean;
   cancelledByParent?: boolean;
 }): { code: ChildSessionFailureCode; retryEligible: boolean } => {
@@ -141,6 +143,14 @@ export const classifyChildSessionFailure = (signal: {
 
   if (signal.budgetExceeded) {
     return { code: "budget-exceeded", retryEligible: false };
+  }
+
+  if (signal.toolOutage) {
+    return { code: "tool-outage", retryEligible: true };
+  }
+
+  if (signal.partialCompletion) {
+    return { code: "partial-completion", retryEligible: true };
   }
 
   if (signal.mergeConflict) {

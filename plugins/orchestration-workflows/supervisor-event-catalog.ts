@@ -144,19 +144,32 @@ export const isMinimumViableEvent = (kind: SupervisorEventKind): boolean =>
 /**
  * Create a fully-formed `SupervisorEvent` with auto-generated correlation ID,
  * ISO-8601 timestamp, and the default severity level for the given kind.
+ *
+ * If `occurredAt` is provided it is used instead of wall-clock time.
+ * The value must be a valid ISO-8601 string; otherwise an error is thrown.
  */
 export const createSupervisorEvent = (
   kind: SupervisorEventKind,
   context: SupervisorCorrelationContext,
-  payload: Record<string, unknown> = {}
+  payload: Record<string, unknown> = {},
+  occurredAt?: string
 ): SupervisorEvent => {
-  const now = Date.now();
+  let timestampMs: number;
+
+  if (occurredAt !== undefined) {
+    timestampMs = Date.parse(occurredAt);
+    if (Number.isNaN(timestampMs)) {
+      throw new Error(`Invalid occurredAt timestamp: "${occurredAt}" is not a valid ISO-8601 string.`);
+    }
+  } else {
+    timestampMs = Date.now();
+  }
 
   return Object.freeze({
     kind,
-    correlationId: buildCorrelationId(context, now),
+    correlationId: buildCorrelationId(context, timestampMs),
     context: Object.freeze({ ...context }),
-    occurredAt: new Date(now).toISOString(),
+    occurredAt: new Date(timestampMs).toISOString(),
     level: EVENT_DEFAULT_LEVELS[kind],
     payload: Object.freeze({ ...payload })
   });

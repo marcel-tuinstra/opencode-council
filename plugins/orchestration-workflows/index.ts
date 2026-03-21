@@ -126,7 +126,7 @@ export const AgentConversations: Plugin = async (input: PluginInput) => {
         // Set session policy with supervisor mode
         if (sessionId) {
           const supervisorRoles: Role[] = plan.goalPlan.status === "supported"
-            ? plan.goalPlan.recommendedRoles.map((r: { role: Role }) => r.role)
+            ? plan.goalPlan?.recommendedRoles?.map((r: { role: Role }) => r.role) ?? ["CTO"]
             : ["CTO"];
 
           const supervisorIntent = detectIntent(supervisorCheck.goal);
@@ -528,7 +528,7 @@ export const AgentConversations: Plugin = async (input: PluginInput) => {
               worktreeId: `lane-${args.laneId}`,
               worktreePath: `${input.directory}/.worktrees/lane-${args.laneId}`,
               branch: `supervisor/lane-${args.laneId}`,
-              runId: `run-${Date.now()}`,
+              runId: `run-${args.laneId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               owner: args.role,
               occurredAt: new Date().toISOString()
             });
@@ -596,6 +596,13 @@ export const AgentConversations: Plugin = async (input: PluginInput) => {
                 childSessionId: childId,
                 laneId: child.laneId
               });
+            }
+
+            // Clean up supervisor state when all children are terminal
+            const allTerminal = children.every(c => c.status === "completed" || c.status === "failed");
+            if (allTerminal) {
+              supervisorPlans.delete(parentId);
+              supervisorChildSessions.delete(parentId);
             }
           }
         }
