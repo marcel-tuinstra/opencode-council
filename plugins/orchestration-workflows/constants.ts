@@ -66,15 +66,15 @@ export const INTENT_KEYWORDS: Record<Intent, RegExp[]> = {
   ],
   marketing: [
     /marketing|positioning|messaging|campaign|launch|brand|audience|copy|narrative/i,
-    /go-to-market|gtm|webinar|case study|ad|funnel|conversion/i
+    /go-to-market|gtm|webinar|case study|ad|funnel|conversion|persona|icp|competitor|brief/i
   ],
   roadmap: [
     /roadmap|milestone|quarter|timeline|deadline|planning|refinement|delivery|scope/i,
-    /prioritization|dependency|release|backlog|estimate|resourcing/i
+    /prioritization|dependency|release|backlog|estimate|resourcing|mvp|prd|requirements?|size|sizing/i
   ],
   research: [
-    /research|interview|evidence|hypothesis|experiment|validate|confidence|survey/i,
-    /competitive|benchmark|discovery|analysis|findings|insight/i
+    /research|explore|compare|interview|evidence|hypothesis|experiment|validate|confidence|survey|assess|evaluate|synthesize|recommend/i,
+    /competitive|competitor|benchmark|discovery|analysis|findings|insight|recommendation|shortlist|decision memo|options?/i
   ],
   mixed: []
 };

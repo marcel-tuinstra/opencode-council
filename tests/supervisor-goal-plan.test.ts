@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { planSupervisorGoal } from "../plugins/orchestration-workflows/supervisor-goal-plan";
+import type { SupervisorGoalRoleRecommendation } from "../plugins/orchestration-workflows/supervisor-goal-plan";
 
 describe("supervisor-goal-plan", () => {
   it("returns a structured plan for a concrete delegated backend goal", () => {
@@ -15,8 +16,8 @@ describe("supervisor-goal-plan", () => {
     expect(result.confidence).toBe("high");
     expect(result.budgetClass).toBe("standard");
     expect(result.laneCount).toBeGreaterThanOrEqual(1);
-    expect(result.recommendedRoles.map((entry) => entry.role)).toContain("CTO");
-    expect(result.recommendedRoles.map((entry) => entry.role)).toContain("DEV");
+    expect(result.recommendedRoles.map((entry: SupervisorGoalRoleRecommendation) => entry.role)).toContain("CTO");
+    expect(result.recommendedRoles.map((entry: SupervisorGoalRoleRecommendation) => entry.role)).toContain("DEV");
     expect(result.remediation).toEqual([]);
   });
 
@@ -69,7 +70,58 @@ describe("supervisor-goal-plan", () => {
     // Assert
     expect(first.status).toBe("supported");
     expect(first.recommendedRoles.length).toBeLessThanOrEqual(2);
-    expect(first.recommendedRoles.every((entry) => ["CTO", "PM", "PO"].includes(entry.role))).toBe(true);
+    expect(first.recommendedRoles.every((entry: SupervisorGoalRoleRecommendation) => ["CTO", "PM", "PO"].includes(entry.role))).toBe(true);
     expect(first).toEqual(second);
+  });
+
+  it("supports bounded tool comparison and recommendation prompts", () => {
+    const goal = "Compare the top customer support tools and recommend one for our onboarding team.";
+
+    const result = planSupervisorGoal({ goal, requestedByRole: "CTO" });
+
+    expect(result.status).toBe("supported");
+    expect(result.confidence).toBe("high");
+    expect(result.recommendedRoles.length).toBeGreaterThan(0);
+  });
+
+  it("supports bounded competitor research with summarized findings", () => {
+    const goal = "Research competitors in payroll software and summarize patterns in their self-serve onboarding flows.";
+
+    const result = planSupervisorGoal({ goal, requestedByRole: "CTO" });
+
+    expect(result.status).toBe("supported");
+    expect(["research", "marketing"]).toContain(result.intent);
+    expect(result.recommendedRoles.map((entry: SupervisorGoalRoleRecommendation) => entry.role)).toContain("RESEARCH");
+  });
+
+  it("supports turning a problem statement into bounded MVP scope", () => {
+    const goal = "Turn our failed trial activation problem into MVP scope with core requirements and a brief.";
+
+    const result = planSupervisorGoal({ goal, requestedByRole: "CTO" });
+
+    expect(result.status).toBe("supported");
+    expect(["roadmap", "mixed"]).toContain(result.intent);
+    expect(result.confidence).toBe("high");
+  });
+
+  it("keeps open-ended brainstorming unsupported", () => {
+    const result = planSupervisorGoal({ goal: "brainstorm startup ideas" });
+
+    expect(result.status).toBe("unsupported");
+    expect(result.confidence).toBe("low");
+  });
+
+  it("keeps unbounded market research unsupported", () => {
+    const result = planSupervisorGoal({ goal: "research the entire CRM market" });
+
+    expect(result.status).toBe("unsupported");
+    expect(result.confidence).toBe("low");
+  });
+
+  it("keeps long-horizon strategy prompts unsupported", () => {
+    const result = planSupervisorGoal({ goal: "define our 12-month strategy" });
+
+    expect(result.status).toBe("unsupported");
+    expect(result.confidence).toBe("low");
   });
 });

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-03-21
+
+### Added
+
+- `@supervisor` now supports bounded research, product discovery, and scoped discovery-planning prompts
+- Discovery-aware work-unit synthesis turns supported discovery asks into structured, actionable supervisor plans
+
+### Changed
+
+- Mixed-intent prompts now route more reliably when discovery work is combined with execution-oriented asks
+- Broad brainstorm and open-ended strategy prompts remain intentionally rejected outside the supported bounded-discovery scope
+
 ## [0.6.0] - 2026-03-21
 
 ### Added
@@ -104,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.4.0
 [0.5.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.5.0
+[0.6.2]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.6.2
 [0.6.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.6.0
 [0.3.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.3.0
 [0.2.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.2.0
