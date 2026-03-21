@@ -1,4 +1,4 @@
-import type { Plugin } from "@opencode-ai/plugin";
+import type { Plugin, PluginInput, OpencodeClient } from "@opencode-ai/plugin";
 import {
   DEEP_MCP_REGEX,
   MARKER_PREFIX,
@@ -50,7 +50,10 @@ import {
 } from "./session";
 import type { Role } from "./types";
 
-export const AgentConversations: Plugin = async () => {
+export const AgentConversations: Plugin = async (input: PluginInput) => {
+  const opencodeClient: OpencodeClient | undefined = input?.client;
+  void opencodeClient; // retained for Waves 2-4
+
   await initializeProviderPatterns();
   const policyDiagnostics = getSupervisorPolicyDiagnostics();
   if (policyDiagnostics.length > 0) {
