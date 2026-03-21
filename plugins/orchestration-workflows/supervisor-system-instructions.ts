@@ -2,6 +2,13 @@ import type { SupervisorPlanResult } from "./supervisor-trigger";
 import type { SupervisorLaneDefinition } from "./supervisor-scheduler";
 import { getSupervisorPolicy } from "./supervisor-config";
 
+const DISCOVERY_INSTRUCTION_INTENTS = new Set(["research", "marketing", "roadmap"]);
+const DISCOVERY_OUTPUT_REGEX = /\b(research|compare|evaluate|benchmark|synthesize|recommend|findings|summary|summari[sz]e|scope|define|audience|persona|icp|competitor|mvp|prd|requirements?|roadmap|positioning|messaging)\b/i;
+
+const isDiscoveryOrientedPlan = (plan: SupervisorPlanResult): boolean => {
+  return DISCOVERY_INSTRUCTION_INTENTS.has(plan.goalPlan.intent) || DISCOVERY_OUTPUT_REGEX.test(plan.goalPlan.goal);
+};
+
 export const buildSupervisorSystemInstruction = (
   plan: SupervisorPlanResult
 ): string => {
@@ -18,6 +25,7 @@ export const buildSupervisorSystemInstruction = (
 
   const policy = getSupervisorPolicy();
   const lines: string[] = [];
+  const discoveryPlan = isDiscoveryOrientedPlan(plan);
 
   lines.push("You are operating in Supervisor mode.");
   lines.push("");
@@ -72,9 +80,13 @@ export const buildSupervisorSystemInstruction = (
 
   lines.push("## Execution Protocol");
   lines.push("");
-  lines.push(
-    "Execute lanes in order. For each lane, use the `supervisor` tool to launch a child session."
-  );
+  lines.push("Execute lanes in order. For each lane, use the `supervisor` tool to launch a child session.");
+  if (discoveryPlan) {
+    lines.push("Keep the plan bounded and synthesis-oriented; do not turn this into an open-ended brainstorm.");
+    lines.push("Each lane should produce concrete findings, comparisons, recommendations, assumptions, and scoped next steps when relevant.");
+  } else {
+    lines.push("Bias toward concrete execution progress, implementation evidence, validation, and review-ready handoff notes.");
+  }
   lines.push("");
 
   lines.push("## Budget and Approval Boundaries");
@@ -92,7 +104,11 @@ export const buildSupervisorSystemInstruction = (
   lines.push(`- Escalation mode: ${policy.approvalGates.escalationMode}`);
   lines.push("");
 
-  lines.push("Report progress after each lane completes.");
+  if (discoveryPlan) {
+    lines.push("Report progress after each lane with findings, recommendation shifts, assumptions, and next-step scope.");
+  } else {
+    lines.push("Report progress after each lane completes.");
+  }
 
   return lines.join("\n");
 };

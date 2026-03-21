@@ -115,6 +115,29 @@ describe("supervisor-trigger", () => {
       expect(result.workUnits[0]!.workUnit.objective).toBe("build the user authentication API");
       expect(result.workUnits[1]!.workUnit.objective).toBe("add integration tests for the auth module");
     });
+
+    it("synthesizes discovery prompts into bounded work units instead of comma fragments", () => {
+      const result = buildSupervisorPlan(
+        "define target audience, goals, and MVP scope for an app"
+      );
+
+      expect(result.status).toBe("supported");
+      expect(result.workUnits).toHaveLength(3);
+      expect(result.workUnits[0]!.workUnit.objective).toContain("target audience");
+      expect(result.workUnits[1]!.workUnit.objective).toContain("MVP scope");
+      expect(result.workUnits[2]!.workUnit.objective).toContain("next steps");
+    });
+
+    it("keeps bounded comparison prompts to 2-4 meaningful work units", () => {
+      const result = buildSupervisorPlan("compare 3 tools and recommend one");
+
+      expect(result.status).toBe("supported");
+      expect(result.workUnits.length).toBeGreaterThanOrEqual(2);
+      expect(result.workUnits.length).toBeLessThanOrEqual(4);
+      expect(result.workUnits[0]!.workUnit.objective).toContain("comparison criteria");
+      expect(result.workUnits[1]!.workUnit.objective).toContain("Compare 3 tools and recommend one");
+      expect(result.workUnits[result.workUnits.length - 1]!.workUnit.objective).toContain("Recommend");
+    });
   });
 
   describe("formatSupervisorPreview", () => {
@@ -135,6 +158,20 @@ describe("supervisor-trigger", () => {
       expect(preview).toContain("Merge:");
       expect(preview).toContain("Policy:");
       expect(preview).toContain("[Supervisor] Mode: active. Child sessions will be launched for each lane.");
+    });
+
+    it("renders mixed discovery previews with synthesis-oriented lane goals", () => {
+      const plan = buildSupervisorPlan(
+        "research competitor patterns, shape positioning for the launch, and outline a near-term roadmap"
+      );
+
+      const preview = formatSupervisorPreview(plan);
+
+      expect(plan.status).toBe("supported");
+      expect(plan.workUnits.length).toBeGreaterThanOrEqual(2);
+      expect(plan.workUnits.length).toBeLessThanOrEqual(4);
+      expect(preview).toContain("comparison dimensions");
+      expect(preview).toContain("recommendations");
     });
 
     it("shows unsupported reason for an unsupported plan", () => {
@@ -222,6 +259,18 @@ describe("supervisor-trigger", () => {
       expect(instruction).toContain("Execute lanes in order. For each lane, use the `supervisor` tool to launch a child session.");
       expect(instruction).toContain("Budget class:");
       expect(instruction).toContain("Report progress after each lane completes.");
+    });
+
+    it("uses discovery-oriented supervisor instructions for research plans", () => {
+      const plan = buildSupervisorPlan("research competitor patterns and summarize findings");
+
+      const instruction = buildSupervisorSystemInstruction(plan);
+
+      expect(instruction).toContain("findings");
+      expect(instruction).toContain("recommendations");
+      expect(instruction).toContain("assumptions");
+      expect(instruction).toContain("scoped next steps");
+      expect(instruction).toContain("bounded");
     });
 
     it("includes merge mode and escalation mode from policy", () => {

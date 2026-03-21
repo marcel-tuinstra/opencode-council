@@ -182,6 +182,24 @@ describe("supervisor integration (Wave 4)", () => {
       // Output should start with supervisor plan preview
       expect(output.text).toContain("[Supervisor] Plan");
     });
+
+    it("shows sane synthesized preview for mixed discovery prompts", async () => {
+      const hooks = await AgentConversations(createMockPluginInput());
+      const sessionID = "test-session-text-discovery";
+
+      const msgOutput = createMessagesOutput(
+        "@supervisor research competitor patterns, shape launch positioning, and outline a near-term roadmap",
+        sessionID
+      );
+      await hooks["experimental.chat.messages.transform"]!({}, msgOutput);
+
+      const { input, output } = createTextCompleteIO(sessionID, "LLM response here");
+      await hooks["experimental.text.complete"]!(input, output);
+
+      expect(output.text).toContain("[Supervisor] Plan");
+      expect(output.text).toContain("comparison dimensions");
+      expect(output.text).toContain("recommendations");
+    });
   });
 
   describe("tool registration — supervisor_launch", () => {

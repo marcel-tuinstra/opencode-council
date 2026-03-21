@@ -35,8 +35,12 @@ export type PlanSupervisorGoalResult = {
   remediation: readonly string[];
 };
 
-const ACTION_REGEX = /\b(implement|build|fix|refactor|design|plan|investigate|analy[sz]e|draft|ship|deliver|create|update|migrate|optimi[sz]e|test|validate|document)\b/i;
-const DELIVERABLE_REGEX = /\b(pull request|pr|test|docs?|release|workflow|story|lane|runbook|policy|dashboard|playbook|plan)\b/i;
+const ACTION_REGEX = /\b(implement|build|fix|refactor|design|plan|investigate|analy[sz]e|draft|ship|deliver|create|update|migrate|optimi[sz]e|test|validate|document|research|explore|scope|define|identify|assess|evaluate|compare|synthesize|recommend|benchmark|map|size)\b/i;
+const DELIVERABLE_REGEX = /\b(pull request|pr|test|docs?|release|workflow|story|lane|runbook|policy|dashboard|playbook|plan|mvp|persona|audience|icp|competitor analysis|brief|prd|requirements?|recommendation|findings|shortlist|options?|decision memo|summary|patterns?)\b/i;
+const DISCOVERY_CUE_REGEX = /\b(research|explore|scope|define|identify|assess|evaluate|compare|synthesize|recommend|benchmark|map|size|mvp|persona|audience|icp|competitor|brief|prd|requirements?|recommendation|findings|shortlist|options?|decision memo)\b/i;
+const OPEN_ENDED_IDEATION_REGEX = /\b(brainstorm|ideate|blue-sky|startup ideas?)\b/i;
+const UNBOUNDED_DISCOVERY_REGEX = /\b(entire|whole|full|all(?:\s+of)?)\b[\s\S]{0,40}\b(market|landscape|industry|category|space)\b/i;
+const LONG_HORIZON_STRATEGY_REGEX = /\b(?:\d{1,2}[- ]month|annual|year(?:ly)?|long[- ]term|multi[- ]year)\s+strategy\b/i;
 const COMPLEXITY_CUES_REGEX = /\b(parallel|multiple|multi-|across|plus|and|integration|migrate|end-to-end|orchestrat|handoff|dependency)\b/gi;
 const RISK_CUES_REGEX = /\b(security|production|prod|release|merge|destructive|delete|billing|auth|credential|secret)\b/gi;
 
@@ -103,21 +107,36 @@ const resolveConfidence = (
   intent: Intent,
   hasActionVerb: boolean,
   hasDeliverableCue: boolean,
+  hasDiscoveryCue: boolean,
   ambiguous: boolean
 ): SupervisorGoalPlanningConfidence => {
   if (ambiguous) {
     return "low";
   }
 
-  if (intent === "mixed" || !hasDeliverableCue) {
+  if (intent === "mixed" || (!hasDeliverableCue && !hasDiscoveryCue)) {
     return "medium";
   }
 
   return hasActionVerb ? "high" : "medium";
 };
 
-const resolveAmbiguity = (goal: string, intent: Intent, hasActionVerb: boolean, hasDeliverableCue: boolean): boolean => {
+const resolveAmbiguity = (
+  goal: string,
+  intent: Intent,
+  hasActionVerb: boolean,
+  hasDeliverableCue: boolean,
+  hasDiscoveryCue: boolean
+): boolean => {
   if (goal.trim().length < 20) {
+    return true;
+  }
+
+  if (
+    OPEN_ENDED_IDEATION_REGEX.test(goal) ||
+    UNBOUNDED_DISCOVERY_REGEX.test(goal) ||
+    LONG_HORIZON_STRATEGY_REGEX.test(goal)
+  ) {
     return true;
   }
 
@@ -125,7 +144,7 @@ const resolveAmbiguity = (goal: string, intent: Intent, hasActionVerb: boolean, 
     return true;
   }
 
-  return intent === "mixed" && !hasActionVerb;
+  return intent === "mixed" && !hasActionVerb && !hasDeliverableCue && !hasDiscoveryCue;
 };
 
 const resolveLeadRole = (intent: Intent): Role => getSupervisorPolicy().routing.intentProfiles[intent].leadRole;
@@ -225,15 +244,18 @@ const resolveLaneCount = (
 export const planSupervisorGoal = (input: PlanSupervisorGoalInput): PlanSupervisorGoalResult => {
   const goal = input.goal.trim();
   const requestedByRole = input.requestedByRole ?? "CTO";
-  const availableRoles = (input.availableRoles ?? SUPPORTED_ROLES).filter((role, index, all) => all.indexOf(role) === index);
+  const availableRoles = (input.availableRoles ?? SUPPORTED_ROLES).filter(
+    (role: Role, index: number, all: readonly Role[]) => all.indexOf(role) === index
+  );
   const maxRoles = Math.max(1, Math.min(input.maxRoles ?? 4, availableRoles.length));
   const intent = detectIntent(goal);
   const hasActionVerb = ACTION_REGEX.test(goal);
   const hasDeliverableCue = DELIVERABLE_REGEX.test(goal);
+  const hasDiscoveryCue = DISCOVERY_CUE_REGEX.test(goal) || ["research", "marketing", "roadmap"].includes(intent);
   const complexityCueCount = countRegexMatches(goal, COMPLEXITY_CUES_REGEX);
   const riskCueCount = countRegexMatches(goal, RISK_CUES_REGEX);
-  const ambiguous = resolveAmbiguity(goal, intent, hasActionVerb, hasDeliverableCue);
-  const confidence = resolveConfidence(intent, hasActionVerb, hasDeliverableCue, ambiguous);
+  const ambiguous = resolveAmbiguity(goal, intent, hasActionVerb, hasDeliverableCue, hasDiscoveryCue);
+  const confidence = resolveConfidence(intent, hasActionVerb, hasDeliverableCue, hasDiscoveryCue, ambiguous);
   const budgetClass = resolveBudgetClass(complexityCueCount, riskCueCount, goal.length);
   const approvalBoundaries = detectApprovalBoundaries(goal);
   const reasons: string[] = [
