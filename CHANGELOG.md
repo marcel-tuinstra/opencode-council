@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Async migration**: entire supervisor pipeline (state store, session lifecycle, worktree provisioner, scheduler, execution workflow) converted from synchronous to async/await
 - **Schema version**: durable state store bumped from v1 to v2 (automatic migration)
 
-## [0.5.0] - Planned
+## [0.5.0] - 2026-03-20
 
 ### Added
 
