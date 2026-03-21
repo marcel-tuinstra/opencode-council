@@ -426,3 +426,23 @@ export {
   MANAGER_ROLES,
   IMPLEMENTATION_ROLES
 } from "./orchestration-workflows/delegation-bridge.ts";
+export type {
+  SupervisorPlanResult
+} from "./orchestration-workflows/supervisor-trigger.ts";
+export {
+  detectSupervisorTrigger,
+  buildSupervisorPlan,
+  formatSupervisorPreview,
+  SUPERVISOR_TRIGGER_REGEX
+} from "./orchestration-workflows/supervisor-trigger.ts";
+export {
+  buildSupervisorSystemInstruction
+} from "./orchestration-workflows/supervisor-system-instructions.ts";
+export type {
+  OpencodeClientAdapterOptions
+} from "./orchestration-workflows/opencode-client-adapter.ts";
+export {
+  createOpencodeClientRuntimeAdapter,
+  abortChildSession,
+  getChildSessionMessages
+} from "./orchestration-workflows/opencode-client-adapter.ts";
