@@ -97,7 +97,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
     launched,
     attached,
 
-    launchSession: (input) => {
+    launchSession: async (input) => {
       launched.push({ ...input });
 
       return {
@@ -109,7 +109,7 @@ const createFakeRuntime = (): SupervisorSessionRuntimeAdapter & {
       };
     },
 
-    attachSession: (input) => {
+    attachSession: async (input) => {
       attached.push({ ...input });
 
       return {
@@ -130,7 +130,7 @@ afterEach(() => {
 });
 
 describe("supervisor-alpha-end-to-end-validation", () => {
-  it("proves one alpha run can traverse planning, worktrees, sessions, approval, review prep, and recovery", () => {
+  it("proves one alpha run can traverse planning, worktrees, sessions, approval, review prep, and recovery", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const repoRoot = path.join(rootDir, "repo");
@@ -155,7 +155,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
     }));
     const lanePlan = planWorkUnitLanes(workUnits);
 
-    store.commitMutation(supervisorAlphaEndToEndFixture.runId, {
+    await store.commitMutation(supervisorAlphaEndToEndFixture.runId, {
       mutationId: `${supervisorAlphaEndToEndFixture.runId}:create`,
       actor: "supervisor",
       summary: "Create the alpha validation run.",
@@ -189,7 +189,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
     });
 
     // Act
-    const provisionedLanes = supervisorAlphaEndToEndFixture.lanes.map((lane, index) => provisioner.provisionLaneWorktree({
+    const provisionedLanes = await Promise.all(supervisorAlphaEndToEndFixture.lanes.map(async (lane, index) => provisioner.provisionLaneWorktree({
       runId: supervisorAlphaEndToEndFixture.runId,
       laneId: lane.id,
       branch: lane.branch,
@@ -198,8 +198,8 @@ describe("supervisor-alpha-end-to-end-validation", () => {
       mutationId: `${lane.id}:provision`,
       occurredAt: `2026-03-13T18:0${index + 1}:00.000Z`,
       baseRef: "epic/supervisor-alpha"
-    }));
-    const deliverySession = lifecycle.launchSession({
+    })));
+    const deliverySession = await lifecycle.launchSession({
       runId: supervisorAlphaEndToEndFixture.runId,
       laneId: supervisorAlphaEndToEndFixture.lanes[0].id,
       owner: supervisorAlphaEndToEndFixture.lanes[0].owner,
@@ -207,7 +207,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
       mutationId: "lane-delivery:launch-session",
       occurredAt: "2026-03-13T18:05:00.000Z"
     });
-    lifecycle.recordHeartbeat({
+    await lifecycle.recordHeartbeat({
       runId: supervisorAlphaEndToEndFixture.runId,
       laneId: supervisorAlphaEndToEndFixture.lanes[0].id,
       actor: "supervisor",
@@ -215,7 +215,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
       occurredAt: "2026-03-13T18:06:00.000Z",
       lastHeartbeatAt: "2026-03-13T18:06:00.000Z"
     });
-    const reviewSession = lifecycle.launchSession({
+    const reviewSession = await lifecycle.launchSession({
       runId: supervisorAlphaEndToEndFixture.runId,
       laneId: supervisorAlphaEndToEndFixture.lanes[1].id,
       owner: supervisorAlphaEndToEndFixture.lanes[1].owner,
@@ -223,7 +223,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
       mutationId: "lane-review:launch-session",
       occurredAt: "2026-03-13T18:07:00.000Z"
     });
-    const stalledReviewSession = lifecycle.detectStalledSession({
+    const stalledReviewSession = await lifecycle.detectStalledSession({
       runId: supervisorAlphaEndToEndFixture.runId,
       laneId: supervisorAlphaEndToEndFixture.lanes[1].id,
       actor: "supervisor",
@@ -233,12 +233,12 @@ describe("supervisor-alpha-end-to-end-validation", () => {
       failureReason: "Lane review heartbeat expired before PR prep completed."
     });
     const recoveryPlaybook = classifySupervisorRecoveryPlaybook({
-      runState: store.getRunState(supervisorAlphaEndToEndFixture.runId)!,
+      runState: (await store.getRunState(supervisorAlphaEndToEndFixture.runId))!,
       laneId: supervisorAlphaEndToEndFixture.lanes[1].id,
       observedAt: "2026-03-13T18:14:00.000Z",
       stallTimeoutMs: 5 * 60 * 1000
     });
-    const replacedReviewSession = lifecycle.replaceSession({
+    const replacedReviewSession = await lifecycle.replaceSession({
       runId: supervisorAlphaEndToEndFixture.runId,
       laneId: supervisorAlphaEndToEndFixture.lanes[1].id,
       owner: "developer-c",
@@ -336,7 +336,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
       throw new Error("Expected the alpha validation review packet to exist.");
     }
 
-    store.commitMutation(supervisorAlphaEndToEndFixture.runId, {
+    await store.commitMutation(supervisorAlphaEndToEndFixture.runId, {
       mutationId: "lane-review:review-ready",
       actor: "supervisor",
       summary: "Persist review-ready artifacts for the alpha validation lane.",
@@ -392,7 +392,7 @@ describe("supervisor-alpha-end-to-end-validation", () => {
       sideEffects: ["prepared-review-bundle"]
     });
 
-    const finalState = store.getRunState(supervisorAlphaEndToEndFixture.runId)!;
+    const finalState = (await store.getRunState(supervisorAlphaEndToEndFixture.runId))!;
     const reviewBundle = createReviewCoordinationBundle({
       run: finalState.run,
       lane: finalState.lanes.find((lane) => lane.laneId === supervisorAlphaEndToEndFixture.lanes[1].id)!,

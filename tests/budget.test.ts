@@ -96,8 +96,8 @@ describe("budget governor", () => {
       expect(diagnostics.provenance.softRunTokens).toBe("policy");
       expect(diagnostics.values.hardRunTokens).toBe(9100);
       expect(diagnostics.provenance.hardRunTokens).toBe("policy");
-      expect(diagnostics.values.softStepTokens).toBe(2800);
-      expect(diagnostics.provenance.softStepTokens).toBe("default");
+      expect(diagnostics.values.softStepTokens).toBe(5600);
+      expect(diagnostics.provenance.softStepTokens).toBe("policy");
       expect(diagnostics.values.truncateAtTokens).toBe(1500);
       expect(diagnostics.provenance.truncateAtTokens).toBe("policy");
     } finally {

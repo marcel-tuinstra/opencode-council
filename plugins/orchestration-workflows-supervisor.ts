@@ -310,7 +310,8 @@ export {
 } from "./orchestration-workflows/lane-lifecycle.ts";
 export {
   createSupervisorDispatchLoop,
-  createSupervisorLaneDefinitions
+  createSupervisorLaneDefinitions,
+  evaluateRetryDecision
 } from "./orchestration-workflows/supervisor-scheduler.ts";
 export {
   buildSupervisorManagedWorktreePath,
@@ -377,6 +378,71 @@ export {
   classifySupervisorRecoveryPlaybook,
   DEFAULT_SUPERVISOR_RECOVERY_STALL_TIMEOUT_MS,
   detectSupervisorPartialCompletionGap,
-  getSupervisorLaneRecoveryContext
+  getSupervisorLaneRecoveryContext,
+  mapChildFailureToRecoveryClass
 } from "./orchestration-workflows/recovery-repair-playbooks.ts";
 export { normalizeWorkUnit } from "./orchestration-workflows/work-unit.ts";
+export type {
+  ChildSessionState,
+  ChildSessionRecord,
+  ChildSessionRetryPolicy,
+  ChildSessionFailureCode,
+  ChildSessionTimeoutPolicy,
+  ChildSessionDeduplicationKey
+} from "./orchestration-workflows/child-session-lifecycle.ts";
+export {
+  canTransitionChildSession,
+  assertChildSessionTransition,
+  classifyChildSessionFailure,
+  resolveRetryEligibility,
+  isTerminalChildSessionState,
+  CHILD_SESSION_TRANSITIONS,
+  DEFAULT_CHILD_SESSION_RETRY_POLICY,
+  DEFAULT_CHILD_SESSION_TIMEOUT_POLICY
+} from "./orchestration-workflows/child-session-lifecycle.ts";
+export type {
+  SupervisorEventKind,
+  SupervisorMvpEventKind,
+  SupervisorExtendedEventKind,
+  SupervisorEventLevel,
+  SupervisorEvent,
+  SupervisorCorrelationContext
+} from "./orchestration-workflows/supervisor-event-catalog.ts";
+export {
+  createSupervisorEvent,
+  buildCorrelationId,
+  isMinimumViableEvent,
+  MINIMUM_VIABLE_EVENTS,
+  EVENT_DEFAULT_LEVELS
+} from "./orchestration-workflows/supervisor-event-catalog.ts";
+export type {
+  DelegationBridgeInput,
+  DelegationBridgeResult,
+  DelegationBridgeProvenanceLog
+} from "./orchestration-workflows/delegation-bridge.ts";
+export {
+  bridgeDelegationPlan,
+  detectDelegationPlanSource,
+  MANAGER_ROLES,
+  IMPLEMENTATION_ROLES
+} from "./orchestration-workflows/delegation-bridge.ts";
+export type {
+  SupervisorPlanResult
+} from "./orchestration-workflows/supervisor-trigger.ts";
+export {
+  detectSupervisorTrigger,
+  buildSupervisorPlan,
+  formatSupervisorPreview,
+  SUPERVISOR_TRIGGER_REGEX
+} from "./orchestration-workflows/supervisor-trigger.ts";
+export {
+  buildSupervisorSystemInstruction
+} from "./orchestration-workflows/supervisor-system-instructions.ts";
+export type {
+  OpencodeClientAdapterOptions
+} from "./orchestration-workflows/opencode-client-adapter.ts";
+export {
+  createOpencodeClientRuntimeAdapter,
+  abortChildSession,
+  getChildSessionMessages
+} from "./orchestration-workflows/opencode-client-adapter.ts";

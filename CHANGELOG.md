@@ -5,7 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Planned
+## [0.6.0] - 2026-03-21
+
+### Added
+
+- **Supervisor execution foundation**: child-session lifecycle with 10-state model, 21 valid transitions, failure classification, and retry policy
+- **Supervisor event catalog**: 21 structured events (11 MVP) with correlation context and severity levels
+- **DelegationPlan→Execution bridge**: reconciles runtime DelegationPlan with supervisor DelegationPlan for execution
+- **Automatic retry engine**: failure classification, exponential backoff, retry budget per lane
+- **Event emission**: 12 lifecycle event emission points across session lifecycle and execution workflow
+- **Child-session records**: persisted in durable state store (schema v2) alongside supervisor session records
+
+### Changed
+
+- **Async migration**: entire supervisor pipeline (state store, session lifecycle, worktree provisioner, scheduler, execution workflow) converted from synchronous to async/await
+- **Schema version**: durable state store bumped from v1 to v2 (automatic migration)
+
+## [0.5.0] - 2026-03-20
 
 ### Added
 
@@ -88,6 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.4.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.4.0
 [0.5.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.5.0
+[0.6.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.6.0
 [0.3.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.3.0
 [0.2.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.2.0
 [0.1.0]: https://github.com/marcel-tuinstra/opencode-council/releases/tag/v0.1.0

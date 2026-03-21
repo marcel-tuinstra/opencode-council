@@ -5,6 +5,12 @@ import {
   type SupervisorApprovalSignal,
   type SupervisorApprovalNextAction
 } from "./approval-gates";
+import {
+  classifyChildSessionFailure,
+  resolveRetryEligibility,
+  DEFAULT_CHILD_SESSION_RETRY_POLICY,
+  type ChildSessionRecord
+} from "./child-session-lifecycle";
 import { evaluateGovernancePolicy } from "./governance-policy";
 import type { LaneCompletionContract, LaneContractViolation } from "./lane-contract";
 import type {
@@ -169,7 +175,7 @@ const sameApprovalRecord = (left?: SupervisorApprovalRecord, right?: SupervisorA
   return JSON.stringify(left) === JSON.stringify(right);
 };
 
-const commitLaneState = (
+const commitLaneState = async (
   store: SupervisorStateStore,
   runId: string,
   actor: string,
@@ -178,7 +184,7 @@ const commitLaneState = (
   targetState: LaneLifecycleState,
   mutationId: string,
   summary: string
-): SupervisorLaneRecord => {
+): Promise<SupervisorLaneRecord> => {
   if (lane.state === targetState) {
     return lane;
   }
@@ -190,7 +196,7 @@ const commitLaneState = (
     updatedAt: occurredAt
   });
 
-  store.commitMutation(runId, {
+  await store.commitMutation(runId, {
     mutationId,
     actor,
     summary,
@@ -209,14 +215,14 @@ const buildInitialLaneRecord = (definition: SupervisorLaneDefinition, occurredAt
   updatedAt: occurredAt
 });
 
-const ensureLaneDefinitions = (
+const ensureLaneDefinitions = async (
   store: SupervisorStateStore,
   runId: string,
   actor: string,
   occurredAt: string,
   lanes: readonly SupervisorDispatchLaneInput[]
-): void => {
-  const state = store.getRunState(runId);
+): Promise<void> => {
+  const state = await store.getRunState(runId);
 
   if (!state) {
     throw new Error(`Cannot dispatch unknown supervisor run '${runId}'.`);
@@ -231,7 +237,7 @@ const ensureLaneDefinitions = (
     return;
   }
 
-  store.commitMutation(runId, {
+  await store.commitMutation(runId, {
     mutationId: `dispatch:init:${occurredAt}`,
     actor,
     summary: "Materialize dispatch lanes from the lane plan.",
@@ -333,6 +339,73 @@ const evaluateReviewRoutingPolicy = (
   };
 };
 
+const findChildSessionForLane = (
+  state: SupervisorRunState,
+  laneId: string,
+  sessionId?: string
+): ChildSessionRecord | undefined => {
+  if (sessionId) {
+    return state.childSessions.find((cs) => cs.sessionId === sessionId);
+  }
+
+  return state.childSessions
+    .filter((cs) => cs.laneId === laneId)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+};
+
+export type EvaluateRetryDecisionResult = {
+  action: "retry" | "exhausted" | "skip";
+  reason: string;
+};
+
+export const evaluateRetryDecision = async (
+  state: SupervisorRunState,
+  laneId: string,
+  sessionRecord: SupervisorSessionRecord,
+  childRecord: ChildSessionRecord | undefined,
+  sessions: SupervisorSessionLifecycle,
+  runId: string,
+  occurredAt: string
+): Promise<EvaluateRetryDecisionResult> => {
+  if (!childRecord) {
+    return { action: "skip", reason: "No child session record found; falling back to existing behavior." };
+  }
+
+  const isStalled = sessionRecord.status === "stalled";
+  const isFailed = sessionRecord.status === "failed";
+
+  if (!isStalled && !isFailed) {
+    return { action: "skip", reason: `Session status '${sessionRecord.status}' is not eligible for retry evaluation.` };
+  }
+
+  const failureClassification = classifyChildSessionFailure({
+    heartbeatMissing: isStalled,
+    runtimeError: isFailed ? (sessionRecord.failureReason ?? "Runtime session failed.") : undefined
+  });
+
+  const childRecordWithFailure: ChildSessionRecord = childRecord.failureCode
+    ? childRecord
+    : { ...childRecord, failureCode: failureClassification.code };
+
+  const retryEligibility = resolveRetryEligibility(childRecordWithFailure, DEFAULT_CHILD_SESSION_RETRY_POLICY);
+
+  if (!retryEligibility.eligible) {
+    return { action: "exhausted", reason: retryEligibility.reason };
+  }
+
+  const lastFailureAt = childRecord.updatedAt;
+  const elapsedSinceFailureMs = Date.parse(occurredAt) - Date.parse(lastFailureAt);
+
+  if (elapsedSinceFailureMs < retryEligibility.nextRetryDelayMs) {
+    return {
+      action: "skip",
+      reason: `Backoff delay not elapsed: ${elapsedSinceFailureMs}ms of ${retryEligibility.nextRetryDelayMs}ms.`
+    };
+  }
+
+  return { action: "retry", reason: retryEligibility.reason };
+};
+
 const summarizeDependencyStates = (
   state: SupervisorRunState,
   dependencyLaneIds: readonly string[]
@@ -384,13 +457,13 @@ export const createSupervisorLaneDefinitions = (
 
 export const createSupervisorDispatchLoop = (
   options: CreateSupervisorDispatchLoopOptions
-): { run(input: RunSupervisorDispatchLoopInput): RunSupervisorDispatchLoopResult } => {
+): { run(input: RunSupervisorDispatchLoopInput): Promise<RunSupervisorDispatchLoopResult> } => {
   const store = options.store;
   const provisioner = options.provisioner;
   const sessions = options.sessions;
   const reviewRoutingPolicyEvaluator = options.reviewRoutingPolicyEvaluator;
 
-  const run = (input: RunSupervisorDispatchLoopInput): RunSupervisorDispatchLoopResult => {
+  const run = async (input: RunSupervisorDispatchLoopInput): Promise<RunSupervisorDispatchLoopResult> => {
     const runId = assertNonEmpty(input.runId, "run id");
     const actor = assertNonEmpty(input.actor, "actor");
     const occurredAt = assertNonEmpty(input.occurredAt, "dispatch timestamp");
@@ -398,14 +471,14 @@ export const createSupervisorDispatchLoop = (
       ? undefined
       : { maxActiveLanes: input.maxActiveLanes });
 
-    ensureLaneDefinitions(store, runId, actor, occurredAt, input.lanes);
+    await ensureLaneDefinitions(store, runId, actor, occurredAt, input.lanes);
 
     const decisions: SupervisorDispatchLaneDecision[] = [];
 
     for (const laneInput of [...input.lanes].sort((left, right) => (
       left.definition.sequence - right.definition.sequence || left.definition.laneId.localeCompare(right.definition.laneId)
     ))) {
-      let state = store.getRunState(runId);
+      let state = await store.getRunState(runId);
       if (!state) {
         throw new Error(`Cannot dispatch unknown supervisor run '${runId}'.`);
       }
@@ -423,7 +496,7 @@ export const createSupervisorDispatchLoop = (
       const assignedOwner = selectSessionOwner(laneInput, state, input.sessionOwners);
 
       if (laneInput.complete) {
-        lane = commitLaneState(
+        lane = await commitLaneState(
           store,
           runId,
           actor,
@@ -433,11 +506,11 @@ export const createSupervisorDispatchLoop = (
           `dispatch:${lane.laneId}:complete:${occurredAt}`,
           `Mark lane '${lane.laneId}' complete after merge.`
         );
-        state = store.getRunState(runId)!;
+        state = (await store.getRunState(runId))!;
         worktree = findWorktree(state, lane.worktreeId);
 
         if (worktree && worktree.status !== "released") {
-          const releaseResult = provisioner.releaseLaneWorktree({
+          const releaseResult = await provisioner.releaseLaneWorktree({
             runId,
             laneId: lane.laneId,
             actor,
@@ -488,7 +561,7 @@ export const createSupervisorDispatchLoop = (
           });
 
           if (reviewRouting.outcome === "repair") {
-            store.commitMutation(runId, {
+            await store.commitMutation(runId, {
               mutationId: `dispatch:${lane.laneId}:review-handoff-repair:${occurredAt}`,
               actor,
               summary: `Capture review handoff evidence for lane '${lane.laneId}' before repair.`,
@@ -516,7 +589,7 @@ export const createSupervisorDispatchLoop = (
           if (reviewRouting.outcome === "escalate") {
             const approvalDecision = buildCheckpointEscalationApprovalRequest(lane, actor, occurredAt, reviewRouting);
 
-            store.commitMutation(runId, {
+            await store.commitMutation(runId, {
               mutationId: `dispatch:${lane.laneId}:checkpoint-escalation:${occurredAt}`,
               actor,
               summary: `Persist checkpoint escalation approval for lane '${lane.laneId}'.`,
@@ -526,17 +599,17 @@ export const createSupervisorDispatchLoop = (
               sideEffects: ["captured-handoff-evidence", "checkpoint-escalated"]
             });
             if (session?.status === "active") {
-              session = sessions.pauseSession({
+              session = (await sessions.pauseSession({
                 runId,
                 laneId: lane.laneId,
                 actor,
                 mutationId: `dispatch:${lane.laneId}:checkpoint-escalation-pause:${occurredAt}`,
                 occurredAt,
                 summary: `Pause lane '${lane.laneId}' while a human resolves the checkpoint escalation.`
-              }).session;
+              })).session;
             }
             if (lane.state === "active") {
-              lane = commitLaneState(
+              lane = await commitLaneState(
                 store,
                 runId,
                 actor,
@@ -565,7 +638,7 @@ export const createSupervisorDispatchLoop = (
           }
 
           if (reviewRouting.outcome === "block") {
-            store.commitMutation(runId, {
+            await store.commitMutation(runId, {
               mutationId: `dispatch:${lane.laneId}:review-handoff-blocked:${occurredAt}`,
               actor,
               summary: `Capture blocked review handoff evidence for lane '${lane.laneId}'.`,
@@ -574,17 +647,17 @@ export const createSupervisorDispatchLoop = (
               sideEffects: ["captured-handoff-evidence", "handoff-blocked"]
             });
             if (session?.status === "active") {
-              session = sessions.pauseSession({
+              session = (await sessions.pauseSession({
                 runId,
                 laneId: lane.laneId,
                 actor,
                 mutationId: `dispatch:${lane.laneId}:review-handoff-blocked-pause:${occurredAt}`,
                 occurredAt,
                 summary: `Pause lane '${lane.laneId}' while declared handoff blockers remain open.`
-              }).session;
+              })).session;
             }
             if (lane.state === "active") {
-              lane = commitLaneState(
+              lane = await commitLaneState(
                 store,
                 runId,
                 actor,
@@ -612,7 +685,7 @@ export const createSupervisorDispatchLoop = (
             continue;
           }
 
-          store.commitMutation(runId, {
+          await store.commitMutation(runId, {
             mutationId: `dispatch:${lane.laneId}:review-ready:${occurredAt}`,
             actor,
             summary: `Mark lane '${lane.laneId}' review ready with validated handoff artifacts.`,
@@ -625,7 +698,7 @@ export const createSupervisorDispatchLoop = (
             artifactUpserts: handoffArtifacts,
             sideEffects: ["prepared-review-bundle", "validated-lane-handoff"]
           });
-          state = store.getRunState(runId)!;
+          state = (await store.getRunState(runId))!;
           lane = findLane(state, laneInput.definition.laneId)!;
           worktree = findWorktree(state, lane.worktreeId);
           session = findSession(state, lane.sessionId);
@@ -681,7 +754,7 @@ export const createSupervisorDispatchLoop = (
 
       if (waitingOn.length > 0) {
         if (lane.state === "active") {
-          lane = commitLaneState(
+          lane = await commitLaneState(
             store,
             runId,
             actor,
@@ -722,7 +795,7 @@ export const createSupervisorDispatchLoop = (
         });
 
         if (!sameApprovalRecord(existingApproval, approvalDecision.approval)) {
-          store.commitMutation(runId, {
+          await store.commitMutation(runId, {
             mutationId: `dispatch:${lane.laneId}:approval:${occurredAt}`,
             actor,
             summary: `Persist approval state for lane '${lane.laneId}'.`,
@@ -730,7 +803,7 @@ export const createSupervisorDispatchLoop = (
             approvalUpserts: approvalDecision.approval ? [approvalDecision.approval] : [],
             sideEffects: [approvalDecision.nextAction === "resume" ? "approval-resolved" : "approval-requested"]
           });
-          state = store.getRunState(runId)!;
+          state = (await store.getRunState(runId))!;
           lane = findLane(state, laneInput.definition.laneId)!;
           worktree = findWorktree(state, lane.worktreeId);
           session = findSession(state, lane.sessionId);
@@ -755,7 +828,7 @@ export const createSupervisorDispatchLoop = (
 
         if (approvalDecision.nextAction === "pause") {
           if (session?.status === "active") {
-            const pauseResult = sessions.pauseSession({
+            const pauseResult = await sessions.pauseSession({
               runId,
               laneId: lane.laneId,
               actor,
@@ -767,7 +840,7 @@ export const createSupervisorDispatchLoop = (
           }
 
           if (lane.state === "active") {
-            lane = commitLaneState(
+            lane = await commitLaneState(
               store,
               runId,
               actor,
@@ -797,7 +870,7 @@ export const createSupervisorDispatchLoop = (
 
         if (approvalDecision.nextAction === "resume") {
           if (lane.state === "waiting") {
-            lane = commitLaneState(
+            lane = await commitLaneState(
               store,
               runId,
               actor,
@@ -807,13 +880,13 @@ export const createSupervisorDispatchLoop = (
               `dispatch:${lane.laneId}:approval-resume:${occurredAt}`,
               `Resume lane '${lane.laneId}' after explicit approval.`
             );
-            state = store.getRunState(runId)!;
+            state = (await store.getRunState(runId))!;
             worktree = findWorktree(state, lane.worktreeId);
             session = findSession(state, lane.sessionId);
           }
 
           if (session?.status === "paused") {
-            const sessionResult = sessions.resumeSession({
+            const sessionResult = await sessions.resumeSession({
               runId,
               laneId: lane.laneId,
               owner: assignedOwner,
@@ -861,7 +934,7 @@ export const createSupervisorDispatchLoop = (
           continue;
         }
 
-        lane = commitLaneState(
+        lane = await commitLaneState(
           store,
           runId,
           actor,
@@ -871,14 +944,14 @@ export const createSupervisorDispatchLoop = (
           `dispatch:${lane.laneId}:active:${occurredAt}`,
           `Activate lane '${lane.laneId}' for dispatch.`
         );
-        state = store.getRunState(runId)!;
+        state = (await store.getRunState(runId))!;
       }
 
       worktree = findWorktree(state, lane.worktreeId);
       session = findSession(state, lane.sessionId);
 
       if (!worktree || worktree.status === "released") {
-        const provisionResult: ProvisionSupervisorLaneWorktreeResult = provisioner.provisionLaneWorktree({
+        const provisionResult: ProvisionSupervisorLaneWorktreeResult = await provisioner.provisionLaneWorktree({
           runId,
           laneId: lane.laneId,
           branch: lane.branch,
@@ -908,7 +981,7 @@ export const createSupervisorDispatchLoop = (
       }
 
       if (!session) {
-        const sessionResult: SupervisorSessionLifecycleResult = sessions.launchSession({
+        const sessionResult: SupervisorSessionLifecycleResult = await sessions.launchSession({
           runId,
           laneId: lane.laneId,
           owner: assignedOwner,
@@ -935,8 +1008,55 @@ export const createSupervisorDispatchLoop = (
       }
 
       if (session.status === "paused" || session.status === "stalled" || session.status === "failed" || session.status === "replaced") {
+        if (session.status === "stalled" || session.status === "failed") {
+          const childRecord = findChildSessionForLane(state, lane.laneId, session.sessionId);
+          const retryDecision = await evaluateRetryDecision(
+            state,
+            lane.laneId,
+            session,
+            childRecord,
+            sessions,
+            runId,
+            occurredAt
+          );
+
+          if (retryDecision.action === "exhausted") {
+            reasons.push(`Retry exhausted: ${retryDecision.reason}`);
+            decisions.push({
+              laneId: lane.laneId,
+              status: session.status === "stalled" ? "active" : "active",
+              targetState: lane.state,
+              action: "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+
+          if (retryDecision.action === "skip" && childRecord) {
+            reasons.push(retryDecision.reason);
+            decisions.push({
+              laneId: lane.laneId,
+              status: "active",
+              targetState: lane.state,
+              action: "none",
+              nextAction: "pause",
+              assignedOwner,
+              reasons: freezeList(reasons),
+              lane,
+              worktree,
+              session
+            });
+            continue;
+          }
+        }
+
         const sessionResult = session.status === "paused"
-          ? sessions.resumeSession({
+          ? await sessions.resumeSession({
               runId,
               laneId: lane.laneId,
               owner: assignedOwner,
@@ -945,7 +1065,7 @@ export const createSupervisorDispatchLoop = (
               occurredAt,
               summary: `Resume paused lane session for '${lane.laneId}'.`
             })
-          : sessions.replaceSession({
+          : await sessions.replaceSession({
               runId,
               laneId: lane.laneId,
               owner: assignedOwner,

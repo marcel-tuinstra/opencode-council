@@ -81,7 +81,7 @@ afterEach(() => {
 });
 
 describe("lane-worktree-provisioner", () => {
-  it("creates one managed worktree per lane and persists the durable mapping", () => {
+  it("creates one managed worktree per lane and persists the durable mapping", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const repoRoot = path.join(rootDir, "repo");
@@ -91,7 +91,7 @@ describe("lane-worktree-provisioner", () => {
     const system = createFakeSystem();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
 
-    store.commitMutation("run-alpha", {
+    await store.commitMutation("run-alpha", {
       mutationId: "run-alpha-create",
       actor: "supervisor",
       summary: "Create the run before provisioning lanes.",
@@ -105,7 +105,7 @@ describe("lane-worktree-provisioner", () => {
     });
 
     // Act
-    const result = provisioner.provisionLaneWorktree({
+    const result = await provisioner.provisionLaneWorktree({
       runId: "run-alpha",
       laneId: "lane-one",
       branch: "marceltuinstra/sc-398-lane-one",
@@ -115,7 +115,7 @@ describe("lane-worktree-provisioner", () => {
       occurredAt: "2026-03-13T13:01:00.000Z",
       baseRef: "epic/supervisor-alpha"
     });
-    const state = store.getRunState("run-alpha");
+    const state = await store.getRunState("run-alpha");
 
     // Assert
     expect(result.action).toBe("created");
@@ -143,7 +143,7 @@ describe("lane-worktree-provisioner", () => {
     ]);
   });
 
-  it("reuses an existing healthy managed lane worktree instead of creating another one", () => {
+  it("reuses an existing healthy managed lane worktree instead of creating another one", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const repoRoot = path.join(rootDir, "repo");
@@ -153,7 +153,7 @@ describe("lane-worktree-provisioner", () => {
     const system = createFakeSystem();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
 
-    store.commitMutation("run-reuse", {
+    await store.commitMutation("run-reuse", {
       mutationId: "run-reuse-create",
       actor: "supervisor",
       summary: "Create a reusable run.",
@@ -166,7 +166,7 @@ describe("lane-worktree-provisioner", () => {
       }
     });
 
-    provisioner.provisionLaneWorktree({
+    await provisioner.provisionLaneWorktree({
       runId: "run-reuse",
       laneId: "lane-reuse",
       branch: "marceltuinstra/sc-398-lane-reuse",
@@ -178,7 +178,7 @@ describe("lane-worktree-provisioner", () => {
     });
 
     // Act
-    const result = provisioner.provisionLaneWorktree({
+    const result = await provisioner.provisionLaneWorktree({
       runId: "run-reuse",
       laneId: "lane-reuse",
       branch: "marceltuinstra/sc-398-lane-reuse",
@@ -196,7 +196,7 @@ describe("lane-worktree-provisioner", () => {
     expect(system.createCount).toBe(1);
   });
 
-  it("blocks provisioning when another git worktree already holds the requested branch", () => {
+  it("blocks provisioning when another git worktree already holds the requested branch", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const repoRoot = path.join(rootDir, "repo");
@@ -207,7 +207,7 @@ describe("lane-worktree-provisioner", () => {
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
     const occupiedPath = path.join(rootDir, "already-in-use");
 
-    store.commitMutation("run-collision", {
+    await store.commitMutation("run-collision", {
       mutationId: "run-collision-create",
       actor: "supervisor",
       summary: "Create a run for collision testing.",
@@ -227,7 +227,7 @@ describe("lane-worktree-provisioner", () => {
     });
 
     // Act
-    const result = provisioner.provisionLaneWorktree({
+    const result = await provisioner.provisionLaneWorktree({
       runId: "run-collision",
       laneId: "lane-two",
       branch: "marceltuinstra/sc-398-shared-branch",
@@ -246,7 +246,7 @@ describe("lane-worktree-provisioner", () => {
     expect(system.createCount).toBe(1);
   });
 
-  it("reconciles drift, collisions, and orphaned managed worktrees", () => {
+  it("reconciles drift, collisions, and orphaned managed worktrees", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const repoRoot = path.join(rootDir, "repo");
@@ -258,7 +258,7 @@ describe("lane-worktree-provisioner", () => {
     const collisionPath = buildSupervisorManagedWorktreePath("run-reconcile", "lane-a", worktreeRootDir);
     const orphanPath = buildSupervisorManagedWorktreePath("run-reconcile", "lane-orphan", worktreeRootDir);
 
-    store.commitMutation("run-reconcile", {
+    await store.commitMutation("run-reconcile", {
       mutationId: "run-reconcile-create",
       actor: "supervisor",
       summary: "Create a run to reconcile.",
@@ -313,7 +313,7 @@ describe("lane-worktree-provisioner", () => {
     mkdirSync(orphanPath, { recursive: true });
 
     // Act
-    const report = provisioner.reconcileLaneWorktrees("run-reconcile");
+    const report = await provisioner.reconcileLaneWorktrees("run-reconcile");
 
     // Assert
     expect(report.isClean).toBe(false);
@@ -336,7 +336,7 @@ describe("lane-worktree-provisioner", () => {
     ]);
   });
 
-  it("releases a provisioned lane worktree and marks it as released in durable state", () => {
+  it("releases a provisioned lane worktree and marks it as released in durable state", async () => {
     // Arrange
     const rootDir = createTempRoot();
     const repoRoot = path.join(rootDir, "repo");
@@ -346,7 +346,7 @@ describe("lane-worktree-provisioner", () => {
     const system = createFakeSystem();
     const provisioner = createSupervisorLaneWorktreeProvisioner({ repoRoot, worktreeRootDir, store, system });
 
-    store.commitMutation("run-release", {
+    await store.commitMutation("run-release", {
       mutationId: "run-release-create",
       actor: "supervisor",
       summary: "Create a run before cleanup.",
@@ -358,7 +358,7 @@ describe("lane-worktree-provisioner", () => {
         createdAt: "2026-03-13T13:40:00.000Z"
       }
     });
-    const provisioned = provisioner.provisionLaneWorktree({
+    const provisioned = await provisioner.provisionLaneWorktree({
       runId: "run-release",
       laneId: "lane-release",
       branch: "marceltuinstra/sc-398-release",
@@ -370,14 +370,14 @@ describe("lane-worktree-provisioner", () => {
     });
 
     // Act
-    const result = provisioner.releaseLaneWorktree({
+    const result = await provisioner.releaseLaneWorktree({
       runId: "run-release",
       laneId: "lane-release",
       actor: "supervisor",
       mutationId: "lane-release-cleanup",
       occurredAt: "2026-03-13T13:42:00.000Z"
     });
-    const state = store.getRunState("run-release");
+    const state = await store.getRunState("run-release");
 
     // Assert
     expect(result.action).toBe("released");

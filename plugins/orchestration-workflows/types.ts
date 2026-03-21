@@ -66,6 +66,7 @@ export type SessionPolicy = {
     reasonCode?: "blocked.mcp-access";
     remediation?: readonly string[];
   }>;
+  supervisorMode?: boolean;
 };
 
 export type McpBlockResult = {

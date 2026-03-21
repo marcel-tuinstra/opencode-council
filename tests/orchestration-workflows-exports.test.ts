@@ -16,7 +16,12 @@ import {
 import {
   createFileBackedSupervisorStateStore,
   createSupervisorDispatchPlan,
-  DEFAULT_SUPERVISOR_PROFILE
+  DEFAULT_SUPERVISOR_PROFILE,
+  canTransitionChildSession,
+  createSupervisorEvent,
+  bridgeDelegationPlan,
+  evaluateRetryDecision,
+  CHILD_SESSION_TRANSITIONS
 } from "../plugins/orchestration-workflows-supervisor.js";
 import type {
   DelegationMode as SourceDelegationMode,
@@ -74,5 +79,24 @@ describe("orchestration workflow package barrels", () => {
     expect(supervisorRoot.createSupervisorDispatchPlan).toBe(createSupervisorDispatchPlan);
     expect(supervisorRoot.createFileBackedSupervisorStateStore).toBe(createFileBackedSupervisorStateStore);
     expect(supervisorRoot.DEFAULT_SUPERVISOR_PROFILE).toBe(DEFAULT_SUPERVISOR_PROFILE);
+  });
+
+  it("exports child-session lifecycle types and functions (Wave 1)", () => {
+    // ChildSessionState is a type – verify a representative value through the transition map
+    expect(CHILD_SESSION_TRANSITIONS).toHaveProperty("pending");
+    expect(CHILD_SESSION_TRANSITIONS).toHaveProperty("failed");
+    expect(typeof canTransitionChildSession).toBe("function");
+  });
+
+  it("exports supervisor event catalog functions (Wave 1)", () => {
+    expect(typeof createSupervisorEvent).toBe("function");
+  });
+
+  it("exports delegation bridge functions (Wave 2)", () => {
+    expect(typeof bridgeDelegationPlan).toBe("function");
+  });
+
+  it("exports retry decision evaluator from scheduler (Wave 3)", () => {
+    expect(typeof evaluateRetryDecision).toBe("function");
   });
 });

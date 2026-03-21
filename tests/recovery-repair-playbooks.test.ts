@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { SupervisorRunState } from "../plugins/orchestration-workflows/durable-state-store";
-import { classifySupervisorRecoveryPlaybook, getSupervisorLaneRecoveryContext } from "../plugins/orchestration-workflows/recovery-repair-playbooks";
+import {
+  classifySupervisorRecoveryPlaybook,
+  getSupervisorLaneRecoveryContext,
+  mapChildFailureToRecoveryClass
+} from "../plugins/orchestration-workflows/recovery-repair-playbooks";
 import type { SupervisorLaneWorktreeReconciliationReport } from "../plugins/orchestration-workflows/lane-worktree-provisioner";
+import type { ChildSessionFailureCode } from "../plugins/orchestration-workflows/child-session-lifecycle";
 
 const createRunState = (): SupervisorRunState => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   run: {
     runId: "run-recovery",
     status: "active",
@@ -86,6 +91,7 @@ const createRunState = (): SupervisorRunState => ({
       updatedAt: "2026-03-13T16:03:00.000Z"
     }
   ],
+  childSessions: [],
   appliedMutations: [],
   auditLog: []
 });
@@ -248,5 +254,28 @@ describe("recovery-repair-playbooks", () => {
     expect(playbook.classification.disposition).toBe("repair");
     expect(playbook.classification.reasons).toEqual(["Missing ready artifacts: pull-request, review-packet."]);
     expect(playbook.actions.map((action) => action.kind)).toEqual(["rebuild-artifacts", "reopen-review"]);
+  });
+
+  it("maps each ChildSessionFailureCode to the expected SupervisorRecoveryFailureClass", () => {
+    const expectedMappings: [ChildSessionFailureCode, string][] = [
+      ["heartbeat-timeout", "stuck-heartbeat"],
+      ["runtime-crash", "failed-session"],
+      ["tool-outage", "tool-outage"],
+      ["budget-exceeded", "failed-session"],
+      ["merge-conflict", "merge-conflict"],
+      ["cancelled-by-parent", "failed-session"],
+      ["unknown", "failed-session"],
+      ["partial-completion", "partial-completion"]
+    ];
+
+    for (const [failureCode, expectedClass] of expectedMappings) {
+      expect(mapChildFailureToRecoveryClass(failureCode)).toBe(expectedClass);
+    }
+  });
+
+  it("maps unrecognized failure codes to 'failed-session' as a fallback", () => {
+    // Force an unknown value through the type boundary to verify defensive behavior
+    const result = mapChildFailureToRecoveryClass("unknown" as ChildSessionFailureCode);
+    expect(result).toBe("failed-session");
   });
 });

@@ -6,6 +6,9 @@ import type {
   SupervisorStateStore,
   SupervisorWorktreeRecord
 } from "./durable-state-store";
+import type { ChildSessionRecord, ChildSessionState } from "./child-session-lifecycle";
+import { assertChildSessionTransition, canTransitionChildSession } from "./child-session-lifecycle";
+import { createSupervisorEvent, type SupervisorCorrelationContext, type SupervisorEvent } from "./supervisor-event-catalog";
 
 export const DEFAULT_SUPERVISOR_SESSION_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -48,8 +51,8 @@ export type AttachSupervisorRuntimeSessionInput = {
 
 export type SupervisorSessionRuntimeAdapter = {
   runtime: SupervisorSessionRuntimeKind;
-  launchSession(input: LaunchSupervisorRuntimeSessionInput): SupervisorRuntimeSessionSnapshot;
-  attachSession(input: AttachSupervisorRuntimeSessionInput): SupervisorRuntimeSessionSnapshot;
+  launchSession(input: LaunchSupervisorRuntimeSessionInput): Promise<SupervisorRuntimeSessionSnapshot>;
+  attachSession(input: AttachSupervisorRuntimeSessionInput): Promise<SupervisorRuntimeSessionSnapshot>;
 };
 
 export type SupervisorSessionBinding = {
@@ -124,6 +127,17 @@ export type DetectStalledSupervisorSessionInput = {
   summary?: string;
 };
 
+export type CancelSupervisorSessionInput = {
+  runId: string;
+  laneId: string;
+  actor: string;
+  mutationId: string;
+  occurredAt: string;
+  sessionId?: string;
+  cancelledReason?: string;
+  summary?: string;
+};
+
 export type SupervisorSessionLifecycleResultAction =
   | "launched"
   | "paused"
@@ -131,6 +145,7 @@ export type SupervisorSessionLifecycleResultAction =
   | "replaced"
   | "heartbeat-recorded"
   | "stalled"
+  | "cancelled"
   | "unchanged";
 
 export type SupervisorSessionLifecycleResult = {
@@ -142,18 +157,20 @@ export type SupervisorSessionLifecycleResult = {
 };
 
 export type SupervisorSessionLifecycle = {
-  getLaneSessionBinding(runId: string, laneId: string): SupervisorSessionBinding;
-  launchSession(input: LaunchSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  pauseSession(input: PauseSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  resumeSession(input: ResumeSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  replaceSession(input: ReplaceSupervisorSessionInput): SupervisorSessionLifecycleResult;
-  recordHeartbeat(input: RecordSupervisorSessionHeartbeatInput): SupervisorSessionLifecycleResult;
-  detectStalledSession(input: DetectStalledSupervisorSessionInput): SupervisorSessionLifecycleResult;
+  getLaneSessionBinding(runId: string, laneId: string): Promise<SupervisorSessionBinding>;
+  launchSession(input: LaunchSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  pauseSession(input: PauseSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  resumeSession(input: ResumeSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  replaceSession(input: ReplaceSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  recordHeartbeat(input: RecordSupervisorSessionHeartbeatInput): Promise<SupervisorSessionLifecycleResult>;
+  detectStalledSession(input: DetectStalledSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
+  cancelSession(input: CancelSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult>;
 };
 
 export type CreateSupervisorSessionLifecycleOptions = {
   store: SupervisorStateStore;
   runtime: SupervisorSessionRuntimeAdapter;
+  emitEvent?: (event: SupervisorEvent) => void;
 };
 
 const freezeRecord = <T extends Record<string, unknown>>(value: T): Readonly<T> => Object.freeze({ ...value });
@@ -194,9 +211,9 @@ const findSession = (state: SupervisorRunState, sessionId: string): SupervisorSe
   state.sessions.find((session) => session.sessionId === sessionId)
 );
 
-const resolveRunState = (store: SupervisorStateStore, runId: string): SupervisorRunState => {
+const resolveRunState = async (store: SupervisorStateStore, runId: string): Promise<SupervisorRunState> => {
   const normalizedRunId = assertNonEmpty(runId, "run id");
-  const state = store.getRunState(normalizedRunId);
+  const state = await store.getRunState(normalizedRunId);
 
   if (!state) {
     throw new Error(`Cannot manage sessions for unknown run '${normalizedRunId}'.`);
@@ -312,6 +329,58 @@ const resolveExistingSession = (
   return session;
 };
 
+const DEFAULT_CHILD_SESSION_HEARTBEAT_INTERVAL_MS = 30_000;
+const DEFAULT_CHILD_SESSION_MAX_RETRIES = 2;
+
+const buildChildSessionRecord = (
+  sessionId: string,
+  parentRunId: string,
+  laneId: string,
+  worktreeId: string,
+  state: ChildSessionState,
+  occurredAt: string,
+  owner?: string,
+  retryCount: number = 0,
+  maxRetries: number = DEFAULT_CHILD_SESSION_MAX_RETRIES
+): ChildSessionRecord => ({
+  sessionId,
+  parentRunId,
+  laneId,
+  worktreeId,
+  correlationId: `${parentRunId}:${laneId}:${sessionId}`,
+  state,
+  owner,
+  heartbeatIntervalMs: DEFAULT_CHILD_SESSION_HEARTBEAT_INTERVAL_MS,
+  heartbeatCount: 0,
+  retryCount,
+  maxRetries,
+  startedAt: occurredAt,
+  updatedAt: occurredAt
+});
+
+const findChildSession = (state: SupervisorRunState, sessionId: string): ChildSessionRecord | undefined => (
+  state.childSessions.find((cs) => cs.sessionId === sessionId)
+);
+
+const transitionChildSession = (
+  record: ChildSessionRecord,
+  to: ChildSessionState,
+  updatedAt: string,
+  updates: Partial<Pick<ChildSessionRecord, "lastHeartbeatAt" | "heartbeatCount" | "cancelledReason" | "completedAt">> = {}
+): ChildSessionRecord => {
+  assertChildSessionTransition(record.state, to);
+  return {
+    ...record,
+    previousState: record.state,
+    state: to,
+    lastHeartbeatAt: updates.lastHeartbeatAt ?? record.lastHeartbeatAt,
+    heartbeatCount: updates.heartbeatCount ?? record.heartbeatCount,
+    cancelledReason: updates.cancelledReason ?? record.cancelledReason,
+    completedAt: updates.completedAt ?? record.completedAt,
+    updatedAt
+  };
+};
+
 const validateLaunchableSession = (binding: SupervisorSessionBinding): void => {
   if (!binding.currentSession) {
     return;
@@ -330,19 +399,19 @@ export const createSupervisorSessionLifecycle = (
   const store = options.store;
   const runtime = options.runtime;
 
-  const getLaneSessionBinding = (runId: string, laneId: string): SupervisorSessionBinding => (
-    resolveLaneSessionBinding(resolveRunState(store, runId), laneId)
+  const getLaneSessionBinding = async (runId: string, laneId: string): Promise<SupervisorSessionBinding> => (
+    resolveLaneSessionBinding(await resolveRunState(store, runId), laneId)
   );
 
-  const launchSession = (input: LaunchSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const launchSession = async (input: LaunchSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
     const owner = assertNonEmpty(input.owner, "session owner");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     validateLaunchableSession(binding);
     const attempt = countLaneSessionAttempts(state, binding.lane.laneId, binding.worktree.worktreeId) + 1;
     const sessionId = buildSupervisorSessionId(state.run.runId, binding.lane.laneId, attempt);
-    const snapshot = runtime.launchSession({
+    const snapshot = await runtime.launchSession({
       runId: state.run.runId,
       laneId: binding.lane.laneId,
       worktreeId: binding.worktree.worktreeId,
@@ -353,16 +422,32 @@ export const createSupervisorSessionLifecycle = (
     });
     const lane = buildLaneRecord(binding.lane, sessionId, occurredAt);
     const session = buildSessionRecord(sessionId, binding, runtime, snapshot, occurredAt, occurredAt);
+    const childSession = buildChildSessionRecord(
+      sessionId,
+      state.run.runId,
+      binding.lane.laneId,
+      binding.worktree.worktreeId,
+      "launching",
+      occurredAt,
+      owner
+    );
 
-    store.commitMutation(state.run.runId, {
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Launch runtime session for lane '${binding.lane.laneId}'.`,
       occurredAt,
       laneUpserts: [lane],
       sessionUpserts: [session],
+      childSessionUpserts: [childSession],
       sideEffects: ["launched-session"]
     });
+
+    options.emitEvent?.(createSupervisorEvent("session.launched", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: sessionId
+    }));
 
     return {
       action: "launched",
@@ -372,13 +457,13 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const resumeSession = (input: ResumeSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const resumeSession = async (input: ResumeSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
     const owner = assertNonEmpty(input.owner, "session owner");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const existingSession = resolveExistingSession(binding, state, input.sessionId);
-    const snapshot = runtime.attachSession({
+    const snapshot = await runtime.attachSession({
       runId: state.run.runId,
       laneId: binding.lane.laneId,
       worktreeId: binding.worktree.worktreeId,
@@ -399,15 +484,28 @@ export const createSupervisorSessionLifecycle = (
       updatedAt: occurredAt
     });
 
-    store.commitMutation(state.run.runId, {
+    const childSessionUpserts: ChildSessionRecord[] = [];
+    const existingChildSession = findChildSession(state, existingSession.sessionId);
+    if (existingChildSession && canTransitionChildSession(existingChildSession.state, "active")) {
+      childSessionUpserts.push(transitionChildSession(existingChildSession, "active", occurredAt));
+    }
+
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Resume runtime session for lane '${binding.lane.laneId}'.`,
       occurredAt,
       laneUpserts: [lane],
       sessionUpserts: [session],
+      childSessionUpserts,
       sideEffects: ["attached-session"]
     });
+
+    options.emitEvent?.(createSupervisorEvent("session.resumed", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: existingSession.sessionId
+    }));
 
     return {
       action: "resumed",
@@ -417,9 +515,9 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const pauseSession = (input: PauseSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const pauseSession = async (input: PauseSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const existingSession = resolveExistingSession(binding, state, input.sessionId);
 
@@ -438,14 +536,27 @@ export const createSupervisorSessionLifecycle = (
       lastHeartbeatAt: existingSession.lastHeartbeatAt
     });
 
-    store.commitMutation(state.run.runId, {
+    const childSessionUpserts: ChildSessionRecord[] = [];
+    const existingChildSession = findChildSession(state, existingSession.sessionId);
+    if (existingChildSession && canTransitionChildSession(existingChildSession.state, "paused")) {
+      childSessionUpserts.push(transitionChildSession(existingChildSession, "paused", occurredAt));
+    }
+
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Pause runtime session for lane '${binding.lane.laneId}'.`,
       occurredAt,
       sessionUpserts: [pausedSession],
+      childSessionUpserts,
       sideEffects: ["paused-session"]
     });
+
+    options.emitEvent?.(createSupervisorEvent("session.paused", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: existingSession.sessionId
+    }));
 
     return {
       action: "paused",
@@ -455,15 +566,15 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const replaceSession = (input: ReplaceSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const replaceSession = async (input: ReplaceSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
     const owner = assertNonEmpty(input.owner, "session owner");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const previousSession = resolveExistingSession(binding, state);
     const attempt = countLaneSessionAttempts(state, binding.lane.laneId, binding.worktree.worktreeId) + 1;
     const sessionId = buildSupervisorSessionId(state.run.runId, binding.lane.laneId, attempt);
-    const snapshot = runtime.launchSession({
+    const snapshot = await runtime.launchSession({
       runId: state.run.runId,
       laneId: binding.lane.laneId,
       worktreeId: binding.worktree.worktreeId,
@@ -480,15 +591,44 @@ export const createSupervisorSessionLifecycle = (
       replacedBySessionId: sessionId
     });
 
-    store.commitMutation(state.run.runId, {
+    const childSessionUpserts: ChildSessionRecord[] = [];
+    const existingChildSession = findChildSession(state, previousSession.sessionId);
+    if (existingChildSession && canTransitionChildSession(existingChildSession.state, "cancelled")) {
+      childSessionUpserts.push(transitionChildSession(existingChildSession, "cancelled", occurredAt, {
+        cancelledReason: "Replaced by a newer runtime session."
+      }));
+    }
+    const accumulatedRetryCount = (existingChildSession?.retryCount ?? 0) + 1;
+    const inheritedMaxRetries = existingChildSession?.maxRetries ?? DEFAULT_CHILD_SESSION_MAX_RETRIES;
+    const newChildSession = buildChildSessionRecord(
+      sessionId,
+      state.run.runId,
+      binding.lane.laneId,
+      binding.worktree.worktreeId,
+      "launching",
+      occurredAt,
+      owner,
+      accumulatedRetryCount,
+      inheritedMaxRetries
+    );
+    childSessionUpserts.push(newChildSession);
+
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Replace runtime session for lane '${binding.lane.laneId}'.`,
       occurredAt,
       laneUpserts: [lane],
       sessionUpserts: [retiredSession, session],
+      childSessionUpserts,
       sideEffects: ["replaced-session"]
     });
+
+    options.emitEvent?.(createSupervisorEvent("session.retrying", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: sessionId
+    }, { replacedSessionId: previousSession.sessionId }));
 
     return {
       action: "replaced",
@@ -499,9 +639,9 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const recordHeartbeat = (input: RecordSupervisorSessionHeartbeatInput): SupervisorSessionLifecycleResult => {
+  const recordHeartbeat = async (input: RecordSupervisorSessionHeartbeatInput): Promise<SupervisorSessionLifecycleResult> => {
     const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const session = resolveExistingSession(binding, state, input.sessionId);
     const nextStatus = input.status ?? session.status;
@@ -520,14 +660,58 @@ export const createSupervisorSessionLifecycle = (
       updatedAt: occurredAt
     });
 
-    store.commitMutation(state.run.runId, {
+    const childSessionUpserts: ChildSessionRecord[] = [];
+    const existingChildSession = findChildSession(state, session.sessionId);
+    if (existingChildSession) {
+      const terminalChildState: ChildSessionState | undefined =
+        (input.status === "completed" || input.status === "failed") ? input.status : undefined;
+
+      if (terminalChildState && canTransitionChildSession(existingChildSession.state, terminalChildState)) {
+        childSessionUpserts.push(transitionChildSession(existingChildSession, terminalChildState, occurredAt, {
+          lastHeartbeatAt: occurredAt,
+          heartbeatCount: existingChildSession.heartbeatCount + 1,
+          completedAt: terminalChildState === "completed" ? occurredAt : undefined
+        }));
+      } else {
+        const nextChildState: ChildSessionState = existingChildSession.state === "launching" ? "active" : existingChildSession.state;
+        const shouldTransition = nextChildState !== existingChildSession.state;
+        if (shouldTransition) {
+          childSessionUpserts.push(transitionChildSession(existingChildSession, nextChildState, occurredAt, {
+            lastHeartbeatAt: occurredAt,
+            heartbeatCount: existingChildSession.heartbeatCount + 1
+          }));
+        } else {
+          childSessionUpserts.push({
+            ...existingChildSession,
+            lastHeartbeatAt: occurredAt,
+            heartbeatCount: existingChildSession.heartbeatCount + 1,
+            updatedAt: occurredAt
+          });
+        }
+      }
+    }
+
+    const stateChanged = nextStatus !== session.status
+      || nextOwner !== session.owner
+      || nextHeartbeatAt !== session.lastHeartbeatAt;
+
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Record heartbeat for lane '${binding.lane.laneId}' session '${session.sessionId}'.`,
       occurredAt,
       sessionUpserts: [nextSession],
+      childSessionUpserts,
       sideEffects: ["recorded-session-heartbeat"]
     });
+
+    if (stateChanged) {
+      options.emitEvent?.(createSupervisorEvent("session.heartbeat", {
+        parentRunId: input.runId,
+        laneId: binding.lane.laneId,
+        sessionId: session.sessionId
+      }));
+    }
 
     return {
       action: "heartbeat-recorded",
@@ -537,9 +721,9 @@ export const createSupervisorSessionLifecycle = (
     };
   };
 
-  const detectStalledSession = (input: DetectStalledSupervisorSessionInput): SupervisorSessionLifecycleResult => {
+  const detectStalledSession = async (input: DetectStalledSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
     const observedAt = assertTimestamp(input.observedAt, "stall observation timestamp");
-    const state = resolveRunState(store, input.runId);
+    const state = await resolveRunState(store, input.runId);
     const binding = resolveLaneSessionBinding(state, input.laneId);
     const session = resolveExistingSession(binding, state);
 
@@ -573,20 +757,96 @@ export const createSupervisorSessionLifecycle = (
       failureReason: input.failureReason ?? `Heartbeat exceeded stall timeout after ${stallTimeoutMs}ms.`
     });
 
-    store.commitMutation(state.run.runId, {
+    const childSessionUpserts: ChildSessionRecord[] = [];
+    const existingChildSession = findChildSession(state, session.sessionId);
+    if (existingChildSession && canTransitionChildSession(existingChildSession.state, "stalled")) {
+      childSessionUpserts.push(transitionChildSession(existingChildSession, "stalled", observedAt));
+    }
+
+    await store.commitMutation(state.run.runId, {
       mutationId: input.mutationId,
       actor: input.actor,
       summary: input.summary ?? `Mark lane '${binding.lane.laneId}' session '${session.sessionId}' as stalled.`,
       occurredAt: observedAt,
       sessionUpserts: [stalledSession],
+      childSessionUpserts,
       sideEffects: ["stalled-session"]
     });
+
+    options.emitEvent?.(createSupervisorEvent("session.stalled", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: session.sessionId
+    }, { lastHeartbeatAt, elapsed: elapsedMs }));
 
     return {
       action: "stalled",
       lane: binding.lane,
       worktree: binding.worktree,
       session: stalledSession
+    };
+  };
+
+  const cancelSession = async (input: CancelSupervisorSessionInput): Promise<SupervisorSessionLifecycleResult> => {
+    const occurredAt = assertTimestamp(input.occurredAt, "mutation timestamp");
+    const state = await resolveRunState(store, input.runId);
+    const binding = resolveLaneSessionBinding(state, input.laneId);
+    const existingSession = resolveExistingSession(binding, state, input.sessionId);
+
+    if (existingSession.status === "completed" || existingSession.status === "failed" || existingSession.status === "replaced") {
+      return {
+        action: "unchanged",
+        lane: binding.lane,
+        worktree: binding.worktree,
+        session: existingSession
+      };
+    }
+
+    const cancelledReason = input.cancelledReason ?? "Cancelled by supervisor.";
+
+    const cancelledSupervisorSession = replaceSessionRecord(existingSession, "failed", occurredAt, {
+      failureReason: cancelledReason
+    });
+
+    const childSessionUpserts: ChildSessionRecord[] = [];
+    const existingChildSession = findChildSession(state, existingSession.sessionId);
+    if (existingChildSession) {
+      if (canTransitionChildSession(existingChildSession.state, "cancelling")) {
+        const cancellingChild = transitionChildSession(existingChildSession, "cancelling", occurredAt, {
+          cancelledReason
+        });
+        const cancelledChild = transitionChildSession(cancellingChild, "cancelled", occurredAt, {
+          cancelledReason
+        });
+        childSessionUpserts.push(cancelledChild);
+      } else if (canTransitionChildSession(existingChildSession.state, "cancelled")) {
+        childSessionUpserts.push(transitionChildSession(existingChildSession, "cancelled", occurredAt, {
+          cancelledReason
+        }));
+      }
+    }
+
+    await store.commitMutation(state.run.runId, {
+      mutationId: input.mutationId,
+      actor: input.actor,
+      summary: input.summary ?? `Cancel runtime session for lane '${binding.lane.laneId}'.`,
+      occurredAt,
+      sessionUpserts: [cancelledSupervisorSession],
+      childSessionUpserts,
+      sideEffects: ["cancelled-session"]
+    });
+
+    options.emitEvent?.(createSupervisorEvent("session.cancelled", {
+      parentRunId: input.runId,
+      laneId: binding.lane.laneId,
+      sessionId: existingSession.sessionId
+    }, { reason: cancelledReason }));
+
+    return {
+      action: "cancelled",
+      lane: binding.lane,
+      worktree: binding.worktree,
+      session: cancelledSupervisorSession
     };
   };
 
@@ -597,7 +857,8 @@ export const createSupervisorSessionLifecycle = (
     resumeSession,
     replaceSession,
     recordHeartbeat,
-    detectStalledSession
+    detectStalledSession,
+    cancelSession
   };
 };
 

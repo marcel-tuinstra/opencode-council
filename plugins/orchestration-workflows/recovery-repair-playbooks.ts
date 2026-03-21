@@ -1,4 +1,5 @@
 import type { SupervisorApprovalBoundary, SupervisorApprovalGateRequest } from "./approval-gates";
+import type { ChildSessionFailureCode } from "./child-session-lifecycle";
 import type {
   SupervisorApprovalRecord,
   SupervisorArtifactRecord,
@@ -495,3 +496,20 @@ export const classifySupervisorRecoveryPlaybook = (
     ]
   );
 };
+
+// ── Child failure → supervisor recovery class mapping ───────────────────────
+
+const CHILD_FAILURE_TO_RECOVERY_CLASS: Readonly<Record<ChildSessionFailureCode, SupervisorRecoveryFailureClass>> = {
+  "heartbeat-timeout": "stuck-heartbeat",
+  "runtime-crash": "failed-session",
+  "tool-outage": "tool-outage",
+  "budget-exceeded": "failed-session",
+  "merge-conflict": "merge-conflict",
+  "cancelled-by-parent": "failed-session",
+  "unknown": "failed-session",
+  "partial-completion": "partial-completion"
+};
+
+export const mapChildFailureToRecoveryClass = (
+  failureCode: ChildSessionFailureCode
+): SupervisorRecoveryFailureClass => CHILD_FAILURE_TO_RECOVERY_CLASS[failureCode] ?? "failed-session";

@@ -10,7 +10,7 @@ const packageJsonPath = fileURLToPath(new URL("../package.json", import.meta.url
 const cliPath = fileURLToPath(new URL("../bin/cli.mjs", import.meta.url));
 
 describe("public contract guardrails", () => {
-  it("keeps the package entry points stable for 0.5.x", () => {
+  it("keeps the package entry points stable for 0.6.x", () => {
     const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
       name: string;
       exports: Record<string, string>;
