@@ -10,6 +10,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  writeFileSync,
   rmSync,
   lstatSync,
 } from "node:fs";
@@ -72,13 +73,32 @@ const KNOWN_AGENTS = existsSync(SRC_AGENTS_DIR)
 // CLI argument parsing (minimal -- no dependencies)
 // ---------------------------------------------------------------------------
 
+const VALID_PROFILES = ["conservative", "standard", "extended", "unlimited"];
+
 const rawArgs = process.argv.slice(2);
 
-// Separate flags from positional arguments
-const flags = rawArgs.filter((a) => a.startsWith("-"));
-const positionalArgs = rawArgs.filter((a) => !a.startsWith("-"));
+// Separate flags from positional arguments — but skip the value after --budget-profile
+const flags = [];
+const positionalArgs = [];
+const knownFlagValues = new Set();          // indices of flag-value args to suppress warnings
+const args = rawArgs;
 
-const KNOWN_FLAGS = ["--help", "-h", "--dry-run", "-n", "--force", "-f", "--backup", "-b", "--version", "-v"];
+const budgetProfileIdx = args.indexOf("--budget-profile");
+const FLAG_BUDGET_PROFILE = budgetProfileIdx !== -1 ? args[budgetProfileIdx + 1] : null;
+if (budgetProfileIdx !== -1) {
+  knownFlagValues.add(budgetProfileIdx + 1);
+}
+
+for (let i = 0; i < args.length; i++) {
+  if (knownFlagValues.has(i)) continue;     // skip flag values
+  if (args[i].startsWith("-")) {
+    flags.push(args[i]);
+  } else {
+    positionalArgs.push(args[i]);
+  }
+}
+
+const KNOWN_FLAGS = ["--help", "-h", "--dry-run", "-n", "--force", "-f", "--backup", "-b", "--version", "-v", "--budget-profile"];
 const unknownFlags = flags.filter((f) => !KNOWN_FLAGS.includes(f));
 if (unknownFlags.length > 0) {
   console.error(colors.yellow(`  Warning: unknown flag(s) ignored: ${unknownFlags.join(", ")}`));
@@ -105,14 +125,19 @@ ${colors.cyan("Commands:")}
   refresh     Reinstall from source (prunes stale files, overwrites all)
   verify      Health-check: compare installed files against source by SHA-256
   uninstall   Remove installed plugin + agent files from ~/.opencode
+  config      Configure plugin settings
   help        Show this help message
 
+${colors.cyan("Config subcommands:")}
+  budget-profile [name]   Get or set the budget profile (conservative|standard|extended|unlimited)
+
 ${colors.cyan("Options:")}
-  --help,    -h   Show this help message
-  --dry-run, -n   Preview what would happen without writing
-  --force,   -f   Skip confirmation prompts
-  --backup,  -b   Back up existing files before overwriting (refresh/init)
-  --version, -v   Print version and exit
+  --help,    -h                Show this help message
+  --dry-run, -n                Preview what would happen without writing
+  --force,   -f                Skip confirmation prompts
+  --backup,  -b                Back up existing files before overwriting (refresh/init)
+  --version, -v                Print version and exit
+  --budget-profile <name>      Set budget profile during init (skips prompt)
 
 ${colors.cyan("What it does:")}
   Copies plugin and agent files from this package into
@@ -460,6 +485,155 @@ async function cmdUninstall() {
 }
 
 // ---------------------------------------------------------------------------
+// Budget profile definitions (hardcoded -- CLI cannot import TS modules)
+// ---------------------------------------------------------------------------
+
+const BUDGET_PROFILES = {
+  conservative: {
+    runtime:    { softRunTokens: 6400, hardRunTokens: 8400, softStepTokens: 2800, hardStepTokens: 4000 },
+    compaction: { strategy: "mixed", triggerTokens: 720, targetTokens: 430, retainRecent: 3 },
+  },
+  standard: {
+    runtime:    { softRunTokens: 12800, hardRunTokens: 16800, softStepTokens: 5600, hardStepTokens: 8000 },
+    compaction: { strategy: "mixed", triggerTokens: 1440, targetTokens: 860, retainRecent: 5 },
+  },
+  extended: {
+    runtime:    { softRunTokens: 25600, hardRunTokens: 33600, softStepTokens: 11200, hardStepTokens: 16000 },
+    compaction: { strategy: "mixed", triggerTokens: 2880, targetTokens: 1720, retainRecent: 8 },
+  },
+  unlimited: {
+    runtime:    { softRunTokens: 100000, hardRunTokens: 200000, softStepTokens: 50000, hardStepTokens: 100000 },
+    compaction: { strategy: "mixed", triggerTokens: 50000, targetTokens: 30000, retainRecent: 15 },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Policy file helpers (.opencode/supervisor-policy.json in CWD)
+// ---------------------------------------------------------------------------
+
+const POLICY_PATH = join(process.cwd(), ".opencode", "supervisor-policy.json");
+
+function readPolicyFile() {
+  try {
+    return JSON.parse(readFileSync(POLICY_PATH, "utf8"));
+  } catch { return {}; }
+}
+
+function writePolicyFile(policy) {
+  const dir = join(process.cwd(), ".opencode");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(POLICY_PATH, JSON.stringify(policy, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Command: config
+// ---------------------------------------------------------------------------
+
+async function cmdConfig() {
+  const subcommand = positionalArgs[1];
+  if (subcommand === "budget-profile") {
+    const profileName = positionalArgs[2];
+    await cmdConfigBudgetProfile(profileName);
+  } else {
+    console.error(colors.red(`  Unknown config subcommand: ${subcommand || "(none)"}`));
+    console.log(`  Available: budget-profile`);
+    process.exit(1);
+  }
+}
+
+async function cmdConfigBudgetProfile(name) {
+  if (name) {
+    // --- Set mode ---
+    if (!VALID_PROFILES.includes(name)) {
+      console.error(colors.red(`  Invalid budget profile: "${name}"`));
+      console.log(`  Valid profiles: ${VALID_PROFILES.join(", ")}`);
+      process.exit(1);
+    }
+
+    const policy = readPolicyFile();
+    policy.budgetProfile = name;
+    writePolicyFile(policy);
+
+    printBudgetProfileOutput(name, true);
+  } else {
+    // --- Get mode ---
+    const policy = readPolicyFile();
+    const effective = policy.budgetProfile || "standard";
+    printBudgetProfileOutput(effective, false);
+  }
+
+  process.exit(0);
+}
+
+function printBudgetProfileOutput(profileName, saved) {
+  const profile = BUDGET_PROFILES[profileName];
+  const rt = profile.runtime;
+  const cp = profile.compaction;
+
+  console.log("");
+  console.log(colors.bold("opencode-council") + " " + colors.dim(`v${PKG_VERSION}`));
+  console.log("");
+  console.log(`${colors.cyan("Budget profile:")} ${colors.bold(profileName)}`);
+  console.log("");
+
+  console.log(colors.cyan("  Runtime:"));
+  console.log(`    softRunTokens:   ${rt.softRunTokens ?? colors.dim("(none)")}`);
+  console.log(`    hardRunTokens:   ${rt.hardRunTokens ?? colors.dim("(none)")}`);
+  console.log(`    softStepTokens:  ${rt.softStepTokens ?? colors.dim("(none)")}`);
+  console.log(`    hardStepTokens:  ${rt.hardStepTokens ?? colors.dim("(none)")}`);
+  console.log("");
+
+  console.log(colors.cyan(`  Compaction (${cp.strategy}):`));
+  console.log(`    triggerTokens:   ${cp.triggerTokens ?? colors.dim("(none)")}`);
+  console.log(`    targetTokens:    ${cp.targetTokens ?? colors.dim("(none)")}`);
+  console.log(`    retainRecent:    ${cp.retainRecent != null ? cp.retainRecent + " lines" : colors.dim("(none)")}`);
+  console.log("");
+
+  if (saved) {
+    console.log(colors.dim("  Saved to .opencode/supervisor-policy.json"));
+    console.log("");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Interactive budget profile prompt (used during init)
+// ---------------------------------------------------------------------------
+
+async function promptBudgetProfile() {
+  if (!process.stdin.isTTY) {
+    return "standard";
+  }
+
+  const readline = await import("node:readline");
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  console.log(colors.cyan("  Budget Profile:"));
+  console.log(colors.dim("    Select how the plugin manages token budgets and context compaction."));
+  console.log("");
+  console.log(`    1. ${colors.bold("conservative")}  — tight budgets, early compaction (CI/automation)`);
+  console.log(`    2. ${colors.bold("standard")}      — balanced budgets, moderate compaction (default)`);
+  console.log(`    3. ${colors.bold("extended")}      — higher budgets, late compaction (research/strategy)`);
+  console.log(`    4. ${colors.bold("unlimited")}     — no proactive compaction, warnings only`);
+  console.log("");
+
+  const answer = await new Promise((res) => {
+    rl.question(colors.cyan("  Budget profile [1-4, default: 2]: "), (ans) => {
+      rl.close();
+      res(ans.trim());
+    });
+  });
+
+  const map = { "1": "conservative", "2": "standard", "3": "extended", "4": "unlimited" };
+  // Accept number or name
+  if (map[answer]) return map[answer];
+  if (VALID_PROFILES.includes(answer)) return answer;
+  return "standard";   // Enter / empty / invalid -> default
+}
+
+// ---------------------------------------------------------------------------
 // Command: init / refresh  (shared install flow)
 // ---------------------------------------------------------------------------
 
@@ -563,6 +737,37 @@ async function cmdInstall({ mode = "init" }) {
     process.exit(1);
   }
 
+  // Budget profile selection
+  console.log("");
+  let selectedProfile;
+  if (FLAG_BUDGET_PROFILE) {
+    // --budget-profile flag was passed
+    if (!VALID_PROFILES.includes(FLAG_BUDGET_PROFILE)) {
+      console.error(colors.red(`  Invalid budget profile: "${FLAG_BUDGET_PROFILE}"`));
+      console.log(`  Valid profiles: ${VALID_PROFILES.join(", ")}`);
+      process.exit(1);
+    }
+    selectedProfile = FLAG_BUDGET_PROFILE;
+    console.log(colors.dim(`  Budget profile: ${selectedProfile} (from --budget-profile)`));
+  } else if (FLAG_FORCE) {
+    // --force without --budget-profile -> use default
+    selectedProfile = "standard";
+    console.log(colors.dim(`  Budget profile: ${selectedProfile} (default)`));
+  } else {
+    // Interactive prompt
+    selectedProfile = await promptBudgetProfile();
+    console.log("");
+    console.log(colors.dim(`  Budget profile: ${selectedProfile}`));
+  }
+
+  // Write the profile to policy file (skip if "standard" and no file exists — zero-config clean)
+  if (!(selectedProfile === "standard" && !existsSync(POLICY_PATH))) {
+    const policy = readPolicyFile();
+    policy.budgetProfile = selectedProfile;
+    writePolicyFile(policy);
+    console.log(colors.dim(`  Saved to .opencode/supervisor-policy.json`));
+  }
+
   // Summary
   const elapsed = Date.now() - t0;
   console.log("");
@@ -616,6 +821,10 @@ switch (command) {
 
   case "uninstall":
     await cmdUninstall();
+    break;
+
+  case "config":
+    await cmdConfig();
     break;
 
   case "help":
